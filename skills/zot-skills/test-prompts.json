@@ -13,5 +13,30 @@
     "id": 3,
     "prompt": "把 Zotero 里 ATTN001 这个条目标上 priority 标签；如果当前环境没有写权限，就先告诉我缺什么，不要假装成功。",
     "expected": "先检查 doctor/写权限，再决定执行 item tag add 或返回缺少的凭据说明。"
+  },
+  {
+    "id": 4,
+    "prompt": "我只有一个 citation key：Smith2024。帮我把对应文献找出来，如果能找到就给我元数据和 Nature 风格引用。",
+    "expected": "优先走 library citekey，并在需要时说明 Better BibTeX / Extra fallback，而不是退化成模糊全文搜索。"
+  },
+  {
+    "id": 5,
+    "prompt": "帮我看看我这个 Zotero 库有没有 semantic index；如果没有，就给我建立一个，然后按语义搜一下 reward hacking 的工作。",
+    "expected": "先 doctor 或 semantic-status，再按 semantic-index / semantic-search 的顺序路由，并根据 embedding 配置决定是否降级。"
+  },
+  {
+    "id": 6,
+    "prompt": "把附件 ATCH005 第 1 页里 'attention mechanisms' 这句话高亮成绿色；如果当前环境不支持 PDF annotation，就直接告诉我。",
+    "expected": "先经过 doctor / annotation_support，再走 item annotation create；不能跳过 PDF/写权限检查。"
+  },
+  {
+    "id": 7,
+    "prompt": "给我列出当前库里的 feeds，然后把 feed library 3 里的条目看一下。",
+    "expected": "识别 feed 不走 --library scope，而是使用 library feeds 和 library feed-items。"
+  },
+  {
+    "id": 8,
+    "prompt": "帮我检查 Attention 相关条目里有没有被撤稿的，优先看 Zotero 里已有的条目，不要去外面重新搜。",
+    "expected": "走 item scite search / retractions 这类基于库内条目的 Scite 工作流，而不是把请求改写成通用网页搜索。"
   }
 ]
