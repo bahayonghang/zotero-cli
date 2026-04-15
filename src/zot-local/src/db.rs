@@ -8,8 +8,9 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use strsim::normalized_levenshtein;
 use tempfile::TempDir;
 use zot_core::{
-    Attachment, Collection, Creator, DuplicateGroup, Item, LibraryScope, LibraryStats, Note,
-    SearchResult, ZotError, ZotResult,
+    AnnotationRecord, Attachment, ChildItem, CitationKeyMatch, Collection, Creator, DuplicateGroup,
+    FeedInfo, Item, LibraryInfo, LibraryScope, LibraryStats, Note, NoteSearchResult, SearchResult,
+    TagSummary, ZotError, ZotResult,
 };
 
 use crate::citation::export_item;
@@ -30,11 +31,21 @@ pub enum SortDirection {
     Desc,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DuplicateMatchMethod {
+    Title,
+    Doi,
+    Both,
+}
+
 #[derive(Debug, Clone)]
 pub struct SearchOptions {
     pub query: String,
     pub collection: Option<String>,
     pub item_type: Option<String>,
+    pub tag: Option<String>,
+    pub creator: Option<String>,
+    pub year: Option<String>,
     pub sort: Option<SortField>,
     pub direction: SortDirection,
     pub limit: usize,
@@ -47,6 +58,9 @@ impl Default for SearchOptions {
             query: String::new(),
             collection: None,
             item_type: None,
+            tag: None,
+            creator: None,
+            year: None,
             sort: None,
             direction: SortDirection::Desc,
             limit: 50,
@@ -203,6 +217,39 @@ impl LocalLibrary {
             }
         }
 
+        if let Some(tag) = options.tag.as_deref() {
+            let tag_lc = tag.to_lowercase();
+            item_ids.retain(|item_id| {
+                self.get_item_tags(*item_id)
+                    .map(|tags| {
+                        tags.iter()
+                            .any(|existing| existing.to_lowercase() == tag_lc)
+                    })
+                    .unwrap_or(false)
+            });
+        }
+
+        if let Some(creator) = options.creator.as_deref() {
+            let creator_lc = creator.to_lowercase();
+            item_ids.retain(|item_id| {
+                self.get_item_creators(*item_id)
+                    .map(|creators| {
+                        creators.iter().any(|existing| {
+                            existing.full_name().to_lowercase().contains(&creator_lc)
+                        })
+                    })
+                    .unwrap_or(false)
+            });
+        }
+
+        if let Some(year) = options.year.as_deref() {
+            item_ids.retain(|item_id| {
+                self.get_item_by_id(*item_id)
+                    .map(|item| item.date.as_deref().unwrap_or_default().starts_with(year))
+                    .unwrap_or(false)
+            });
+        }
+
         let total = item_ids.len();
         let mut items = self.get_items_batch(&item_ids.into_iter().collect::<Vec<_>>())?;
         sort_items(&mut items, options.sort, options.direction);
@@ -269,6 +316,254 @@ impl LocalLibrary {
             });
         }
         Ok(notes)
+    }
+
+    pub fn search_notes(&self, query: &str, limit: usize) -> ZotResult<Vec<NoteSearchResult>> {
+        let pattern = format!("%{query}%");
+        let title_field_id = self.field_id("title")?.unwrap_or(4);
+        let sql = format!(
+            "SELECT i.key, n.note, n.title, pi.key, pdv.value
+             FROM itemNotes n
+             JOIN items i ON n.itemID = i.itemID
+             LEFT JOIN items pi ON n.parentItemID = pi.itemID
+             LEFT JOIN itemData pd ON pi.itemID = pd.itemID AND pd.fieldID = {title_field_id}
+             LEFT JOIN itemDataValues pdv ON pd.valueID = pdv.valueID
+             WHERE n.note LIKE ?1
+             AND i.libraryID = ?2
+             AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
+             LIMIT ?3"
+        );
+        let mut stmt = self.conn.prepare(&sql).map_err(sql_err("search-notes"))?;
+        let rows = stmt
+            .query_map(params![pattern, self.library_id, limit as i64], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            })
+            .map_err(sql_err("search-notes"))?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            let (key, note_html, title, parent_key, parent_title) =
+                row.map_err(sql_err("search-notes"))?;
+            let clean = html_to_text(&note_html);
+            if !clean.to_lowercase().contains(&query.to_lowercase()) {
+                continue;
+            }
+            let tags = if let Some(item_id) = self.item_id_by_key(&key)? {
+                self.get_item_tags(item_id)?
+            } else {
+                Vec::new()
+            };
+            results.push(NoteSearchResult {
+                key,
+                parent_key,
+                parent_title,
+                title,
+                content: clean,
+                tags,
+            });
+        }
+        Ok(results)
+    }
+
+    pub fn get_tags(&self) -> ZotResult<Vec<TagSummary>> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT t.name, COUNT(*) as cnt
+                 FROM itemTags it
+                 JOIN tags t ON it.tagID = t.tagID
+                 JOIN items i ON it.itemID = i.itemID
+                 WHERE i.libraryID = ?1
+                 GROUP BY t.tagID, t.name
+                 ORDER BY cnt DESC, t.name ASC",
+            )
+            .map_err(sql_err("get-tags"))?;
+        let rows = stmt
+            .query_map(params![self.library_id], |row| {
+                Ok(TagSummary {
+                    name: row.get::<_, String>(0)?,
+                    count: row.get::<_, i64>(1)? as usize,
+                })
+            })
+            .map_err(sql_err("get-tags"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("get-tags"))
+    }
+
+    pub fn search_by_citation_key(&self, citekey: &str) -> ZotResult<Option<CitationKeyMatch>> {
+        let field_id = self.field_id("extra")?;
+        let Some(field_id) = field_id else {
+            return Ok(None);
+        };
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT i.key, iv.value
+                 FROM items i
+                 JOIN itemData id ON i.itemID = id.itemID
+                 JOIN itemDataValues iv ON id.valueID = iv.valueID
+                 WHERE i.libraryID = ?1 AND id.fieldID = ?2",
+            )
+            .map_err(sql_err("search-citation-key"))?;
+        let rows = stmt
+            .query_map(params![self.library_id, field_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(sql_err("search-citation-key"))?;
+        for row in rows {
+            let (item_key, extra) = row.map_err(sql_err("search-citation-key"))?;
+            for line in extra.lines() {
+                let normalized = line.trim().to_lowercase();
+                if (normalized.starts_with("citation key:")
+                    || normalized.starts_with("citationkey:"))
+                    && line
+                        .split_once(':')
+                        .map(|(_, value)| value.trim() == citekey)
+                        .unwrap_or(false)
+                    && let Some(item) = self.get_item(&item_key)?
+                {
+                    return Ok(Some(CitationKeyMatch {
+                        citekey: citekey.to_string(),
+                        source: "extra".to_string(),
+                        item,
+                    }));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn get_item_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
+        let mut children = Vec::new();
+        children.extend(self.get_note_children(key)?);
+        children.extend(self.get_attachment_children(key)?);
+        children.extend(self.get_annotation_children(key)?);
+        Ok(children)
+    }
+
+    pub fn get_items_children(
+        &self,
+        keys: &[String],
+    ) -> ZotResult<BTreeMap<String, Vec<ChildItem>>> {
+        let mut grouped = BTreeMap::new();
+        for key in keys {
+            grouped.insert(key.clone(), self.get_item_children(key)?);
+        }
+        Ok(grouped)
+    }
+
+    pub fn get_annotations(
+        &self,
+        item_key: Option<&str>,
+        limit: usize,
+    ) -> ZotResult<Vec<AnnotationRecord>> {
+        if !self.table_exists("itemAnnotations")? {
+            return Ok(Vec::new());
+        }
+        let mut results = if let Some(item_key) = item_key {
+            self.get_annotation_children(item_key)?
+                .into_iter()
+                .map(child_to_annotation_record)
+                .collect::<Vec<_>>()
+        } else {
+            let title_field_id = self.field_id("title")?.unwrap_or(4);
+            let sql = format!(
+                "SELECT i.key, ia.text, ia.comment, ia.color, ia.pageLabel, ia.type,
+                        att.key, gpi.key, gpdv.value
+                 FROM itemAnnotations ia
+                 JOIN items i ON ia.itemID = i.itemID
+                 LEFT JOIN items att ON ia.parentItemID = att.itemID
+                 LEFT JOIN itemAttachments iatt ON ia.parentItemID = iatt.itemID
+                 LEFT JOIN items gpi ON iatt.parentItemID = gpi.itemID
+                 LEFT JOIN itemData gpd ON gpi.itemID = gpd.itemID AND gpd.fieldID = {title_field_id}
+                 LEFT JOIN itemDataValues gpdv ON gpd.valueID = gpdv.valueID
+                 WHERE i.libraryID = ?1
+                 AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
+                 ORDER BY i.key ASC
+                 LIMIT ?2"
+            );
+            let mut stmt = self
+                .conn
+                .prepare(&sql)
+                .map_err(sql_err("get-annotations"))?;
+            let rows = stmt
+                .query_map(params![self.library_id, limit as i64], |row| {
+                    Ok(AnnotationRecord {
+                        key: row.get::<_, String>(0)?,
+                        parent_key: row.get::<_, Option<String>>(7)?,
+                        parent_title: row.get::<_, Option<String>>(8)?,
+                        attachment_key: row.get::<_, Option<String>>(6)?,
+                        attachment_title: None,
+                        annotation_type: annotation_type_name(row.get::<_, i64>(5)?),
+                        text: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                        comment: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                        color: row.get::<_, Option<String>>(3)?,
+                        page_label: row.get::<_, Option<String>>(4)?,
+                        tags: Vec::new(),
+                    })
+                })
+                .map_err(sql_err("get-annotations"))?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(sql_err("get-annotations"))?
+        };
+        results.truncate(limit);
+        Ok(results)
+    }
+
+    pub fn search_annotations(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> ZotResult<Vec<AnnotationRecord>> {
+        if !self.table_exists("itemAnnotations")? {
+            return Ok(Vec::new());
+        }
+        let pattern = format!("%{query}%");
+        let title_field_id = self.field_id("title")?.unwrap_or(4);
+        let sql = format!(
+            "SELECT i.key, ia.text, ia.comment, ia.color, ia.pageLabel, ia.type,
+                    att.key, gpi.key, gpdv.value
+             FROM itemAnnotations ia
+             JOIN items i ON ia.itemID = i.itemID
+             LEFT JOIN items att ON ia.parentItemID = att.itemID
+             LEFT JOIN itemAttachments iatt ON ia.parentItemID = iatt.itemID
+             LEFT JOIN items gpi ON iatt.parentItemID = gpi.itemID
+             LEFT JOIN itemData gpd ON gpi.itemID = gpd.itemID AND gpd.fieldID = {title_field_id}
+             LEFT JOIN itemDataValues gpdv ON gpd.valueID = gpdv.valueID
+             WHERE (ia.text LIKE ?1 OR ia.comment LIKE ?1)
+             AND i.libraryID = ?2
+             AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
+             LIMIT ?3"
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(sql_err("search-annotations"))?;
+        let rows = stmt
+            .query_map(params![pattern, self.library_id, limit as i64], |row| {
+                Ok(AnnotationRecord {
+                    key: row.get::<_, String>(0)?,
+                    parent_key: row.get::<_, Option<String>>(7)?,
+                    parent_title: row.get::<_, Option<String>>(8)?,
+                    attachment_key: row.get::<_, Option<String>>(6)?,
+                    attachment_title: None,
+                    annotation_type: annotation_type_name(row.get::<_, i64>(5)?),
+                    text: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                    comment: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                    color: row.get::<_, Option<String>>(3)?,
+                    page_label: row.get::<_, Option<String>>(4)?,
+                    tags: Vec::new(),
+                })
+            })
+            .map_err(sql_err("search-annotations"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("search-annotations"))
     }
 
     pub fn get_collections(&self) -> ZotResult<Vec<Collection>> {
@@ -355,6 +650,19 @@ impl LocalLibrary {
             .collect())
     }
 
+    pub fn search_collections(&self, query: &str, limit: usize) -> ZotResult<Vec<Collection>> {
+        let query_lc = query.to_lowercase();
+        let mut flattened = Vec::new();
+        for collection in self.get_collections()? {
+            flatten_collection_tree(&collection, &mut flattened);
+        }
+        Ok(flattened
+            .into_iter()
+            .filter(|collection| collection.name.to_lowercase().contains(&query_lc))
+            .take(limit)
+            .collect())
+    }
+
     pub fn get_collection_items(&self, collection_key: &str) -> ZotResult<Vec<Item>> {
         let collection_id = self.resolve_collection_id(collection_key)?;
         let mut stmt = self
@@ -368,6 +676,158 @@ impl LocalLibrary {
             .collect::<Result<Vec<_>, _>>()
             .map_err(sql_err("get-collection-items"))?;
         self.get_items_batch(&item_ids)
+    }
+
+    pub fn get_libraries(&self) -> ZotResult<Vec<LibraryInfo>> {
+        if !self.table_exists("libraries")? {
+            return Ok(Vec::new());
+        }
+        let feeds_available = self.table_exists("feeds")?;
+        let feed_join = if feeds_available {
+            "LEFT JOIN feeds f ON l.libraryID = f.libraryID"
+        } else {
+            ""
+        };
+        let query = format!(
+            "SELECT l.libraryID, l.type, l.editable, l.filesEditable,
+                    g.groupID, g.name, g.description,
+                    {} AS feedName, {} AS feedUrl,
+                    (SELECT COUNT(*)
+                     FROM items i
+                     JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+                     WHERE i.libraryID = l.libraryID
+                     AND it.typeName NOT IN ('attachment', 'note', 'annotation')) as itemCount
+             FROM libraries l
+             LEFT JOIN groups g ON l.libraryID = g.libraryID
+             {}
+             ORDER BY l.type, l.libraryID",
+            if feeds_available { "f.name" } else { "NULL" },
+            if feeds_available { "f.url" } else { "NULL" },
+            feed_join
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&query)
+            .map_err(sql_err("get-libraries"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(LibraryInfo {
+                    library_id: row.get::<_, i64>(0)?,
+                    library_type: row.get::<_, String>(1)?,
+                    editable: row.get::<_, i64>(2)? != 0,
+                    files_editable: row.get::<_, i64>(3)? != 0,
+                    group_id: row.get::<_, Option<i64>>(4)?,
+                    group_name: row.get::<_, Option<String>>(5)?,
+                    group_description: row.get::<_, Option<String>>(6)?,
+                    feed_name: row.get::<_, Option<String>>(7)?,
+                    feed_url: row.get::<_, Option<String>>(8)?,
+                    item_count: row.get::<_, i64>(9)? as usize,
+                })
+            })
+            .map_err(sql_err("get-libraries"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("get-libraries"))
+    }
+
+    pub fn get_feeds(&self) -> ZotResult<Vec<FeedInfo>> {
+        if !self.table_exists("feeds")? {
+            return Ok(Vec::new());
+        }
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT f.libraryID, f.name, f.url, f.lastCheck, f.lastUpdate,
+                        f.lastCheckError, f.refreshInterval,
+                        (SELECT COUNT(*)
+                         FROM feedItems fi
+                         JOIN items i ON fi.itemID = i.itemID
+                         WHERE i.libraryID = f.libraryID) as itemCount
+                 FROM feeds f
+                 ORDER BY f.name",
+            )
+            .map_err(sql_err("get-feeds"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(FeedInfo {
+                    library_id: row.get::<_, i64>(0)?,
+                    name: row.get::<_, String>(1)?,
+                    url: row.get::<_, String>(2)?,
+                    last_check: row.get::<_, Option<String>>(3)?,
+                    last_update: row.get::<_, Option<String>>(4)?,
+                    last_check_error: row.get::<_, Option<String>>(5)?,
+                    refresh_interval: row.get::<_, Option<i64>>(6)?,
+                    item_count: row.get::<_, i64>(7)? as usize,
+                })
+            })
+            .map_err(sql_err("get-feeds"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("get-feeds"))
+    }
+
+    pub fn get_feed_items(&self, library_id: i64, limit: usize) -> ZotResult<Vec<Item>> {
+        if !self.table_exists("feeds")? || !self.table_exists("feedItems")? {
+            return Ok(Vec::new());
+        }
+        let title_field_id = self.field_id("title")?.unwrap_or(1);
+        let abstract_field_id = self.field_id("abstractNote")?.unwrap_or(2);
+        let url_field_id = self.field_id("url")?.unwrap_or(0);
+        let query = format!(
+            "SELECT i.itemID, i.key, it.typeName, i.dateAdded,
+                    title_val.value, abstract_val.value, url_val.value
+             FROM feedItems fi
+             JOIN items i ON fi.itemID = i.itemID
+             JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+             LEFT JOIN itemData title_data ON i.itemID = title_data.itemID AND title_data.fieldID = {title_field_id}
+             LEFT JOIN itemDataValues title_val ON title_data.valueID = title_val.valueID
+             LEFT JOIN itemData abstract_data ON i.itemID = abstract_data.itemID AND abstract_data.fieldID = {abstract_field_id}
+             LEFT JOIN itemDataValues abstract_val ON abstract_data.valueID = abstract_val.valueID
+             LEFT JOIN itemData url_data ON i.itemID = url_data.itemID AND url_data.fieldID = {url_field_id}
+             LEFT JOIN itemDataValues url_val ON url_data.valueID = url_val.valueID
+             WHERE i.libraryID = ?1
+             ORDER BY i.dateAdded DESC
+             LIMIT ?2"
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&query)
+            .map_err(sql_err("get-feed-items"))?;
+        let rows = stmt
+            .query_map(params![library_id, limit as i64], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?.unwrap_or_default(),
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                ))
+            })
+            .map_err(sql_err("get-feed-items"))?;
+        let raw = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("get-feed-items"))?;
+        raw.into_iter()
+            .map(
+                |(item_id, key, item_type, date_added, title, abstract_note, url)| {
+                    Ok(Item {
+                        key,
+                        item_type,
+                        title,
+                        creators: self.get_item_creators(item_id)?,
+                        abstract_note,
+                        date: None,
+                        url,
+                        doi: None,
+                        tags: Vec::new(),
+                        collections: Vec::new(),
+                        date_added,
+                        date_modified: None,
+                        extra: BTreeMap::new(),
+                    })
+                },
+            )
+            .collect()
     }
 
     pub fn get_attachments(&self, key: &str) -> ZotResult<Vec<Attachment>> {
@@ -406,6 +866,41 @@ impl LocalLibrary {
             });
         }
         Ok(attachments)
+    }
+
+    pub fn get_attachment_by_key(&self, key: &str) -> ZotResult<Option<Attachment>> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT ia.parentItemID, ia.contentType, ia.path, parent.key
+                 FROM itemAttachments ia
+                 JOIN items i ON ia.itemID = i.itemID
+                 LEFT JOIN items parent ON ia.parentItemID = parent.itemID
+                 WHERE i.key = ?1 AND i.libraryID = ?2",
+            )
+            .map_err(sql_err("get-attachment-by-key"))?;
+        let row = stmt
+            .query_row(params![key, self.library_id], |row| {
+                Ok((
+                    row.get::<_, Option<i64>>(0)?,
+                    row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                    row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            })
+            .optional()
+            .map_err(sql_err("get-attachment-by-key"))?;
+        Ok(
+            row.map(|(_, content_type, raw_path, parent_key)| Attachment {
+                key: key.to_string(),
+                parent_key: parent_key.unwrap_or_default(),
+                filename: raw_path
+                    .strip_prefix("storage:")
+                    .unwrap_or(&raw_path)
+                    .to_string(),
+                content_type,
+            }),
+        )
     }
 
     pub fn get_pdf_attachment(&self, key: &str) -> ZotResult<Option<Attachment>> {
@@ -464,61 +959,76 @@ impl LocalLibrary {
         self.get_items_batch(&item_ids)
     }
 
-    pub fn find_duplicates(&self, limit: usize) -> ZotResult<Vec<DuplicateGroup>> {
-        let items = self.list_items(None, 10_000, 0)?;
+    pub fn find_duplicates(
+        &self,
+        method: DuplicateMatchMethod,
+        collection: Option<&str>,
+        limit: usize,
+    ) -> ZotResult<Vec<DuplicateGroup>> {
+        let items = self.list_items(collection, 10_000, 0)?;
         let mut groups = Vec::new();
         let mut seen: BTreeSet<String> = BTreeSet::new();
 
-        let mut doi_map: HashMap<String, Vec<Item>> = HashMap::new();
-        for item in &items {
-            if let Some(doi) = item.doi.as_deref() {
-                doi_map
-                    .entry(doi.trim().to_lowercase())
-                    .or_default()
-                    .push(item.clone());
+        if matches!(
+            method,
+            DuplicateMatchMethod::Doi | DuplicateMatchMethod::Both
+        ) {
+            let mut doi_map: HashMap<String, Vec<Item>> = HashMap::new();
+            for item in &items {
+                if let Some(doi) = item.doi.as_deref() {
+                    doi_map
+                        .entry(doi.trim().to_lowercase())
+                        .or_default()
+                        .push(item.clone());
+                }
             }
-        }
-        for items in doi_map.into_values() {
-            if items.len() > 1 {
-                let group_key = items
-                    .iter()
-                    .map(|item| item.key.clone())
-                    .collect::<Vec<_>>()
-                    .join(",");
-                if seen.insert(group_key) {
-                    groups.push(DuplicateGroup {
-                        match_type: "doi".to_string(),
-                        score: 1.0,
-                        items,
-                    });
+            for items in doi_map.into_values() {
+                if items.len() > 1 {
+                    let group_key = items
+                        .iter()
+                        .map(|item| item.key.clone())
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    if seen.insert(format!("doi:{group_key}")) {
+                        groups.push(DuplicateGroup {
+                            match_type: "doi".to_string(),
+                            score: 1.0,
+                            items,
+                        });
+                    }
                 }
             }
         }
 
-        let mut used = HashSet::new();
-        for index in 0..items.len() {
-            if used.contains(&items[index].key) {
-                continue;
-            }
-            let mut cluster = vec![items[index].clone()];
-            let left = normalize_title(&items[index].title);
-            for other in items.iter().skip(index + 1) {
-                if used.contains(&other.key) {
+        if matches!(
+            method,
+            DuplicateMatchMethod::Title | DuplicateMatchMethod::Both
+        ) {
+            let mut used = HashSet::new();
+            for index in 0..items.len() {
+                if used.contains(&items[index].key) {
                     continue;
                 }
-                let right = normalize_title(&other.title);
-                if normalized_levenshtein(&left, &right) >= 0.92 {
-                    cluster.push(other.clone());
-                    used.insert(other.key.clone());
+                let mut cluster = vec![items[index].clone()];
+                let left = normalize_title(&items[index].title);
+                for other in items.iter().skip(index + 1) {
+                    if used.contains(&other.key) {
+                        continue;
+                    }
+                    let right = normalize_title(&other.title);
+                    if normalized_levenshtein(&left, &right) >= 0.92 {
+                        cluster.push(other.clone());
+                        used.insert(other.key.clone());
+                    }
                 }
-            }
-            if cluster.len() > 1 {
-                used.insert(items[index].key.clone());
-                groups.push(DuplicateGroup {
-                    match_type: "title".to_string(),
-                    score: 0.92,
-                    items: cluster,
-                });
+                if cluster.len() > 1 {
+                    used.insert(items[index].key.clone());
+                    groups.push(DuplicateGroup {
+                        match_type: "title".to_string(),
+                        score: 0.92,
+                        items: cluster,
+                    });
+                }
             }
         }
 
@@ -1024,6 +1534,153 @@ impl LocalLibrary {
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(sql_err("item-collection-keys"))
     }
+
+    fn table_exists(&self, table: &str) -> ZotResult<bool> {
+        self.conn
+            .query_row(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                params![table],
+                |_| Ok(()),
+            )
+            .optional()
+            .map(|value| value.is_some())
+            .map_err(sql_err("table-exists"))
+    }
+
+    fn field_id(&self, field_name: &str) -> ZotResult<Option<i64>> {
+        self.conn
+            .query_row(
+                "SELECT fieldID FROM fields WHERE fieldName = ?1",
+                params![field_name],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .map_err(sql_err("field-id"))
+    }
+
+    fn get_note_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
+        Ok(self
+            .get_notes(key)?
+            .into_iter()
+            .map(|note| ChildItem {
+                key: note.key,
+                parent_key: Some(note.parent_key),
+                item_type: "note".to_string(),
+                title: None,
+                content_type: None,
+                filename: None,
+                note: Some(note.content),
+                annotation_type: None,
+                text: None,
+                comment: None,
+                color: None,
+                page_label: None,
+                tags: note.tags,
+            })
+            .collect())
+    }
+
+    fn get_attachment_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
+        Ok(self
+            .get_attachments(key)?
+            .into_iter()
+            .map(|attachment| ChildItem {
+                key: attachment.key,
+                parent_key: Some(attachment.parent_key),
+                item_type: "attachment".to_string(),
+                title: Some(attachment.filename.clone()),
+                content_type: Some(attachment.content_type),
+                filename: Some(attachment.filename),
+                note: None,
+                annotation_type: None,
+                text: None,
+                comment: None,
+                color: None,
+                page_label: None,
+                tags: Vec::new(),
+            })
+            .collect())
+    }
+
+    fn get_annotation_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
+        if !self.table_exists("itemAnnotations")? {
+            return Ok(Vec::new());
+        }
+
+        let Some(item) = self.get_item(key)? else {
+            return Ok(Vec::new());
+        };
+        let Some(item_id) = self.item_id_by_key(&item.key)? else {
+            return Ok(Vec::new());
+        };
+
+        let attachment_ids = if item.item_type == "attachment" {
+            vec![item_id]
+        } else {
+            let mut stmt = self
+                .conn
+                .prepare(
+                    "SELECT itemID
+                     FROM itemAttachments
+                     WHERE parentItemID = ?1
+                     AND contentType IN ('application/pdf', 'application/epub+zip', 'text/html')",
+                )
+                .map_err(sql_err("annotation-attachment-ids"))?;
+            let rows = stmt
+                .query_map(params![item_id], |row| row.get::<_, i64>(0))
+                .map_err(sql_err("annotation-attachment-ids"))?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(sql_err("annotation-attachment-ids"))?
+        };
+
+        let mut children = Vec::new();
+        for attachment_id in attachment_ids {
+            let attachment_key = self
+                .conn
+                .query_row(
+                    "SELECT key FROM items WHERE itemID = ?1",
+                    params![attachment_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .map_err(sql_err("annotation-attachment-key"))?;
+            let mut stmt = self
+                .conn
+                .prepare(
+                    "SELECT i.key, ia.text, ia.comment, ia.color, ia.pageLabel, ia.type
+                     FROM itemAnnotations ia
+                     JOIN items i ON ia.itemID = i.itemID
+                     WHERE ia.parentItemID = ?1
+                     AND i.libraryID = ?2
+                     AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
+                     ORDER BY i.key ASC",
+                )
+                .map_err(sql_err("annotation-children"))?;
+            let rows = stmt
+                .query_map(params![attachment_id, self.library_id], |row| {
+                    Ok(ChildItem {
+                        key: row.get::<_, String>(0)?,
+                        parent_key: Some(attachment_key.clone()),
+                        item_type: "annotation".to_string(),
+                        title: None,
+                        content_type: None,
+                        filename: None,
+                        note: None,
+                        annotation_type: Some(annotation_type_name(row.get::<_, i64>(5)?)),
+                        text: Some(row.get::<_, Option<String>>(1)?.unwrap_or_default()),
+                        comment: Some(row.get::<_, Option<String>>(2)?.unwrap_or_default()),
+                        color: row.get::<_, Option<String>>(3)?,
+                        page_label: row.get::<_, Option<String>>(4)?,
+                        tags: Vec::new(),
+                    })
+                })
+                .map_err(sql_err("annotation-children"))?;
+            children.extend(
+                rows.collect::<Result<Vec<_>, _>>()
+                    .map_err(sql_err("annotation-children"))?,
+            );
+        }
+        Ok(children)
+    }
 }
 
 fn sort_items(items: &mut [Item], sort: Option<SortField>, direction: SortDirection) {
@@ -1075,6 +1732,48 @@ fn normalize_title(title: &str) -> String {
         .join(" ")
 }
 
+fn annotation_type_name(value: i64) -> String {
+    match value {
+        1 => "highlight",
+        2 => "note",
+        3 => "image",
+        4 => "ink",
+        5 => "underline",
+        _ => "unknown",
+    }
+    .to_string()
+}
+
+fn child_to_annotation_record(child: ChildItem) -> AnnotationRecord {
+    AnnotationRecord {
+        key: child.key,
+        parent_key: None,
+        parent_title: None,
+        attachment_key: child.parent_key,
+        attachment_title: None,
+        annotation_type: child
+            .annotation_type
+            .unwrap_or_else(|| "unknown".to_string()),
+        text: child.text.unwrap_or_default(),
+        comment: child.comment.unwrap_or_default(),
+        color: child.color,
+        page_label: child.page_label,
+        tags: child.tags,
+    }
+}
+
+fn flatten_collection_tree(collection: &Collection, flattened: &mut Vec<Collection>) {
+    flattened.push(Collection {
+        key: collection.key.clone(),
+        name: collection.name.clone(),
+        parent_key: collection.parent_key.clone(),
+        children: Vec::new(),
+    });
+    for child in &collection.children {
+        flatten_collection_tree(child, flattened);
+    }
+}
+
 fn repeat_placeholders(count: usize) -> String {
     std::iter::repeat_n("?", count)
         .collect::<Vec<_>>()
@@ -1110,9 +1809,16 @@ fn sql_err(context: &'static str) -> impl Fn(rusqlite::Error) -> ZotError {
 
 #[cfg(test)]
 mod tests {
+    use rusqlite::Connection;
+    use tempfile::TempDir;
     use zot_core::LibraryScope;
 
-    use super::{LocalLibrary, SearchOptions};
+    use super::{DuplicateMatchMethod, LocalLibrary, SearchOptions};
+
+    struct TestFixture {
+        lib: LocalLibrary,
+        _dir: TempDir,
+    }
 
     fn fixture_library() -> LocalLibrary {
         let data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1126,6 +1832,254 @@ mod tests {
             Ok(lib) => lib,
             Err(err) => panic!("fixture db: {err}"),
         }
+    }
+
+    fn rich_fixture_library() -> TestFixture {
+        let dir = match tempfile::tempdir() {
+            Ok(dir) => dir,
+            Err(err) => panic!("tempdir failed: {err}"),
+        };
+        let db_path = dir.path().join("zotero.sqlite");
+        let conn = match Connection::open(&db_path) {
+            Ok(conn) => conn,
+            Err(err) => panic!("open temp sqlite failed: {err}"),
+        };
+        if let Err(err) = conn.execute_batch(
+            r#"
+            CREATE TABLE libraries (libraryID INTEGER PRIMARY KEY, type TEXT NOT NULL, editable INT NOT NULL DEFAULT 1, filesEditable INT NOT NULL DEFAULT 1);
+            INSERT INTO libraries VALUES (1, 'user', 1, 1);
+            INSERT INTO libraries VALUES (2, 'group', 1, 1);
+            INSERT INTO libraries VALUES (3, 'feed', 0, 0);
+
+            CREATE TABLE groups (
+                groupID INTEGER PRIMARY KEY,
+                libraryID INT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                version INT NOT NULL DEFAULT 1
+            );
+            INSERT INTO groups VALUES (99999, 2, 'Lab Group', '', 1);
+
+            CREATE TABLE itemTypes (itemTypeID INTEGER PRIMARY KEY, typeName TEXT NOT NULL);
+            INSERT INTO itemTypes VALUES (2, 'journalArticle');
+            INSERT INTO itemTypes VALUES (3, 'book');
+            INSERT INTO itemTypes VALUES (14, 'attachment');
+            INSERT INTO itemTypes VALUES (26, 'note');
+            INSERT INTO itemTypes VALUES (37, 'preprint');
+            INSERT INTO itemTypes VALUES (38, 'annotation');
+
+            CREATE TABLE fields (fieldID INTEGER PRIMARY KEY, fieldName TEXT NOT NULL);
+            INSERT INTO fields VALUES (1, 'url');
+            INSERT INTO fields VALUES (4, 'title');
+            INSERT INTO fields VALUES (6, 'abstractNote');
+            INSERT INTO fields VALUES (14, 'date');
+            INSERT INTO fields VALUES (26, 'DOI');
+            INSERT INTO fields VALUES (90, 'extra');
+
+            CREATE TABLE items (
+                itemID INTEGER PRIMARY KEY,
+                itemTypeID INT NOT NULL REFERENCES itemTypes(itemTypeID),
+                dateAdded TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                dateModified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                clientDateModified TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                libraryID INT NOT NULL REFERENCES libraries(libraryID),
+                key TEXT NOT NULL UNIQUE
+            );
+
+            CREATE TABLE itemData (itemID INT NOT NULL, fieldID INT NOT NULL, valueID INT NOT NULL, PRIMARY KEY (itemID, fieldID));
+            CREATE TABLE itemDataValues (valueID INTEGER PRIMARY KEY, value TEXT NOT NULL);
+
+            CREATE TABLE creatorTypes (creatorTypeID INTEGER PRIMARY KEY, creatorType TEXT NOT NULL);
+            INSERT INTO creatorTypes VALUES (1, 'author');
+            INSERT INTO creatorTypes VALUES (2, 'editor');
+
+            CREATE TABLE creators (creatorID INTEGER PRIMARY KEY, firstName TEXT, lastName TEXT NOT NULL);
+            CREATE TABLE itemCreators (itemID INT NOT NULL, creatorID INT NOT NULL, creatorTypeID INT NOT NULL DEFAULT 1, orderIndex INT NOT NULL DEFAULT 0, PRIMARY KEY (itemID, creatorID, creatorTypeID, orderIndex));
+
+            CREATE TABLE tags (tagID INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
+            CREATE TABLE itemTags (itemID INT NOT NULL, tagID INT NOT NULL, type INT NOT NULL DEFAULT 0, PRIMARY KEY (itemID, tagID));
+
+            CREATE TABLE collections (collectionID INTEGER PRIMARY KEY, collectionName TEXT NOT NULL, parentCollectionID INT, libraryID INT NOT NULL, key TEXT NOT NULL UNIQUE);
+            CREATE TABLE collectionItems (collectionID INT NOT NULL, itemID INT NOT NULL, orderIndex INT NOT NULL DEFAULT 0, PRIMARY KEY (collectionID, itemID));
+
+            CREATE TABLE itemNotes (itemID INT PRIMARY KEY, parentItemID INT, note TEXT, title TEXT);
+            CREATE TABLE itemAnnotations (
+                itemID INT PRIMARY KEY,
+                parentItemID INT NOT NULL,
+                type INT NOT NULL,
+                text TEXT,
+                comment TEXT,
+                color TEXT,
+                pageLabel TEXT
+            );
+
+            CREATE TABLE itemAttachments (
+                itemID INT PRIMARY KEY,
+                parentItemID INT,
+                linkMode INT,
+                contentType TEXT,
+                charsetID INT,
+                path TEXT
+            );
+
+            CREATE TABLE itemRelations (itemID INT NOT NULL, predicateID INT NOT NULL, object TEXT NOT NULL, PRIMARY KEY (itemID, predicateID, object));
+            CREATE TABLE relationPredicates (predicateID INTEGER PRIMARY KEY, predicate TEXT NOT NULL UNIQUE);
+            INSERT INTO relationPredicates VALUES (1, 'dc:relation');
+
+            CREATE TABLE fulltextItemWords (wordID INT NOT NULL, itemID INT NOT NULL, PRIMARY KEY (wordID, itemID));
+            CREATE TABLE fulltextWords (wordID INTEGER PRIMARY KEY, word TEXT NOT NULL UNIQUE);
+
+            CREATE TABLE feeds (
+                libraryID INT PRIMARY KEY,
+                name TEXT NOT NULL,
+                url TEXT NOT NULL,
+                lastCheck TEXT,
+                lastUpdate TEXT,
+                lastCheckError TEXT,
+                refreshInterval INT
+            );
+            CREATE TABLE feedItems (itemID INT PRIMARY KEY);
+
+            CREATE TABLE deletedItems (
+                itemID INTEGER PRIMARY KEY,
+                dateDeleted DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                FOREIGN KEY (itemID) REFERENCES items(itemID) ON DELETE CASCADE
+            );
+
+            CREATE TABLE version (schema TEXT PRIMARY KEY, version INT NOT NULL);
+            INSERT INTO version VALUES ('userdata', 120);
+
+            INSERT INTO items VALUES (1, 2, '2024-01-01', '2024-01-02', '2024-01-02', 1, 'ATTN001');
+            INSERT INTO itemDataValues VALUES (1, 'Attention Is All You Need');
+            INSERT INTO itemDataValues VALUES (2, 'We propose a new architecture...');
+            INSERT INTO itemDataValues VALUES (3, '2017');
+            INSERT INTO itemDataValues VALUES (4, '10.5555/attention');
+            INSERT INTO itemDataValues VALUES (21, 'Citation Key: Smith2024
+Original Date: 2017');
+            INSERT INTO itemData VALUES (1, 4, 1);
+            INSERT INTO itemData VALUES (1, 6, 2);
+            INSERT INTO itemData VALUES (1, 14, 3);
+            INSERT INTO itemData VALUES (1, 26, 4);
+            INSERT INTO itemData VALUES (1, 90, 21);
+
+            INSERT INTO items VALUES (2, 2, '2024-02-01', '2024-02-02', '2024-02-02', 1, 'BERT002');
+            INSERT INTO itemDataValues VALUES (5, 'BERT: Pre-training of Deep Bidirectional Transformers');
+            INSERT INTO itemDataValues VALUES (6, 'We introduce BERT...');
+            INSERT INTO itemDataValues VALUES (7, '2019');
+            INSERT INTO itemDataValues VALUES (8, '10.5555/bert');
+            INSERT INTO itemData VALUES (2, 4, 5);
+            INSERT INTO itemData VALUES (2, 6, 6);
+            INSERT INTO itemData VALUES (2, 14, 7);
+            INSERT INTO itemData VALUES (2, 26, 8);
+
+            INSERT INTO items VALUES (3, 3, '2024-03-01', '2024-03-02', '2024-03-02', 1, 'DEEP003');
+            INSERT INTO itemDataValues VALUES (9, 'Deep Learning');
+            INSERT INTO itemDataValues VALUES (10, 'An MIT Press book...');
+            INSERT INTO itemDataValues VALUES (11, '2016');
+            INSERT INTO itemData VALUES (3, 4, 9);
+            INSERT INTO itemData VALUES (3, 6, 10);
+            INSERT INTO itemData VALUES (3, 14, 11);
+
+            INSERT INTO items VALUES (6, 37, '2024-04-01', '2024-04-02', '2024-04-02', 1, 'SCAL006');
+            INSERT INTO itemDataValues VALUES (12, 'Scaling Laws for Neural Language Models');
+            INSERT INTO itemDataValues VALUES (13, 'We study scaling laws...');
+            INSERT INTO itemDataValues VALUES (14, '2020');
+            INSERT INTO itemData VALUES (6, 4, 12);
+            INSERT INTO itemData VALUES (6, 6, 13);
+            INSERT INTO itemData VALUES (6, 14, 14);
+
+            INSERT INTO items VALUES (4, 26, '2024-01-03', '2024-01-03', '2024-01-03', 1, 'NOTE004');
+            INSERT INTO itemNotes VALUES (4, 1, '<p>This paper introduces the transformer architecture.</p>', 'Transformer note');
+
+            INSERT INTO items VALUES (5, 14, '2024-01-01', '2024-01-01', '2024-01-01', 1, 'ATCH005');
+            INSERT INTO itemAttachments VALUES (5, 1, 0, 'application/pdf', NULL, 'storage:attention.pdf');
+
+            INSERT INTO items VALUES (11, 38, '2024-01-04', '2024-01-04', '2024-01-04', 1, 'ANNO011');
+            INSERT INTO itemAnnotations VALUES (11, 5, 1, 'attention mechanisms are the core finding', 'important highlight', '#2ea043', '1');
+
+            INSERT INTO items VALUES (7, 2, '2023-06-01', '2023-06-02', '2023-06-02', 1, 'TRSH007');
+            INSERT INTO itemDataValues VALUES (15, 'Old Survey of Neural Networks');
+            INSERT INTO itemDataValues VALUES (16, '2010');
+            INSERT INTO itemData VALUES (7, 4, 15);
+            INSERT INTO itemData VALUES (7, 14, 16);
+            INSERT INTO deletedItems VALUES (7, '2024-03-01 12:00:00');
+
+            INSERT INTO items VALUES (8, 2, '2024-05-01', '2024-05-02', '2024-05-02', 1, 'DUPE008');
+            INSERT INTO itemDataValues VALUES (17, 'Attention Is All You Need');
+            INSERT INTO itemDataValues VALUES (18, '10.5555/attention');
+            INSERT INTO itemData VALUES (8, 4, 17);
+            INSERT INTO itemData VALUES (8, 26, 18);
+
+            INSERT INTO items VALUES (9, 2, '2024-06-01', '2024-06-02', '2024-06-02', 2, 'GRPITM09');
+            INSERT INTO itemDataValues VALUES (19, 'Group Paper on Protein Folding');
+            INSERT INTO itemDataValues VALUES (20, '2024');
+            INSERT INTO itemData VALUES (9, 4, 19);
+            INSERT INTO itemData VALUES (9, 14, 20);
+
+            INSERT INTO items VALUES (12, 2, '2026-04-01', '2026-04-01', '2026-04-01', 3, 'FEED012');
+            INSERT INTO itemDataValues VALUES (22, 'Feed Paper on Agents');
+            INSERT INTO itemDataValues VALUES (23, 'A feed-imported paper about agent tooling.');
+            INSERT INTO itemDataValues VALUES (24, 'https://example.com/feed-paper');
+            INSERT INTO itemData VALUES (12, 4, 22);
+            INSERT INTO itemData VALUES (12, 6, 23);
+            INSERT INTO itemData VALUES (12, 1, 24);
+            INSERT INTO feedItems VALUES (12);
+            INSERT INTO feeds VALUES (3, 'ML Weekly', 'https://example.com/ml-weekly.xml', '2026-04-01', '2026-04-01', NULL, 60);
+
+            INSERT INTO creators VALUES (1, 'Ashish', 'Vaswani');
+            INSERT INTO creators VALUES (2, 'Noam', 'Shazeer');
+            INSERT INTO creators VALUES (3, 'Jacob', 'Devlin');
+            INSERT INTO creators VALUES (4, 'Ian', 'Goodfellow');
+            INSERT INTO creators VALUES (5, 'Jared', 'Kaplan');
+            INSERT INTO creators VALUES (6, 'John', 'Smith');
+            INSERT INTO creators VALUES (7, 'Alice', 'Wong');
+            INSERT INTO itemCreators VALUES (1, 1, 1, 0);
+            INSERT INTO itemCreators VALUES (1, 2, 1, 1);
+            INSERT INTO itemCreators VALUES (2, 3, 1, 0);
+            INSERT INTO itemCreators VALUES (3, 4, 1, 0);
+            INSERT INTO itemCreators VALUES (6, 5, 1, 0);
+            INSERT INTO itemCreators VALUES (7, 6, 1, 0);
+            INSERT INTO itemCreators VALUES (9, 7, 1, 0);
+
+            INSERT INTO tags VALUES (1, 'transformer');
+            INSERT INTO tags VALUES (2, 'attention');
+            INSERT INTO tags VALUES (3, 'NLP');
+            INSERT INTO tags VALUES (4, 'scaling');
+            INSERT INTO itemTags VALUES (1, 1, 0);
+            INSERT INTO itemTags VALUES (1, 2, 0);
+            INSERT INTO itemTags VALUES (2, 1, 0);
+            INSERT INTO itemTags VALUES (2, 3, 0);
+            INSERT INTO itemTags VALUES (4, 2, 0);
+            INSERT INTO itemTags VALUES (6, 4, 0);
+
+            INSERT INTO collections VALUES (1, 'Machine Learning', NULL, 1, 'COLML01');
+            INSERT INTO collections VALUES (2, 'Transformers', 1, 1, 'COLTR02');
+            INSERT INTO collections VALUES (3, 'Group Papers', NULL, 2, 'GRPCOL03');
+            INSERT INTO collectionItems VALUES (1, 1, 0);
+            INSERT INTO collectionItems VALUES (1, 2, 0);
+            INSERT INTO collectionItems VALUES (1, 3, 0);
+            INSERT INTO collectionItems VALUES (1, 6, 0);
+            INSERT INTO collectionItems VALUES (2, 1, 0);
+            INSERT INTO collectionItems VALUES (3, 9, 0);
+
+            INSERT INTO itemRelations VALUES (1, 1, 'http://zotero.org/users/local/BERT002');
+
+            INSERT INTO fulltextWords VALUES (1, 'transformer');
+            INSERT INTO fulltextWords VALUES (2, 'attention');
+            INSERT INTO fulltextWords VALUES (3, 'mechanism');
+            INSERT INTO fulltextItemWords VALUES (1, 5);
+            INSERT INTO fulltextItemWords VALUES (2, 5);
+            INSERT INTO fulltextItemWords VALUES (3, 5);
+            "#,
+        ) {
+            panic!("seed rich fixture failed: {err}");
+        }
+        drop(conn);
+        let lib = match LocalLibrary::open(dir.path(), LibraryScope::User) {
+            Ok(lib) => lib,
+            Err(err) => panic!("open rich fixture failed: {err}"),
+        };
+        TestFixture { lib, _dir: dir }
     }
 
     #[test]
@@ -1160,5 +2114,180 @@ mod tests {
             Err(err) => panic!("group item failed: {err}"),
         };
         assert!(group_item.is_some());
+    }
+
+    #[test]
+    fn supports_structured_search_and_citation_key_lookup() {
+        let fixture = rich_fixture_library();
+        let lib = &fixture.lib;
+        let result = match lib.search(SearchOptions {
+            query: "attention".to_string(),
+            tag: Some("attention".to_string()),
+            creator: Some("Vaswani".to_string()),
+            year: Some("2017".to_string()),
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("structured search failed: {err}"),
+        };
+        assert_eq!(result.total, 1);
+        assert_eq!(result.items[0].key, "ATTN001");
+
+        let preprint = match lib.search(SearchOptions {
+            query: "scaling".to_string(),
+            item_type: Some("preprint".to_string()),
+            year: Some("2020".to_string()),
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("preprint search failed: {err}"),
+        };
+        assert_eq!(preprint.total, 1);
+        assert_eq!(preprint.items[0].key, "SCAL006");
+
+        let citekey = match lib.search_by_citation_key("Smith2024") {
+            Ok(result) => result,
+            Err(err) => panic!("citation key lookup failed: {err}"),
+        };
+        let citekey = match citekey {
+            Some(result) => result,
+            None => panic!("expected citation key result"),
+        };
+        assert_eq!(citekey.source, "extra");
+        assert_eq!(citekey.item.key, "ATTN001");
+    }
+
+    #[test]
+    fn enumerates_tags_libraries_feeds_and_feed_items() {
+        let fixture = rich_fixture_library();
+        let lib = &fixture.lib;
+
+        let tags = match lib.get_tags() {
+            Ok(tags) => tags,
+            Err(err) => panic!("get tags failed: {err}"),
+        };
+        assert!(
+            tags.iter()
+                .any(|tag| tag.name == "transformer" && tag.count == 2)
+        );
+        assert!(
+            tags.iter()
+                .any(|tag| tag.name == "attention" && tag.count == 2)
+        );
+
+        let libraries = match lib.get_libraries() {
+            Ok(entries) => entries,
+            Err(err) => panic!("get libraries failed: {err}"),
+        };
+        assert!(libraries.iter().any(|entry| entry.library_type == "user"));
+        assert!(libraries.iter().any(|entry| entry.library_type == "group"));
+        assert!(libraries.iter().any(|entry| entry.library_type == "feed"
+            && entry.feed_name.as_deref() == Some("ML Weekly")
+            && entry.item_count == 1));
+
+        let feeds = match lib.get_feeds() {
+            Ok(entries) => entries,
+            Err(err) => panic!("get feeds failed: {err}"),
+        };
+        assert_eq!(feeds.len(), 1);
+        assert_eq!(feeds[0].name, "ML Weekly");
+        assert_eq!(feeds[0].item_count, 1);
+
+        let feed_items = match lib.get_feed_items(3, 10) {
+            Ok(items) => items,
+            Err(err) => panic!("get feed items failed: {err}"),
+        };
+        assert_eq!(feed_items.len(), 1);
+        assert_eq!(feed_items[0].key, "FEED012");
+    }
+
+    #[test]
+    fn exposes_children_notes_annotations_and_collection_search() {
+        let fixture = rich_fixture_library();
+        let lib = &fixture.lib;
+
+        let children = match lib.get_item_children("ATTN001") {
+            Ok(children) => children,
+            Err(err) => panic!("get item children failed: {err}"),
+        };
+        assert!(
+            children
+                .iter()
+                .any(|child| child.item_type == "note" && child.key == "NOTE004")
+        );
+        assert!(
+            children
+                .iter()
+                .any(|child| child.item_type == "attachment" && child.key == "ATCH005")
+        );
+        assert!(children.iter().any(|child| {
+            child.item_type == "annotation"
+                && child.key == "ANNO011"
+                && child.annotation_type.as_deref() == Some("highlight")
+        }));
+
+        let note_hits = match lib.search_notes("transformer", 10) {
+            Ok(results) => results,
+            Err(err) => panic!("search notes failed: {err}"),
+        };
+        assert_eq!(note_hits.len(), 1);
+        assert_eq!(note_hits[0].key, "NOTE004");
+        assert_eq!(
+            note_hits[0].parent_title.as_deref(),
+            Some("Attention Is All You Need")
+        );
+
+        let annotations = match lib.get_annotations(None, 10) {
+            Ok(results) => results,
+            Err(err) => panic!("get annotations failed: {err}"),
+        };
+        assert_eq!(annotations.len(), 1);
+        assert_eq!(annotations[0].key, "ANNO011");
+        assert_eq!(
+            annotations[0].parent_title.as_deref(),
+            Some("Attention Is All You Need")
+        );
+
+        let annotation_hits = match lib.search_annotations("core finding", 10) {
+            Ok(results) => results,
+            Err(err) => panic!("search annotations failed: {err}"),
+        };
+        assert_eq!(annotation_hits.len(), 1);
+        assert_eq!(annotation_hits[0].key, "ANNO011");
+
+        let collections = match lib.search_collections("transform", 10) {
+            Ok(results) => results,
+            Err(err) => panic!("search collections failed: {err}"),
+        };
+        assert!(
+            collections
+                .iter()
+                .any(|collection| collection.key == "COLTR02")
+        );
+    }
+
+    #[test]
+    fn finds_duplicates_by_title_doi_and_both() {
+        let fixture = rich_fixture_library();
+        let lib = &fixture.lib;
+
+        for method in [
+            DuplicateMatchMethod::Title,
+            DuplicateMatchMethod::Doi,
+            DuplicateMatchMethod::Both,
+        ] {
+            let groups = match lib.find_duplicates(method, None, 10) {
+                Ok(groups) => groups,
+                Err(err) => panic!("find duplicates failed for {:?}: {err}", method),
+            };
+            assert!(groups.iter().any(|group| {
+                let keys = group
+                    .items
+                    .iter()
+                    .map(|item| item.key.as_str())
+                    .collect::<Vec<_>>();
+                keys.contains(&"ATTN001") && keys.contains(&"DUPE008")
+            }));
+        }
     }
 }

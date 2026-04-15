@@ -1,23 +1,30 @@
 mod format;
 
 use std::collections::{BTreeMap, HashSet};
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::Result;
+use chrono::Utc;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use format::{
     print_collections, print_enveloped, print_error, print_item, print_items, print_json,
     print_query_chunks, print_stats, print_workspace,
 };
-use zot_core::{AppConfig, EnvelopeMeta, LibraryScope, redact_secret};
-use zot_local::{
-    CitationStyle, HybridMode, LocalLibrary, PdfBackend, PdfCache, PdfiumBackend, RagIndex,
-    SearchOptions, SortDirection, SortField, WorkspaceStore, build_metadata_chunk, chunk_text,
-    compute_term_frequencies, format_citation, tokenize,
+use zot_core::{
+    AppConfig, EnvelopeMeta, LibraryScope, PdfOutlineEntry, RetractionCheckResult, SciteItemReport,
+    SemanticHit, SemanticIndexStatus, redact_secret,
 };
+use zot_local::{
+    CitationStyle, DuplicateMatchMethod, HybridMode, LocalLibrary, PdfBackend, PdfCache,
+    PdfiumBackend, RagIndex, SearchOptions, SortDirection, SortField, WorkspaceStore,
+    build_metadata_chunk, chunk_text, compute_term_frequencies, format_citation, tokenize,
+};
+use zot_remote::oa::CreatorName;
 use zot_remote::{
-    EmbeddingClient, PublicationStatus, SemanticScholarClient, ZoteroRemote, extract_preprint_info,
+    BetterBibTexClient, EmbeddingClient, OaClient, PublicationStatus, SciteClient,
+    SemanticScholarClient, ZoteroRemote, extract_preprint_info, normalize_arxiv_id, normalize_doi,
 };
 
 #[derive(Parser)]
@@ -70,7 +77,16 @@ enum LibraryCommand {
     List(LibraryListArgs),
     Recent(LibraryRecentArgs),
     Stats,
-    Duplicates(LimitArgs),
+    Citekey(LibraryCiteKeyArgs),
+    Tags,
+    Libraries,
+    Feeds,
+    FeedItems(LibraryFeedItemsArgs),
+    SemanticSearch(LibrarySemanticSearchArgs),
+    SemanticIndex(LibrarySemanticIndexArgs),
+    SemanticStatus,
+    Duplicates(LibraryDuplicatesArgs),
+    DuplicatesMerge(LibraryDuplicatesMergeArgs),
 }
 
 #[derive(Subcommand)]
@@ -79,9 +95,15 @@ enum ItemCommand {
     Related(ItemRelatedArgs),
     Open(ItemOpenArgs),
     Pdf(ItemPdfArgs),
+    Fulltext(ItemPdfArgs),
+    Children(ItemChildrenArgs),
+    Outline(ItemKeyArgs),
     Export(ItemExportArgs),
     Cite(ItemCiteArgs),
     Create(ItemCreateArgs),
+    AddDoi(AddByDoiArgs),
+    AddUrl(AddByUrlArgs),
+    AddFile(AddFromFileArgs),
     Update(ItemUpdateArgs),
     Trash(ItemKeyArgs),
     Restore(ItemKeyArgs),
@@ -94,13 +116,23 @@ enum ItemCommand {
         #[command(subcommand)]
         command: ItemTagCommand,
     },
+    Annotation {
+        #[command(subcommand)]
+        command: ItemAnnotationCommand,
+    },
+    Scite {
+        #[command(subcommand)]
+        command: ItemSciteCommand,
+    },
 }
 
 #[derive(Subcommand)]
 enum ItemNoteCommand {
     List(ItemKeyArgs),
+    Search(NoteSearchArgs),
     Add(ItemNoteAddArgs),
     Update(ItemNoteUpdateArgs),
+    Delete(ItemKeyArgs),
 }
 
 #[derive(Subcommand)]
@@ -108,12 +140,29 @@ enum ItemTagCommand {
     List(ItemKeyArgs),
     Add(ItemTagUpdateArgs),
     Remove(ItemTagUpdateArgs),
+    Batch(ItemTagBatchArgs),
+}
+
+#[derive(Subcommand)]
+enum ItemAnnotationCommand {
+    List(AnnotationListArgs),
+    Search(AnnotationSearchArgs),
+    Create(AnnotationCreateArgs),
+    CreateArea(AnnotationCreateAreaArgs),
+}
+
+#[derive(Subcommand)]
+enum ItemSciteCommand {
+    Report(SciteReportArgs),
+    Search(SciteSearchArgs),
+    Retractions(SciteRetractionsArgs),
 }
 
 #[derive(Subcommand)]
 enum CollectionCommand {
     List,
     Items(CollectionItemsArgs),
+    Search(CollectionSearchArgs),
     Create(CollectionCreateArgs),
     Rename(CollectionRenameArgs),
     Delete(CollectionKeyArgs),
@@ -160,6 +209,12 @@ struct LibrarySearchArgs {
     #[arg(long = "type")]
     item_type: Option<String>,
     #[arg(long)]
+    tag: Option<String>,
+    #[arg(long)]
+    creator: Option<String>,
+    #[arg(long)]
+    year: Option<String>,
+    #[arg(long)]
     sort: Option<SortFieldArg>,
     #[arg(long, default_value = "desc")]
     direction: SortDirectionArg,
@@ -186,6 +241,61 @@ struct LibraryRecentArgs {
     sort: SortFieldArg,
     #[arg(long, default_value_t = 50)]
     limit: usize,
+}
+
+#[derive(Args)]
+struct LibraryCiteKeyArgs {
+    citekey: String,
+}
+
+#[derive(Args)]
+struct LibraryFeedItemsArgs {
+    library_id: i64,
+    #[arg(long, default_value_t = 20)]
+    limit: usize,
+}
+
+#[derive(Args)]
+struct LibrarySemanticSearchArgs {
+    query: String,
+    #[arg(long, default_value = "hybrid")]
+    mode: HybridModeArg,
+    #[arg(long)]
+    collection: Option<String>,
+    #[arg(long, default_value_t = 10)]
+    limit: usize,
+}
+
+#[derive(Args)]
+struct LibrarySemanticIndexArgs {
+    #[arg(long)]
+    fulltext: bool,
+    #[arg(long)]
+    force_rebuild: bool,
+    #[arg(long)]
+    collection: Option<String>,
+    #[arg(long, default_value_t = 0)]
+    limit: usize,
+}
+
+#[derive(Args)]
+struct LibraryDuplicatesArgs {
+    #[arg(long, default_value = "both")]
+    method: DuplicateMethodArg,
+    #[arg(long)]
+    collection: Option<String>,
+    #[arg(long, default_value_t = 50)]
+    limit: usize,
+}
+
+#[derive(Args)]
+struct LibraryDuplicatesMergeArgs {
+    #[arg(long)]
+    keeper: String,
+    #[arg(long = "duplicate")]
+    duplicates: Vec<String>,
+    #[arg(long)]
+    confirm: bool,
 }
 
 #[derive(Args)]
@@ -217,6 +327,11 @@ struct ItemPdfArgs {
 }
 
 #[derive(Args)]
+struct ItemChildrenArgs {
+    keys: Vec<String>,
+}
+
+#[derive(Args)]
 struct ItemExportArgs {
     key: String,
     #[arg(long, default_value = "bibtex")]
@@ -238,6 +353,49 @@ struct ItemCreateArgs {
     url: Option<String>,
     #[arg(long)]
     pdf: Option<PathBuf>,
+    #[arg(long = "collection")]
+    collections: Vec<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+    #[arg(long, default_value = "auto")]
+    attach_mode: AttachModeArg,
+}
+
+#[derive(Args)]
+struct AddByDoiArgs {
+    doi: String,
+    #[arg(long = "collection")]
+    collections: Vec<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+    #[arg(long, default_value = "auto")]
+    attach_mode: AttachModeArg,
+}
+
+#[derive(Args)]
+struct AddByUrlArgs {
+    url: String,
+    #[arg(long = "collection")]
+    collections: Vec<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+    #[arg(long, default_value = "auto")]
+    attach_mode: AttachModeArg,
+}
+
+#[derive(Args)]
+struct AddFromFileArgs {
+    file: PathBuf,
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long, default_value = "document")]
+    item_type: String,
+    #[arg(long)]
+    doi: Option<String>,
+    #[arg(long = "collection")]
+    collections: Vec<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
 }
 
 #[derive(Args)]
@@ -266,6 +424,13 @@ struct ItemNoteAddArgs {
 }
 
 #[derive(Args)]
+struct NoteSearchArgs {
+    query: String,
+    #[arg(long, default_value_t = 20)]
+    limit: usize,
+}
+
+#[derive(Args)]
 struct ItemNoteUpdateArgs {
     note_key: String,
     #[arg(long)]
@@ -280,8 +445,29 @@ struct ItemTagUpdateArgs {
 }
 
 #[derive(Args)]
+struct ItemTagBatchArgs {
+    #[arg(long, default_value = "")]
+    query: String,
+    #[arg(long)]
+    tag: Option<String>,
+    #[arg(long = "add-tag")]
+    add_tags: Vec<String>,
+    #[arg(long = "remove-tag")]
+    remove_tags: Vec<String>,
+    #[arg(long, default_value_t = 50)]
+    limit: usize,
+}
+
+#[derive(Args)]
 struct CollectionItemsArgs {
     key: String,
+}
+
+#[derive(Args)]
+struct CollectionSearchArgs {
+    query: String,
+    #[arg(long, default_value_t = 20)]
+    limit: usize,
 }
 
 #[derive(Args)]
@@ -384,6 +570,78 @@ struct UpdateStatusArgs {
     limit: usize,
 }
 
+#[derive(Args)]
+struct AnnotationListArgs {
+    #[arg(long)]
+    item_key: Option<String>,
+    #[arg(long, default_value_t = 50)]
+    limit: usize,
+}
+
+#[derive(Args)]
+struct AnnotationSearchArgs {
+    query: String,
+    #[arg(long, default_value_t = 20)]
+    limit: usize,
+}
+
+#[derive(Args)]
+struct AnnotationCreateArgs {
+    attachment_key: String,
+    #[arg(long)]
+    page: usize,
+    #[arg(long)]
+    text: String,
+    #[arg(long)]
+    comment: Option<String>,
+    #[arg(long, default_value = "#ffd400")]
+    color: String,
+}
+
+#[derive(Args)]
+struct AnnotationCreateAreaArgs {
+    attachment_key: String,
+    #[arg(long)]
+    page: usize,
+    #[arg(long)]
+    x: f32,
+    #[arg(long)]
+    y: f32,
+    #[arg(long)]
+    width: f32,
+    #[arg(long)]
+    height: f32,
+    #[arg(long)]
+    comment: Option<String>,
+    #[arg(long, default_value = "#ffd400")]
+    color: String,
+}
+
+#[derive(Args)]
+struct SciteReportArgs {
+    #[arg(long)]
+    item_key: Option<String>,
+    #[arg(long)]
+    doi: Option<String>,
+}
+
+#[derive(Args)]
+struct SciteSearchArgs {
+    query: String,
+    #[arg(long, default_value_t = 10)]
+    limit: usize,
+}
+
+#[derive(Args)]
+struct SciteRetractionsArgs {
+    #[arg(long)]
+    collection: Option<String>,
+    #[arg(long)]
+    tag: Option<String>,
+    #[arg(long, default_value_t = 50)]
+    limit: usize,
+}
+
 #[derive(Clone, Copy, ValueEnum)]
 enum SortFieldArg {
     DateAdded,
@@ -410,6 +668,20 @@ enum HybridModeArg {
     Bm25,
     Semantic,
     Hybrid,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum AttachModeArg {
+    Auto,
+    LinkedUrl,
+    None,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum DuplicateMethodArg {
+    Title,
+    Doi,
+    Both,
 }
 
 #[tokio::main]
@@ -458,6 +730,16 @@ impl AppContext {
         }
         ZoteroRemote::new(library_id, &self.config.zotero.api_key, self.scope.clone())
     }
+
+    fn library_index_path(&self) -> PathBuf {
+        let scope = match &self.scope {
+            LibraryScope::User => "user".to_string(),
+            LibraryScope::Group { group_id } => format!("group-{group_id}"),
+        };
+        AppConfig::config_dir()
+            .join("indexes")
+            .join(format!("{scope}.idx.sqlite"))
+    }
 }
 
 async fn run(cli: Cli) -> Result<()> {
@@ -493,6 +775,18 @@ async fn handle_doctor(ctx: &AppContext) -> Result<()> {
         .ok()
         .and_then(|library| library.check_schema_compatibility().ok())
         .flatten();
+    let libraries = library
+        .as_ref()
+        .ok()
+        .and_then(|library| library.get_libraries().ok())
+        .unwrap_or_default();
+    let feeds = library
+        .as_ref()
+        .ok()
+        .and_then(|library| library.get_feeds().ok())
+        .unwrap_or_default();
+    let bbt = BetterBibTexClient::new();
+    let semantic_status = library_semantic_status(ctx).await.ok();
     let payload = serde_json::json!({
         "config_file": AppConfig::config_file(),
         "data_dir": data_dir,
@@ -512,6 +806,18 @@ async fn handle_doctor(ctx: &AppContext) -> Result<()> {
         },
         "pdf_backend": {
             "available": pdf_backend.availability_hint().is_ok(),
+        },
+        "better_bibtex": {
+            "available": bbt.probe().await,
+        },
+        "libraries": {
+            "count": libraries.len(),
+            "feeds_available": !feeds.is_empty(),
+        },
+        "semantic_index": semantic_status,
+        "annotation_support": {
+            "pdf_outline": pdf_backend.availability_hint().is_ok(),
+            "annotation_creation": ctx.config.write_credentials_configured() && pdf_backend.availability_hint().is_ok(),
         },
         "schema_version": schema_version,
     });
@@ -537,6 +843,24 @@ async fn handle_doctor(ctx: &AppContext) -> Result<()> {
                 "unavailable"
             }
         );
+        println!(
+            "Better BibTeX: {}",
+            if bbt.probe().await {
+                "available"
+            } else {
+                "unavailable"
+            }
+        );
+        println!("Libraries discovered: {}", libraries.len());
+        println!("Feeds discovered: {}", feeds.len());
+        if let Some(status) = semantic_status {
+            println!(
+                "Semantic index: {} (items={}, chunks={})",
+                if status.exists { "present" } else { "missing" },
+                status.indexed_items,
+                status.indexed_chunks
+            );
+        }
         if let Some(version) = schema_version {
             println!("Schema version: {version}");
         }
@@ -552,6 +876,9 @@ async fn handle_library(ctx: &AppContext, command: LibraryCommand) -> Result<()>
                 query: args.query,
                 collection: args.collection,
                 item_type: args.item_type,
+                tag: args.tag,
+                creator: args.creator,
+                year: args.year,
                 sort: args.sort.map(Into::into),
                 direction: args.direction.into(),
                 limit: args.limit,
@@ -601,8 +928,134 @@ async fn handle_library(ctx: &AppContext, command: LibraryCommand) -> Result<()>
                 print_stats(&stats);
             }
         }
+        LibraryCommand::Citekey(args) => {
+            let item = if let Some(result) = library.search_by_citation_key(&args.citekey)? {
+                Some(result)
+            } else {
+                let bbt = BetterBibTexClient::new();
+                if bbt.probe().await {
+                    bbt.search(&args.citekey)
+                        .await?
+                        .into_iter()
+                        .find(|candidate| candidate.citekey == args.citekey)
+                        .and_then(|candidate| library.get_item(&candidate.item_key).ok().flatten())
+                        .map(|item| zot_core::CitationKeyMatch {
+                            citekey: args.citekey.clone(),
+                            source: "better-bibtex".to_string(),
+                            item,
+                        })
+                } else {
+                    None
+                }
+            }
+            .ok_or_else(|| zot_core::ZotError::InvalidInput {
+                code: "citation-key-not-found".to_string(),
+                message: format!("Citation key '{}' not found", args.citekey),
+                hint: None,
+            })?;
+            if ctx.json {
+                print_enveloped(&item, None)?;
+            } else {
+                print_items(std::slice::from_ref(&item.item));
+            }
+        }
+        LibraryCommand::Tags => {
+            let tags = library.get_tags()?;
+            if ctx.json {
+                print_enveloped(&tags, None)?;
+            } else {
+                for tag in tags {
+                    println!("{} ({})", tag.name, tag.count);
+                }
+            }
+        }
+        LibraryCommand::Libraries => {
+            let libraries = library.get_libraries()?;
+            if ctx.json {
+                print_enveloped(&libraries, None)?;
+            } else {
+                for entry in libraries {
+                    println!(
+                        "{} [{}] items={}{}{}",
+                        entry.library_id,
+                        entry.library_type,
+                        entry.item_count,
+                        entry
+                            .group_name
+                            .as_deref()
+                            .map(|name| format!(" name={name}"))
+                            .unwrap_or_default(),
+                        entry
+                            .feed_name
+                            .as_deref()
+                            .map(|name| format!(" feed={name}"))
+                            .unwrap_or_default()
+                    );
+                }
+            }
+        }
+        LibraryCommand::Feeds => {
+            let feeds = library.get_feeds()?;
+            if ctx.json {
+                print_enveloped(&feeds, None)?;
+            } else if feeds.is_empty() {
+                println!("No RSS feeds found.");
+            } else {
+                for feed in feeds {
+                    println!("{} [{}] {}", feed.library_id, feed.item_count, feed.name);
+                    println!("  URL: {}", feed.url);
+                }
+            }
+        }
+        LibraryCommand::FeedItems(args) => {
+            let items = library.get_feed_items(args.library_id, args.limit)?;
+            if ctx.json {
+                print_enveloped(&items, None)?;
+            } else {
+                print_items(&items);
+            }
+        }
+        LibraryCommand::SemanticSearch(args) => {
+            let hits = library_semantic_search(ctx, &library, args).await?;
+            if ctx.json {
+                print_enveloped(&hits, None)?;
+            } else {
+                for hit in hits {
+                    println!("{} [{:.3}] {}", hit.item.key, hit.score, hit.item.title);
+                    if let Some(chunk) = hit.matched_chunk {
+                        println!("  {}", chunk);
+                    }
+                }
+            }
+        }
+        LibraryCommand::SemanticIndex(args) => {
+            let payload = library_semantic_index(ctx, &library, args).await?;
+            if ctx.json {
+                print_enveloped(payload, None)?;
+            } else {
+                println!("Library semantic index updated.");
+            }
+        }
+        LibraryCommand::SemanticStatus => {
+            let status = library_semantic_status(ctx).await?;
+            if ctx.json {
+                print_enveloped(status, None)?;
+            } else {
+                println!(
+                    "{} chunks={} items={} embeddings={}",
+                    status.path,
+                    status.indexed_chunks,
+                    status.indexed_items,
+                    status.chunks_with_embeddings
+                );
+            }
+        }
         LibraryCommand::Duplicates(args) => {
-            let groups = library.find_duplicates(args.limit)?;
+            let groups = library.find_duplicates(
+                args.method.into(),
+                args.collection.as_deref(),
+                args.limit,
+            )?;
             if ctx.json {
                 print_enveloped(&groups, None)?;
             } else {
@@ -611,6 +1064,15 @@ async fn handle_library(ctx: &AppContext, command: LibraryCommand) -> Result<()>
                     print_items(&group.items);
                     println!();
                 }
+            }
+        }
+        LibraryCommand::DuplicatesMerge(args) => {
+            let payload =
+                merge_duplicates(ctx, &args.keeper, &args.duplicates, args.confirm).await?;
+            if ctx.json {
+                print_enveloped(payload, None)?;
+            } else {
+                println!("{}", serde_json::to_string_pretty(&payload)?);
             }
         }
     }
@@ -653,6 +1115,21 @@ async fn handle_item(ctx: &AppContext, command: ItemCommand) -> Result<()> {
         }
         ItemCommand::Open(args) => handle_item_open(ctx, args).await?,
         ItemCommand::Pdf(args) => handle_item_pdf(ctx, args).await?,
+        ItemCommand::Fulltext(args) => handle_item_pdf(ctx, args).await?,
+        ItemCommand::Children(args) => {
+            let children = ctx.local_library()?.get_items_children(&args.keys)?;
+            if ctx.json {
+                print_enveloped(&children, None)?;
+            } else {
+                for (key, values) in children {
+                    println!("{key}");
+                    for value in values {
+                        println!("  - {} [{}]", value.key, value.item_type);
+                    }
+                }
+            }
+        }
+        ItemCommand::Outline(args) => handle_item_outline(ctx, &args.key).await?,
         ItemCommand::Export(args) => {
             let library = ctx.local_library()?;
             let export = library
@@ -689,6 +1166,53 @@ async fn handle_item(ctx: &AppContext, command: ItemCommand) -> Result<()> {
             }
         }
         ItemCommand::Create(args) => handle_item_create(ctx, args).await?,
+        ItemCommand::AddDoi(args) => {
+            let key = add_item_by_doi(
+                ctx,
+                &args.doi,
+                &args.collections,
+                &args.tags,
+                args.attach_mode,
+            )
+            .await?;
+            if ctx.json {
+                print_enveloped(serde_json::json!({ "key": key }), None)?;
+            } else {
+                println!("Created item: {key}");
+            }
+        }
+        ItemCommand::AddUrl(args) => {
+            let key = add_item_by_url(
+                ctx,
+                &args.url,
+                &args.collections,
+                &args.tags,
+                args.attach_mode,
+            )
+            .await?;
+            if ctx.json {
+                print_enveloped(serde_json::json!({ "key": key }), None)?;
+            } else {
+                println!("Created item: {key}");
+            }
+        }
+        ItemCommand::AddFile(args) => {
+            let key = add_item_from_file(
+                ctx,
+                &args.file,
+                args.title.as_deref(),
+                &args.item_type,
+                args.doi.as_deref(),
+                &args.collections,
+                &args.tags,
+            )
+            .await?;
+            if ctx.json {
+                print_enveloped(serde_json::json!({ "key": key }), None)?;
+            } else {
+                println!("Created item: {key}");
+            }
+        }
         ItemCommand::Update(args) => {
             let mut fields = BTreeMap::new();
             if let Some(title) = args.title {
@@ -741,6 +1265,8 @@ async fn handle_item(ctx: &AppContext, command: ItemCommand) -> Result<()> {
         }
         ItemCommand::Note { command } => handle_item_note(ctx, command).await?,
         ItemCommand::Tag { command } => handle_item_tag(ctx, command).await?,
+        ItemCommand::Annotation { command } => handle_item_annotation(ctx, command).await?,
+        ItemCommand::Scite { command } => handle_item_scite(ctx, command).await?,
     }
     Ok(())
 }
@@ -754,6 +1280,21 @@ async fn handle_item_note(ctx: &AppContext, command: ItemNoteCommand) -> Result<
             } else {
                 for note in notes {
                     println!("{}: {}", note.key, note.content);
+                }
+            }
+        }
+        ItemNoteCommand::Search(args) => {
+            let notes = ctx.local_library()?.search_notes(&args.query, args.limit)?;
+            if ctx.json {
+                print_enveloped(&notes, None)?;
+            } else {
+                for note in notes {
+                    println!(
+                        "{} [{}] {}",
+                        note.key,
+                        note.parent_title.unwrap_or_else(|| "Unknown".to_string()),
+                        note.content
+                    );
                 }
             }
         }
@@ -773,6 +1314,14 @@ async fn handle_item_note(ctx: &AppContext, command: ItemNoteCommand) -> Result<
                 print_enveloped(serde_json::json!({ "updated": args.note_key }), None)?;
             } else {
                 println!("Note updated: {}", args.note_key);
+            }
+        }
+        ItemNoteCommand::Delete(args) => {
+            ctx.remote()?.delete_note(&args.key).await?;
+            if ctx.json {
+                print_enveloped(serde_json::json!({ "trashed": args.key }), None)?;
+            } else {
+                println!("Note moved to trash: {}", args.key);
             }
         }
     }
@@ -819,6 +1368,116 @@ async fn handle_item_tag(ctx: &AppContext, command: ItemTagCommand) -> Result<()
                 println!("Tags removed.");
             }
         }
+        ItemTagCommand::Batch(args) => {
+            let payload = batch_update_tags(ctx, args).await?;
+            if ctx.json {
+                print_enveloped(payload, None)?;
+            } else {
+                println!("{}", serde_json::to_string_pretty(&payload)?);
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn handle_item_annotation(ctx: &AppContext, command: ItemAnnotationCommand) -> Result<()> {
+    match command {
+        ItemAnnotationCommand::List(args) => {
+            let annotations = ctx
+                .local_library()?
+                .get_annotations(args.item_key.as_deref(), args.limit)?;
+            if ctx.json {
+                print_enveloped(&annotations, None)?;
+            } else if annotations.is_empty() {
+                println!("No annotations found.");
+            } else {
+                for annotation in annotations {
+                    println!(
+                        "{} [{}] {}",
+                        annotation.key, annotation.annotation_type, annotation.text
+                    );
+                }
+            }
+        }
+        ItemAnnotationCommand::Search(args) => {
+            let annotations = ctx
+                .local_library()?
+                .search_annotations(&args.query, args.limit)?;
+            if ctx.json {
+                print_enveloped(&annotations, None)?;
+            } else if annotations.is_empty() {
+                println!("No annotations found.");
+            } else {
+                for annotation in annotations {
+                    println!(
+                        "{} [{}] {}",
+                        annotation.key, annotation.annotation_type, annotation.text
+                    );
+                }
+            }
+        }
+        ItemAnnotationCommand::Create(args) => {
+            let payload = create_highlight_annotation(
+                ctx,
+                &args.attachment_key,
+                args.page,
+                &args.text,
+                args.comment.as_deref(),
+                &args.color,
+            )
+            .await?;
+            if ctx.json {
+                print_enveloped(payload, None)?;
+            } else {
+                println!("{}", serde_json::to_string_pretty(&payload)?);
+            }
+        }
+        ItemAnnotationCommand::CreateArea(args) => {
+            let payload = create_area_annotation(ctx, &args).await?;
+            if ctx.json {
+                print_enveloped(payload, None)?;
+            } else {
+                println!("{}", serde_json::to_string_pretty(&payload)?);
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn handle_item_scite(ctx: &AppContext, command: ItemSciteCommand) -> Result<()> {
+    match command {
+        ItemSciteCommand::Report(args) => {
+            let report = scite_report(ctx, args.item_key.as_deref(), args.doi.as_deref()).await?;
+            if ctx.json {
+                print_enveloped(&report, None)?;
+            } else {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+        }
+        ItemSciteCommand::Search(args) => {
+            let reports = scite_search(ctx, &args.query, args.limit).await?;
+            if ctx.json {
+                print_enveloped(&reports, None)?;
+            } else {
+                println!("{}", serde_json::to_string_pretty(&reports)?);
+            }
+        }
+        ItemSciteCommand::Retractions(args) => {
+            let reports = scite_retractions(
+                ctx,
+                args.collection.as_deref(),
+                args.tag.as_deref(),
+                args.limit,
+            )
+            .await?;
+            if ctx.json {
+                print_enveloped(&reports, None)?;
+            } else if reports.is_empty() {
+                println!("No editorial notices found.");
+            } else {
+                println!("{}", serde_json::to_string_pretty(&reports)?);
+            }
+        }
     }
     Ok(())
 }
@@ -839,6 +1498,16 @@ async fn handle_collection(ctx: &AppContext, command: CollectionCommand) -> Resu
                 print_enveloped(&items, None)?;
             } else {
                 print_items(&items);
+            }
+        }
+        CollectionCommand::Search(args) => {
+            let collections = ctx
+                .local_library()?
+                .search_collections(&args.query, args.limit)?;
+            if ctx.json {
+                print_enveloped(&collections, None)?;
+            } else {
+                print_collections(&collections, 0);
             }
         }
         CollectionCommand::Create(args) => {
@@ -1141,26 +1810,28 @@ async fn handle_item_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<()> {
 }
 
 async fn handle_item_create(ctx: &AppContext, args: ItemCreateArgs) -> Result<()> {
-    let remote = ctx.remote()?;
-    let backend = PdfiumBackend;
     let key = if let Some(pdf) = args.pdf.as_deref() {
-        let doi = if let Some(doi) = args.doi.as_deref() {
-            Some(doi.to_string())
-        } else {
-            backend.extract_doi(pdf)?
-        };
-        let doi = doi.ok_or_else(|| zot_core::ZotError::Pdf {
-            code: "doi-not-found".to_string(),
-            message: "No DOI found in PDF".to_string(),
-            hint: Some("Pass --doi to override DOI detection".to_string()),
-        })?;
-        let key = remote.create_item(Some(&doi), None).await?;
-        let _attachment_key = remote.upload_attachment(&key, pdf).await?;
-        key
+        add_item_from_file(
+            ctx,
+            pdf,
+            None,
+            "document",
+            args.doi.as_deref(),
+            &args.collections,
+            &args.tags,
+        )
+        .await?
+    } else if let Some(doi) = args.doi.as_deref() {
+        add_item_by_doi(ctx, doi, &args.collections, &args.tags, args.attach_mode).await?
+    } else if let Some(url) = args.url.as_deref() {
+        add_item_by_url(ctx, url, &args.collections, &args.tags, args.attach_mode).await?
     } else {
-        remote
-            .create_item(args.doi.as_deref(), args.url.as_deref())
-            .await?
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "item-create".to_string(),
+            message: "Provide --doi, --url, or --pdf".to_string(),
+            hint: None,
+        }
+        .into());
     };
     if ctx.json {
         print_enveloped(serde_json::json!({ "key": key }), None)?;
@@ -1374,6 +2045,879 @@ async fn handle_workspace_query(
     Ok(())
 }
 
+async fn handle_item_outline(ctx: &AppContext, key: &str) -> Result<()> {
+    let library = ctx.local_library()?;
+    let attachment =
+        library
+            .get_pdf_attachment(key)?
+            .ok_or_else(|| zot_core::ZotError::InvalidInput {
+                code: "item-no-pdf".to_string(),
+                message: format!("Item '{}' has no PDF attachment", key),
+                hint: None,
+            })?;
+    let backend = PdfiumBackend;
+    let entries = backend.extract_outline(&library.pdf_path(&attachment))?;
+    if ctx.json {
+        print_enveloped(&entries, None)?;
+    } else if entries.is_empty() {
+        println!("This PDF does not contain a table of contents/outline.");
+    } else {
+        print_outline_entries(&entries);
+    }
+    Ok(())
+}
+
+async fn library_semantic_status(ctx: &AppContext) -> Result<SemanticIndexStatus> {
+    let path = ctx.library_index_path();
+    if !path.exists() {
+        return Ok(SemanticIndexStatus {
+            exists: false,
+            path: path.display().to_string(),
+            indexed_items: 0,
+            indexed_chunks: 0,
+            chunks_with_embeddings: 0,
+            last_indexed_at: None,
+        });
+    }
+    let index = RagIndex::open(&path)?;
+    Ok(SemanticIndexStatus {
+        exists: true,
+        path: path.display().to_string(),
+        indexed_items: index.indexed_keys()?.len(),
+        indexed_chunks: index.chunk_count()?,
+        chunks_with_embeddings: index.embedding_count()?,
+        last_indexed_at: index.get_meta("indexed_at")?,
+    })
+}
+
+async fn library_semantic_index(
+    ctx: &AppContext,
+    library: &LocalLibrary,
+    args: LibrarySemanticIndexArgs,
+) -> Result<serde_json::Value> {
+    let path = ctx.library_index_path();
+    let index = RagIndex::open(&path)?;
+    if args.force_rebuild || path.exists() {
+        index.clear()?;
+    }
+    let backend = PdfiumBackend;
+    let cache = PdfCache::new(Some(
+        AppConfig::config_dir()
+            .join("cache")
+            .join("library_md_cache.sqlite"),
+    ))?;
+    let embedding_client = EmbeddingClient::new(ctx.config.embedding.clone());
+    let mut items = if let Some(collection) = args.collection.as_deref() {
+        library.get_collection_items(collection)?
+    } else {
+        let limit = if args.limit == 0 { 10_000 } else { args.limit };
+        library.list_items(None, limit, 0)?
+    };
+    if args.limit > 0 {
+        items.truncate(args.limit);
+    }
+    let mut all_texts = Vec::new();
+    let mut chunk_ids = Vec::new();
+    for item in &items {
+        let metadata_chunk = build_metadata_chunk(item);
+        let chunk_id = index.insert_chunk(&item.key, "metadata", &metadata_chunk)?;
+        index.insert_terms(
+            chunk_id,
+            &compute_term_frequencies(&tokenize(&metadata_chunk)),
+        )?;
+        all_texts.push(metadata_chunk);
+        chunk_ids.push(chunk_id);
+        if args.fulltext
+            && let Some(attachment) = library.get_pdf_attachment(&item.key)?
+        {
+            let pdf_path = library.pdf_path(&attachment);
+            let text = if let Some(cached) = cache.get(&pdf_path)? {
+                cached
+            } else {
+                let extracted = backend.extract_text(&pdf_path, None)?;
+                cache.put(&pdf_path, &extracted)?;
+                extracted
+            };
+            for chunk in chunk_text(&text, &item.title, 500, 50) {
+                let chunk_id = index.insert_chunk(&item.key, "pdf", &chunk)?;
+                index.insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&chunk)))?;
+                all_texts.push(chunk);
+                chunk_ids.push(chunk_id);
+            }
+        }
+    }
+    if embedding_client.configured() && !all_texts.is_empty() {
+        let embeddings = embedding_client.embed(&all_texts).await?;
+        for (chunk_id, embedding) in chunk_ids.into_iter().zip(embeddings.into_iter()) {
+            index.set_embedding(chunk_id, &embedding)?;
+        }
+    }
+    index.set_meta("indexed_at", &Utc::now().to_rfc3339())?;
+    let status = library_semantic_status(ctx).await?;
+    Ok(serde_json::json!({
+        "indexed": true,
+        "items": items.len(),
+        "fulltext": args.fulltext,
+        "status": status,
+    }))
+}
+
+async fn library_semantic_search(
+    ctx: &AppContext,
+    library: &LocalLibrary,
+    args: LibrarySemanticSearchArgs,
+) -> Result<Vec<SemanticHit>> {
+    let index = RagIndex::open(ctx.library_index_path())?;
+    let mut mode: HybridMode = args.mode.into();
+    let embedding = if matches!(mode, HybridMode::Semantic | HybridMode::Hybrid) {
+        let client = EmbeddingClient::new(ctx.config.embedding.clone());
+        if client.configured() {
+            Some(
+                client
+                    .embed(std::slice::from_ref(&args.query))
+                    .await?
+                    .into_iter()
+                    .next()
+                    .unwrap_or_default(),
+            )
+        } else {
+            mode = HybridMode::Bm25;
+            None
+        }
+    } else {
+        None
+    };
+    let allowed = if let Some(collection) = args.collection.as_deref() {
+        library
+            .get_collection_items(collection)?
+            .into_iter()
+            .map(|item| item.key)
+            .collect::<HashSet<_>>()
+    } else {
+        HashSet::new()
+    };
+    let chunks = index.query(
+        &args.query,
+        mode,
+        embedding.as_deref(),
+        args.limit.saturating_mul(5).max(args.limit),
+    )?;
+    let mut deduped = BTreeMap::<String, SemanticHit>::new();
+    for chunk in chunks {
+        if !allowed.is_empty() && !allowed.contains(&chunk.item_key) {
+            continue;
+        }
+        if let Some(item) = library.get_item(&chunk.item_key)? {
+            let entry = deduped
+                .entry(item.key.clone())
+                .or_insert_with(|| SemanticHit {
+                    item: item.clone(),
+                    score: chunk.score,
+                    source: chunk.source.clone(),
+                    matched_chunk: Some(chunk.content.clone()),
+                });
+            if chunk.score > entry.score {
+                entry.score = chunk.score;
+                entry.source = chunk.source.clone();
+                entry.matched_chunk = Some(chunk.content.clone());
+            }
+        }
+        if deduped.len() >= args.limit {
+            break;
+        }
+    }
+    Ok(deduped.into_values().collect())
+}
+
+async fn batch_update_tags(ctx: &AppContext, args: ItemTagBatchArgs) -> Result<serde_json::Value> {
+    if args.query.trim().is_empty() && args.tag.is_none() {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "batch-tags-filter".to_string(),
+            message: "Provide --query and/or --tag".to_string(),
+            hint: None,
+        }
+        .into());
+    }
+    if args.add_tags.is_empty() && args.remove_tags.is_empty() {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "batch-tags-op".to_string(),
+            message: "Provide --add-tag and/or --remove-tag".to_string(),
+            hint: None,
+        }
+        .into());
+    }
+    let library = ctx.local_library()?;
+    let result = library.search(SearchOptions {
+        query: args.query,
+        tag: args.tag,
+        limit: args.limit,
+        ..SearchOptions::default()
+    })?;
+    let remote = ctx.remote()?;
+    for item in &result.items {
+        if !args.add_tags.is_empty() {
+            remote.add_tags(&item.key, &args.add_tags).await?;
+        }
+        if !args.remove_tags.is_empty() {
+            remote.remove_tags(&item.key, &args.remove_tags).await?;
+        }
+    }
+    Ok(serde_json::json!({
+        "matched": result.items.len(),
+        "keys": result.items.iter().map(|item| item.key.clone()).collect::<Vec<_>>(),
+        "added": args.add_tags,
+        "removed": args.remove_tags,
+    }))
+}
+
+async fn add_item_by_doi(
+    ctx: &AppContext,
+    doi: &str,
+    collections: &[String],
+    tags: &[String],
+    attach_mode: AttachModeArg,
+) -> Result<String> {
+    let doi = normalize_doi(doi).ok_or_else(|| zot_core::ZotError::InvalidInput {
+        code: "invalid-doi".to_string(),
+        message: format!("'{}' does not appear to be a valid DOI", doi),
+        hint: None,
+    })?;
+    let oa = OaClient::new();
+    let work = oa.fetch_crossref_work(&doi).await?;
+    let remote = ctx.remote()?;
+    let key = remote
+        .create_item_from_value(build_crossref_item_payload(&work, collections, tags))
+        .await?;
+    if !matches!(attach_mode, AttachModeArg::None) {
+        maybe_attach_open_access_pdf(ctx, &remote, &key, &doi, Some(&work), attach_mode).await?;
+    }
+    Ok(key)
+}
+
+async fn add_item_by_url(
+    ctx: &AppContext,
+    url: &str,
+    collections: &[String],
+    tags: &[String],
+    attach_mode: AttachModeArg,
+) -> Result<String> {
+    if let Some(doi) = normalize_doi(url) {
+        return add_item_by_doi(ctx, &doi, collections, tags, attach_mode).await;
+    }
+    let remote = ctx.remote()?;
+    if let Some(arxiv_id) = normalize_arxiv_id(url) {
+        let work = OaClient::new().fetch_arxiv_work(&arxiv_id).await?;
+        let key = remote
+            .create_item_from_value(build_arxiv_item_payload(&work, collections, tags))
+            .await?;
+        if !matches!(attach_mode, AttachModeArg::None) {
+            maybe_attach_pdf_url(
+                &remote,
+                &key,
+                &work.pdf_url,
+                &format!("arxiv_{}.pdf", arxiv_id.replace('/', "_")),
+                attach_mode,
+            )
+            .await?;
+        }
+        return Ok(key);
+    }
+    remote
+        .create_item_from_value(serde_json::json!({
+            "itemType": "webpage",
+            "title": url,
+            "url": url,
+            "accessDate": "",
+            "collections": collections,
+            "tags": tags.iter().map(|tag| serde_json::json!({ "tag": tag })).collect::<Vec<_>>(),
+        }))
+        .await
+        .map_err(Into::into)
+}
+
+async fn add_item_from_file(
+    ctx: &AppContext,
+    file: &std::path::Path,
+    title: Option<&str>,
+    item_type: &str,
+    doi_override: Option<&str>,
+    collections: &[String],
+    tags: &[String],
+) -> Result<String> {
+    let backend = PdfiumBackend;
+    let resolved_doi = if let Some(doi) = doi_override {
+        Some(
+            normalize_doi(doi).ok_or_else(|| zot_core::ZotError::InvalidInput {
+                code: "invalid-doi".to_string(),
+                message: format!("'{}' does not appear to be a valid DOI", doi),
+                hint: None,
+            })?,
+        )
+    } else if file
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.eq_ignore_ascii_case("pdf"))
+        .unwrap_or(false)
+    {
+        backend.extract_doi(file)?
+    } else {
+        None
+    };
+    let remote = ctx.remote()?;
+    let key = if let Some(doi) = resolved_doi.as_deref() {
+        let key = add_item_by_doi(ctx, doi, collections, tags, AttachModeArg::None).await?;
+        remote.upload_attachment(&key, file).await?;
+        key
+    } else {
+        let payload = serde_json::json!({
+            "itemType": item_type,
+            "title": title.unwrap_or_else(|| file.file_name().and_then(|name| name.to_str()).unwrap_or("document")),
+            "collections": collections,
+            "tags": tags.iter().map(|tag| serde_json::json!({ "tag": tag })).collect::<Vec<_>>(),
+        });
+        let key = remote.create_item_from_value(payload).await?;
+        remote.upload_attachment(&key, file).await?;
+        key
+    };
+    Ok(key)
+}
+
+async fn maybe_attach_open_access_pdf(
+    _ctx: &AppContext,
+    remote: &ZoteroRemote,
+    item_key: &str,
+    doi: &str,
+    crossref: Option<&zot_remote::CrossRefWork>,
+    attach_mode: AttachModeArg,
+) -> Result<()> {
+    if matches!(attach_mode, AttachModeArg::None) {
+        return Ok(());
+    }
+    if let Some(resolved) = OaClient::new()
+        .resolve_open_access_pdf(doi, crossref)
+        .await?
+    {
+        maybe_attach_pdf_url(
+            remote,
+            item_key,
+            &resolved.url,
+            &format!("{}.pdf", doi.replace('/', "_")),
+            attach_mode,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+async fn maybe_attach_pdf_url(
+    remote: &ZoteroRemote,
+    item_key: &str,
+    url: &str,
+    filename: &str,
+    attach_mode: AttachModeArg,
+) -> Result<()> {
+    match attach_mode {
+        AttachModeArg::None => {}
+        AttachModeArg::LinkedUrl => {
+            remote
+                .add_linked_attachment(item_key, url, "PDF (linked URL)")
+                .await?;
+        }
+        AttachModeArg::Auto => {
+            let response = reqwest::Client::new()
+                .get(url)
+                .send()
+                .await
+                .map_err(|err| zot_core::ZotError::Remote {
+                    code: "pdf-download".to_string(),
+                    message: err.to_string(),
+                    hint: None,
+                    status: err.status().map(|status| status.as_u16()),
+                })?;
+            if !response.status().is_success() {
+                return Ok(());
+            }
+            let bytes = response
+                .bytes()
+                .await
+                .map_err(|err| zot_core::ZotError::Remote {
+                    code: "pdf-download-bytes".to_string(),
+                    message: err.to_string(),
+                    hint: None,
+                    status: err.status().map(|status| status.as_u16()),
+                })?;
+            let path = std::env::temp_dir().join(format!("{}-{}", uuid::Uuid::new_v4(), filename));
+            let mut file =
+                std::fs::File::create(&path).map_err(|source| zot_core::ZotError::Io {
+                    path: path.clone(),
+                    source,
+                })?;
+            file.write_all(&bytes)
+                .map_err(|source| zot_core::ZotError::Io {
+                    path: path.clone(),
+                    source,
+                })?;
+            let upload_result = remote.upload_attachment(item_key, &path).await;
+            let _ = std::fs::remove_file(&path);
+            upload_result?;
+        }
+    }
+    Ok(())
+}
+
+fn build_crossref_item_payload(
+    work: &zot_remote::CrossRefWork,
+    collections: &[String],
+    tags: &[String],
+) -> serde_json::Value {
+    serde_json::json!({
+        "itemType": crossref_type_to_zotero(&work.record_type),
+        "title": work.title.clone().unwrap_or_else(|| work.doi.clone()),
+        "creators": work.creators.iter().map(creator_to_json).collect::<Vec<_>>(),
+        "date": work.date,
+        "DOI": work.doi,
+        "url": work.url,
+        "volume": work.volume,
+        "issue": work.issue,
+        "pages": work.pages,
+        "publisher": work.publisher,
+        "ISSN": work.issn,
+        "publicationTitle": work.publication_title,
+        "abstractNote": work.abstract_note,
+        "collections": collections,
+        "tags": tags.iter().map(|tag| serde_json::json!({ "tag": tag })).collect::<Vec<_>>(),
+    })
+}
+
+fn build_arxiv_item_payload(
+    work: &zot_remote::ArxivWork,
+    collections: &[String],
+    tags: &[String],
+) -> serde_json::Value {
+    serde_json::json!({
+        "itemType": "preprint",
+        "title": work.title,
+        "creators": work.creators.iter().map(creator_to_json).collect::<Vec<_>>(),
+        "abstractNote": work.abstract_note,
+        "date": work.date,
+        "url": work.abs_url,
+        "extra": format!("arXiv:{}", work.arxiv_id),
+        "collections": collections,
+        "tags": tags.iter().map(|tag| serde_json::json!({ "tag": tag })).collect::<Vec<_>>(),
+    })
+}
+
+fn creator_to_json(creator: &CreatorName) -> serde_json::Value {
+    serde_json::json!({
+        "creatorType": creator.creator_type,
+        "firstName": creator.first_name,
+        "lastName": creator.last_name,
+    })
+}
+
+fn crossref_type_to_zotero(value: &str) -> &'static str {
+    match value {
+        "journal-article" => "journalArticle",
+        "book" => "book",
+        "book-chapter" => "bookSection",
+        "proceedings-article" => "conferencePaper",
+        "report" => "report",
+        "dissertation" => "thesis",
+        "posted-content" => "preprint",
+        _ => "document",
+    }
+}
+
+async fn merge_duplicates(
+    ctx: &AppContext,
+    keeper_key: &str,
+    duplicate_keys: &[String],
+    confirm: bool,
+) -> Result<serde_json::Value> {
+    let remote = ctx.remote()?;
+    let mut duplicates = duplicate_keys
+        .iter()
+        .filter(|key| key.as_str() != keeper_key)
+        .cloned()
+        .collect::<Vec<_>>();
+    if duplicates.is_empty() {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "duplicate-keys".to_string(),
+            message: "No duplicate keys to merge".to_string(),
+            hint: None,
+        }
+        .into());
+    }
+    let mut keeper = remote.get_item_json(keeper_key).await?;
+    let keeper_children = remote.list_children(keeper_key).await?;
+    let mut tags = keeper
+        .get("tags")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|tag| {
+            tag.get("tag")
+                .and_then(|value| value.as_str())
+                .map(ToOwned::to_owned)
+        })
+        .collect::<HashSet<_>>();
+    let mut collections = keeper
+        .get("collections")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+        .collect::<HashSet<_>>();
+    let keeper_signatures = keeper_children
+        .iter()
+        .filter_map(attachment_signature)
+        .collect::<HashSet<_>>();
+    let mut child_items = Vec::new();
+    let mut skipped_attachments = 0usize;
+    for key in &duplicates {
+        let item = remote.get_item_json(key).await?;
+        let children = remote.list_children(key).await?;
+        for tag in item
+            .get("tags")
+            .and_then(|value| value.as_array())
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|tag| {
+                tag.get("tag")
+                    .and_then(|value| value.as_str())
+                    .map(ToOwned::to_owned)
+            })
+        {
+            tags.insert(tag);
+        }
+        for collection in item
+            .get("collections")
+            .and_then(|value| value.as_array())
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+        {
+            collections.insert(collection);
+        }
+        for child in children {
+            if let Some(signature) = attachment_signature(&child) {
+                if keeper_signatures.contains(&signature) {
+                    skipped_attachments += 1;
+                    continue;
+                }
+            }
+            child_items.push(child);
+        }
+    }
+
+    if !confirm {
+        duplicates.sort();
+        return Ok(serde_json::json!({
+            "keeper": keeper_key,
+            "duplicates": duplicates,
+            "tags": tags,
+            "collections": collections,
+            "child_items_to_reparent": child_items.len(),
+            "skipped_duplicate_attachments": skipped_attachments,
+            "confirm_required": true,
+        }));
+    }
+
+    keeper["tags"] = serde_json::Value::Array(
+        tags.into_iter()
+            .map(|tag| serde_json::json!({ "tag": tag }))
+            .collect(),
+    );
+    remote.update_item_value(&keeper).await?;
+    for collection in collections {
+        remote
+            .add_item_to_collection(keeper_key, &collection)
+            .await?;
+    }
+    for mut child in child_items {
+        child["parentItem"] = serde_json::Value::String(keeper_key.to_string());
+        remote.update_item_value(&child).await?;
+    }
+    for key in &duplicates {
+        remote.set_deleted(key, true).await?;
+    }
+    Ok(serde_json::json!({
+        "keeper": keeper_key,
+        "duplicates_trashed": duplicates,
+        "skipped_duplicate_attachments": skipped_attachments,
+    }))
+}
+
+fn attachment_signature(value: &serde_json::Value) -> Option<(String, String, String, String)> {
+    (value
+        .get("itemType")
+        .and_then(|item_type| item_type.as_str())
+        == Some("attachment"))
+    .then(|| {
+        (
+            value
+                .get("contentType")
+                .and_then(|entry| entry.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            value
+                .get("filename")
+                .and_then(|entry| entry.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            value
+                .get("md5")
+                .and_then(|entry| entry.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            value
+                .get("url")
+                .and_then(|entry| entry.as_str())
+                .unwrap_or_default()
+                .to_string(),
+        )
+    })
+}
+
+async fn create_highlight_annotation(
+    ctx: &AppContext,
+    attachment_key: &str,
+    page: usize,
+    text: &str,
+    comment: Option<&str>,
+    color: &str,
+) -> Result<serde_json::Value> {
+    let library = ctx.local_library()?;
+    let attachment = library
+        .get_attachment_by_key(attachment_key)?
+        .ok_or_else(|| zot_core::ZotError::InvalidInput {
+            code: "attachment-not-found".to_string(),
+            message: format!("Attachment '{}' not found", attachment_key),
+            hint: None,
+        })?;
+    if attachment.content_type != "application/pdf" {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "attachment-not-pdf".to_string(),
+            message: format!("Attachment '{}' is not a PDF attachment", attachment_key),
+            hint: None,
+        }
+        .into());
+    }
+    let pdf_path = library.pdf_path(&attachment);
+    let backend = PdfiumBackend;
+    let position = backend
+        .find_text_position(&pdf_path, page, text)?
+        .ok_or_else(|| zot_core::ZotError::Pdf {
+            code: "annotation-text-not-found".to_string(),
+            message: "Could not find the requested text on the target page".to_string(),
+            hint: Some("Try a shorter exact phrase copied from the PDF".to_string()),
+        })?;
+    let payload = serde_json::json!({
+        "itemType": "annotation",
+        "parentItem": attachment_key,
+        "annotationType": "highlight",
+        "annotationText": text,
+        "annotationComment": comment.unwrap_or(""),
+        "annotationColor": color,
+        "annotationSortIndex": position.sort_index,
+        "annotationPosition": build_annotation_position_json(position.page_index, &position.rects),
+        "annotationPageLabel": position.page_label,
+    });
+    let key = ctx.remote()?.create_item_from_value(payload).await?;
+    Ok(serde_json::json!({
+        "annotation_key": key,
+        "page": position.page_label,
+        "text": text,
+        "color": color,
+    }))
+}
+
+async fn create_area_annotation(
+    ctx: &AppContext,
+    args: &AnnotationCreateAreaArgs,
+) -> Result<serde_json::Value> {
+    let library = ctx.local_library()?;
+    let attachment = library
+        .get_attachment_by_key(&args.attachment_key)?
+        .ok_or_else(|| zot_core::ZotError::InvalidInput {
+            code: "attachment-not-found".to_string(),
+            message: format!("Attachment '{}' not found", args.attachment_key),
+            hint: None,
+        })?;
+    if attachment.content_type != "application/pdf" {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "attachment-not-pdf".to_string(),
+            message: format!(
+                "Attachment '{}' is not a PDF attachment",
+                args.attachment_key
+            ),
+            hint: None,
+        }
+        .into());
+    }
+    let pdf_path = library.pdf_path(&attachment);
+    let backend = PdfiumBackend;
+    let position = backend.build_area_position(
+        &pdf_path,
+        args.page,
+        args.x,
+        args.y,
+        args.width,
+        args.height,
+    )?;
+    let payload = serde_json::json!({
+        "itemType": "annotation",
+        "parentItem": args.attachment_key,
+        "annotationType": "image",
+        "annotationComment": args.comment.as_deref().unwrap_or(""),
+        "annotationColor": args.color,
+        "annotationSortIndex": position.sort_index,
+        "annotationPosition": build_annotation_position_json(position.page_index, &position.rects),
+        "annotationPageLabel": position.page_label,
+    });
+    let key = ctx.remote()?.create_item_from_value(payload).await?;
+    Ok(serde_json::json!({
+        "annotation_key": key,
+        "page": position.page_label,
+        "rects": position.rects,
+        "color": args.color,
+    }))
+}
+
+fn build_annotation_position_json(page_index: usize, rects: &[[f32; 4]]) -> String {
+    serde_json::json!({
+        "pageIndex": page_index,
+        "rects": rects,
+    })
+    .to_string()
+}
+
+async fn scite_report(
+    ctx: &AppContext,
+    item_key: Option<&str>,
+    doi: Option<&str>,
+) -> Result<SciteItemReport> {
+    let resolved_doi = if let Some(doi) = doi {
+        normalize_doi(doi).ok_or_else(|| zot_core::ZotError::InvalidInput {
+            code: "invalid-doi".to_string(),
+            message: format!("'{}' does not appear to be a valid DOI", doi),
+            hint: None,
+        })?
+    } else if let Some(item_key) = item_key {
+        let item = ctx.local_library()?.get_item(item_key)?.ok_or_else(|| {
+            zot_core::ZotError::InvalidInput {
+                code: "item-not-found".to_string(),
+                message: format!("Item '{}' not found", item_key),
+                hint: None,
+            }
+        })?;
+        item.doi.ok_or_else(|| zot_core::ZotError::InvalidInput {
+            code: "item-no-doi".to_string(),
+            message: format!("Item '{}' has no DOI", item_key),
+            hint: None,
+        })?
+    } else {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "scite-target".to_string(),
+            message: "Provide --item-key or --doi".to_string(),
+            hint: None,
+        }
+        .into());
+    };
+    SciteClient::new()
+        .get_report(&resolved_doi)
+        .await?
+        .ok_or_else(|| {
+            zot_core::ZotError::Remote {
+                code: "scite-not-found".to_string(),
+                message: format!("No Scite data found for DOI {}", resolved_doi),
+                hint: None,
+                status: None,
+            }
+            .into()
+        })
+}
+
+async fn scite_search(
+    ctx: &AppContext,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<serde_json::Value>> {
+    let library = ctx.local_library()?;
+    let items = library
+        .search(SearchOptions {
+            query: query.to_string(),
+            limit,
+            ..SearchOptions::default()
+        })?
+        .items;
+    let dois = items
+        .iter()
+        .filter_map(|item| item.doi.clone())
+        .collect::<Vec<_>>();
+    let reports = SciteClient::new().get_reports_batch(&dois).await?;
+    Ok(items
+        .into_iter()
+        .map(|item| {
+            serde_json::json!({
+                "item": item,
+                "scite": item.doi.as_deref().and_then(|doi| reports.get(doi)),
+            })
+        })
+        .collect())
+}
+
+async fn scite_retractions(
+    ctx: &AppContext,
+    collection: Option<&str>,
+    tag: Option<&str>,
+    limit: usize,
+) -> Result<Vec<RetractionCheckResult>> {
+    let library = ctx.local_library()?;
+    let mut items = if let Some(collection) = collection {
+        library.get_collection_items(collection)?
+    } else {
+        library.list_items(None, limit, 0)?
+    };
+    if let Some(tag) = tag {
+        items.retain(|item| item.tags.iter().any(|value| value == tag));
+    }
+    items.truncate(limit);
+    let dois = items
+        .iter()
+        .filter_map(|item| item.doi.clone())
+        .collect::<Vec<_>>();
+    let reports = SciteClient::new().get_reports_batch(&dois).await?;
+    Ok(items
+        .into_iter()
+        .filter_map(|item| {
+            item.doi
+                .as_deref()
+                .and_then(|doi| reports.get(doi))
+                .filter(|report| !report.notices.is_empty())
+                .map(|report| RetractionCheckResult {
+                    item,
+                    notices: report.notices.clone(),
+                })
+        })
+        .collect())
+}
+
+fn print_outline_entries(entries: &[PdfOutlineEntry]) {
+    for entry in entries {
+        let indent = "  ".repeat(entry.level.saturating_sub(1));
+        if let Some(page) = entry.page {
+            println!("{indent}- {} (p. {page})", entry.title);
+        } else {
+            println!("{indent}- {}", entry.title);
+        }
+    }
+}
+
 fn open_target(target: &str) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
@@ -1463,6 +3007,49 @@ impl From<HybridModeArg> for HybridMode {
             HybridModeArg::Bm25 => HybridMode::Bm25,
             HybridModeArg::Semantic => HybridMode::Semantic,
             HybridModeArg::Hybrid => HybridMode::Hybrid,
+        }
+    }
+}
+
+impl From<DuplicateMethodArg> for DuplicateMatchMethod {
+    fn from(value: DuplicateMethodArg) -> Self {
+        match value {
+            DuplicateMethodArg::Title => DuplicateMatchMethod::Title,
+            DuplicateMethodArg::Doi => DuplicateMatchMethod::Doi,
+            DuplicateMethodArg::Both => DuplicateMatchMethod::Both,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::Cli;
+
+    #[test]
+    fn parses_new_library_and_item_command_surfaces() {
+        for argv in [
+            ["zot", "library", "semantic-status"].as_slice(),
+            ["zot", "library", "citekey", "Smith2024"].as_slice(),
+            ["zot", "library", "duplicates", "--method", "both"].as_slice(),
+            ["zot", "item", "children", "ATTN001"].as_slice(),
+            ["zot", "item", "annotation", "search", "core"].as_slice(),
+            ["zot", "item", "scite", "search", "attention"].as_slice(),
+            [
+                "zot",
+                "item",
+                "scite",
+                "retractions",
+                "--tag",
+                "reading-list",
+            ]
+            .as_slice(),
+            ["zot", "collection", "search", "Transform"].as_slice(),
+        ] {
+            if let Err(err) = Cli::try_parse_from(argv) {
+                panic!("cli parse failed for {:?}: {err}", argv);
+            }
         }
     }
 }

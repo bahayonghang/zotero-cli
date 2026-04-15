@@ -3,7 +3,24 @@ use std::time::UNIX_EPOCH;
 
 use pdfium_render::prelude::*;
 use rusqlite::{Connection, OptionalExtension, params};
-use zot_core::{AnnotationSnippet, ZotError, ZotResult};
+use zot_core::{AnnotationSnippet, PdfOutlineEntry, ZotError, ZotResult};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PdfMatchPosition {
+    pub page_index: usize,
+    pub page_label: String,
+    pub matched_text: String,
+    pub rects: Vec<[f32; 4]>,
+    pub sort_index: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PdfAreaPosition {
+    pub page_index: usize,
+    pub page_label: String,
+    pub rects: Vec<[f32; 4]>,
+    pub sort_index: String,
+}
 
 pub trait PdfBackend {
     fn availability_hint(&self) -> ZotResult<()>;
@@ -13,6 +30,22 @@ pub trait PdfBackend {
         page_range: Option<(usize, usize)>,
     ) -> ZotResult<String>;
     fn extract_annotations(&self, pdf_path: &Path) -> ZotResult<Vec<AnnotationSnippet>>;
+    fn extract_outline(&self, pdf_path: &Path) -> ZotResult<Vec<PdfOutlineEntry>>;
+    fn find_text_position(
+        &self,
+        pdf_path: &Path,
+        page: usize,
+        text: &str,
+    ) -> ZotResult<Option<PdfMatchPosition>>;
+    fn build_area_position(
+        &self,
+        pdf_path: &Path,
+        page: usize,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+    ) -> ZotResult<PdfAreaPosition>;
     fn extract_doi(&self, pdf_path: &Path) -> ZotResult<Option<String>> {
         let text = self.extract_text(pdf_path, Some((1, 2)))?;
         let re = regex::Regex::new(r"10\.\d{4,9}/[^\s]+").map_err(|err| ZotError::Pdf {
@@ -127,6 +160,161 @@ impl PdfBackend for PdfiumBackend {
             }
         }
         Ok(result)
+    }
+
+    fn extract_outline(&self, pdf_path: &Path) -> ZotResult<Vec<PdfOutlineEntry>> {
+        let pdfium = Self::pdfium()?;
+        let document = pdfium
+            .load_pdf_from_file(pdf_path, None)
+            .map_err(|err| ZotError::Pdf {
+                code: "pdf-open".to_string(),
+                message: err.to_string(),
+                hint: Some(format!("Failed to open PDF: {}", pdf_path.display())),
+            })?;
+        let mut entries = Vec::new();
+        for bookmark in document.bookmarks().iter() {
+            let level = bookmark
+                .title()
+                .as_deref()
+                .map(|title| title.matches('.').count() + 1)
+                .unwrap_or(1);
+            let title = bookmark.title().unwrap_or_default();
+            let page = bookmark
+                .destination()
+                .and_then(|destination| destination.page_index().ok())
+                .map(|page_index| (page_index + 1) as usize);
+            entries.push(PdfOutlineEntry { level, title, page });
+        }
+        Ok(entries)
+    }
+
+    fn find_text_position(
+        &self,
+        pdf_path: &Path,
+        page: usize,
+        text: &str,
+    ) -> ZotResult<Option<PdfMatchPosition>> {
+        let pdfium = Self::pdfium()?;
+        let document = pdfium
+            .load_pdf_from_file(pdf_path, None)
+            .map_err(|err| ZotError::Pdf {
+                code: "pdf-open".to_string(),
+                message: err.to_string(),
+                hint: Some(format!("Failed to open PDF: {}", pdf_path.display())),
+            })?;
+        if page == 0 || page > document.pages().len() as usize {
+            return Err(ZotError::Pdf {
+                code: "invalid-page-range".to_string(),
+                message: format!("Page {page} is out of bounds"),
+                hint: None,
+            });
+        }
+        let page_ref = document
+            .pages()
+            .get((page - 1) as i32)
+            .map_err(|err| ZotError::Pdf {
+                code: "pdf-page".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
+        let page_label = page_ref.label().unwrap_or("").to_string();
+        let page_text = page_ref.text().map_err(|err| ZotError::Pdf {
+            code: "pdf-text".to_string(),
+            message: err.to_string(),
+            hint: None,
+        })?;
+        let search = page_text
+            .search(text, &PdfSearchOptions::new())
+            .map_err(|err| ZotError::Pdf {
+                code: "pdf-search".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
+        if let Some(result) = search.find_next() {
+            let rects = result
+                .iter()
+                .map(|segment| {
+                    let bounds = segment.bounds();
+                    [
+                        bounds.left().value,
+                        bounds.bottom().value,
+                        bounds.right().value,
+                        bounds.top().value,
+                    ]
+                })
+                .collect::<Vec<_>>();
+            let first = rects.first().copied().unwrap_or([0.0, 0.0, 0.0, 0.0]);
+            let sort_index = format!(
+                "{:05}|{:06}|{:05}",
+                page.saturating_sub(1),
+                first[1].round() as i64,
+                first[0].round() as i64
+            );
+            return Ok(Some(PdfMatchPosition {
+                page_index: page.saturating_sub(1),
+                page_label,
+                matched_text: result
+                    .iter()
+                    .map(|segment| segment.text())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                rects,
+                sort_index,
+            }));
+        }
+        Ok(None)
+    }
+
+    fn build_area_position(
+        &self,
+        pdf_path: &Path,
+        page: usize,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+    ) -> ZotResult<PdfAreaPosition> {
+        let pdfium = Self::pdfium()?;
+        let document = pdfium
+            .load_pdf_from_file(pdf_path, None)
+            .map_err(|err| ZotError::Pdf {
+                code: "pdf-open".to_string(),
+                message: err.to_string(),
+                hint: Some(format!("Failed to open PDF: {}", pdf_path.display())),
+            })?;
+        if page == 0 || page > document.pages().len() as usize {
+            return Err(ZotError::Pdf {
+                code: "invalid-page-range".to_string(),
+                message: format!("Page {page} is out of bounds"),
+                hint: None,
+            });
+        }
+        let page_ref = document
+            .pages()
+            .get((page - 1) as i32)
+            .map_err(|err| ZotError::Pdf {
+                code: "pdf-page".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
+        let page_size = page_ref.page_size();
+        let page_width = page_size.width().value;
+        let page_height = page_size.height().value;
+        let left = x * page_width;
+        let right = (x + width) * page_width;
+        let top = page_height - (y * page_height);
+        let bottom = page_height - ((y + height) * page_height);
+        Ok(PdfAreaPosition {
+            page_index: page.saturating_sub(1),
+            page_label: page_ref.label().unwrap_or("").to_string(),
+            rects: vec![[left, bottom, right, top]],
+            sort_index: format!(
+                "{:05}|{:06}|{:05}",
+                page.saturating_sub(1),
+                bottom.round() as i64,
+                left.round() as i64
+            ),
+        })
     }
 }
 

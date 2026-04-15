@@ -279,6 +279,17 @@ impl RagIndex {
         Ok(())
     }
 
+    pub fn get_meta(&self, key: &str) -> ZotResult<Option<String>> {
+        self.conn
+            .query_row(
+                "SELECT value FROM index_meta WHERE key = ?1",
+                params![key],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(db_err("rag-get-meta"))
+    }
+
     pub fn indexed_keys(&self) -> ZotResult<Vec<String>> {
         let mut stmt = self
             .conn
@@ -289,6 +300,26 @@ impl RagIndex {
             .map_err(db_err("rag-indexed-keys"))?;
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(db_err("rag-indexed-keys"))
+    }
+
+    pub fn chunk_count(&self) -> ZotResult<usize> {
+        self.conn
+            .query_row("SELECT COUNT(*) FROM chunks", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map(|count| count as usize)
+            .map_err(db_err("rag-chunk-count"))
+    }
+
+    pub fn embedding_count(&self) -> ZotResult<usize> {
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM chunks WHERE embedding IS NOT NULL AND embedding != ''",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count as usize)
+            .map_err(db_err("rag-embedding-count"))
     }
 
     pub fn query(

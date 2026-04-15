@@ -73,6 +73,94 @@ pub struct DuplicateGroup {
     pub items: Vec<Item>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TagSummary {
+    pub name: String,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ChildItem {
+    pub key: String,
+    pub parent_key: Option<String>,
+    pub item_type: String,
+    pub title: Option<String>,
+    pub content_type: Option<String>,
+    pub filename: Option<String>,
+    pub note: Option<String>,
+    pub annotation_type: Option<String>,
+    pub text: Option<String>,
+    pub comment: Option<String>,
+    pub color: Option<String>,
+    pub page_label: Option<String>,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NoteSearchResult {
+    pub key: String,
+    pub parent_key: Option<String>,
+    pub parent_title: Option<String>,
+    pub title: Option<String>,
+    pub content: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AnnotationRecord {
+    pub key: String,
+    pub parent_key: Option<String>,
+    pub parent_title: Option<String>,
+    pub attachment_key: Option<String>,
+    pub attachment_title: Option<String>,
+    pub annotation_type: String,
+    pub text: String,
+    pub comment: String,
+    pub color: Option<String>,
+    pub page_label: Option<String>,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CitationKeyMatch {
+    pub citekey: String,
+    pub source: String,
+    pub item: Item,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LibraryInfo {
+    pub library_id: i64,
+    pub library_type: String,
+    pub editable: bool,
+    pub files_editable: bool,
+    pub group_id: Option<i64>,
+    pub group_name: Option<String>,
+    pub group_description: Option<String>,
+    pub feed_name: Option<String>,
+    pub feed_url: Option<String>,
+    pub item_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FeedInfo {
+    pub library_id: i64,
+    pub name: String,
+    pub url: String,
+    pub last_check: Option<String>,
+    pub last_update: Option<String>,
+    pub last_check_error: Option<String>,
+    pub refresh_interval: Option<i64>,
+    pub item_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PdfOutlineEntry {
+    pub level: usize,
+    pub title: String,
+    pub page: Option<usize>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LibraryStats {
     pub total_items: usize,
@@ -106,6 +194,24 @@ pub struct QueryChunk {
     pub content: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SemanticHit {
+    pub item: Item,
+    pub score: f32,
+    pub source: String,
+    pub matched_chunk: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SemanticIndexStatus {
+    pub exists: bool,
+    pub path: String,
+    pub indexed_items: usize,
+    pub indexed_chunks: usize,
+    pub chunks_with_embeddings: usize,
+    pub last_indexed_at: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AnnotationSnippet {
     pub annotation_type: String,
@@ -125,4 +231,33 @@ pub struct PublicationMatch {
     pub journal: Option<String>,
     pub doi: Option<String>,
     pub date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SciteTally {
+    pub supporting: u32,
+    pub contrasting: u32,
+    pub mentioning: u32,
+    pub total: u32,
+    pub citing_publications: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EditorialNotice {
+    pub notice_type: String,
+    pub source: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SciteItemReport {
+    pub doi: String,
+    pub title: String,
+    pub tally: Option<SciteTally>,
+    pub notices: Vec<EditorialNotice>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RetractionCheckResult {
+    pub item: Item,
+    pub notices: Vec<EditorialNotice>,
 }

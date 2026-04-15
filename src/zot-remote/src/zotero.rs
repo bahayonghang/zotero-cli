@@ -55,23 +55,16 @@ impl ZoteroRemote {
                 hint: None,
             });
         };
-        let response = self
-            .client
-            .post(self.endpoint("items"))
-            .header("Zotero-Write-Token", Uuid::new_v4().to_string())
-            .json(&payload)
-            .send()
+        self.create_items(&payload, "create-item")
             .await
-            .map_err(remote_err("create-item"))?;
-        let body: MultiWriteResponse = self.ensure_json(response, "create-item").await?;
-        body.successful
-            .and_then(|successful| successful.get("0").and_then(|entry| entry.key.clone()))
-            .ok_or_else(|| ZotError::Remote {
-                code: "create-item".to_string(),
-                message: "Unexpected create item response".to_string(),
-                hint: None,
-                status: None,
-            })
+            .and_then(first_created_key)
+    }
+
+    pub async fn create_item_from_value(&self, value: Value) -> ZotResult<String> {
+        let payload = Value::Array(vec![value]);
+        self.create_items(&payload, "create-item-raw")
+            .await
+            .and_then(first_created_key)
     }
 
     pub async fn update_item_fields(
@@ -97,10 +90,12 @@ impl ZoteroRemote {
 
     pub async fn delete_item(&self, key: &str) -> ZotResult<()> {
         let item = self.get_item_data(key).await?;
+        let payload = json!({ "deleted": 1 });
         let response = self
             .client
-            .delete(self.endpoint(&format!("items/{key}")))
+            .patch(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
+            .json(&payload)
             .send()
             .await
             .map_err(remote_err("delete-item"))?;
@@ -127,23 +122,9 @@ impl ZoteroRemote {
             "parentItem": parent_key,
             "note": content,
         }]);
-        let response = self
-            .client
-            .post(self.endpoint("items"))
-            .header("Zotero-Write-Token", Uuid::new_v4().to_string())
-            .json(&payload)
-            .send()
+        self.create_items(&payload, "add-note")
             .await
-            .map_err(remote_err("add-note"))?;
-        let body: MultiWriteResponse = self.ensure_json(response, "add-note").await?;
-        body.successful
-            .and_then(|successful| successful.get("0").and_then(|entry| entry.key.clone()))
-            .ok_or_else(|| ZotError::Remote {
-                code: "add-note".to_string(),
-                message: "Unexpected add note response".to_string(),
-                hint: None,
-                status: None,
-            })
+            .and_then(first_created_key)
     }
 
     pub async fn update_note(&self, note_key: &str, content: &str) -> ZotResult<()> {
@@ -421,6 +402,101 @@ impl ZoteroRemote {
         Ok(attachment_key)
     }
 
+    pub async fn add_linked_attachment(
+        &self,
+        parent_key: &str,
+        url: &str,
+        title: &str,
+    ) -> ZotResult<String> {
+        self.create_item_from_value(json!({
+            "itemType": "attachment",
+            "parentItem": parent_key,
+            "linkMode": "linked_url",
+            "title": title,
+            "url": url,
+            "contentType": "application/pdf",
+        }))
+        .await
+    }
+
+    pub async fn delete_note(&self, note_key: &str) -> ZotResult<()> {
+        self.delete_item(note_key).await
+    }
+
+    pub async fn get_item_json(&self, key: &str) -> ZotResult<Value> {
+        let item = self.get_item_data(key).await?;
+        Ok(item.data)
+    }
+
+    pub async fn list_children(&self, key: &str) -> ZotResult<Vec<Value>> {
+        let response = self
+            .client
+            .request(Method::GET, self.endpoint(&format!("items/{key}/children")))
+            .send()
+            .await
+            .map_err(remote_err("list-children"))?;
+        self.ensure_json(response, "list-children").await
+    }
+
+    pub async fn update_item_value(&self, item: &Value) -> ZotResult<()> {
+        let key =
+            item.get("key")
+                .and_then(Value::as_str)
+                .ok_or_else(|| ZotError::InvalidInput {
+                    code: "update-item-value".to_string(),
+                    message: "Missing item key in payload".to_string(),
+                    hint: None,
+                })?;
+        let version =
+            item.get("version")
+                .and_then(Value::as_i64)
+                .ok_or_else(|| ZotError::InvalidInput {
+                    code: "update-item-value".to_string(),
+                    message: "Missing item version in payload".to_string(),
+                    hint: None,
+                })?;
+        let response = self
+            .client
+            .put(self.endpoint(&format!("items/{key}")))
+            .header("If-Unmodified-Since-Version", version.to_string())
+            .json(item)
+            .send()
+            .await
+            .map_err(remote_err("update-item-value"))?;
+        self.ensure_empty(response, "update-item-value").await
+    }
+
+    pub async fn set_deleted(&self, key: &str, deleted: bool) -> ZotResult<()> {
+        let item = self.get_item_data(key).await?;
+        let response = self
+            .client
+            .patch(self.endpoint(&format!("items/{key}")))
+            .header("If-Unmodified-Since-Version", item.version().to_string())
+            .json(&json!({ "deleted": if deleted { 1 } else { 0 } }))
+            .send()
+            .await
+            .map_err(remote_err("set-deleted"))?;
+        self.ensure_empty(response, "set-deleted").await
+    }
+
+    async fn create_items(&self, payload: &Value, code: &str) -> ZotResult<Vec<String>> {
+        let response = self
+            .client
+            .post(self.endpoint("items"))
+            .header("Zotero-Write-Token", Uuid::new_v4().to_string())
+            .json(payload)
+            .send()
+            .await
+            .map_err(remote_err("create-items"))?;
+        let body: MultiWriteResponse = self.ensure_json(response, code).await?;
+        Ok(body
+            .successful
+            .unwrap_or_default()
+            .into_values()
+            .filter_map(|entry| entry.key)
+            .collect())
+    }
+
     fn endpoint(&self, path: &str) -> String {
         let scope = match self.scope {
             LibraryScope::User => format!("users/{}", self.library_id),
@@ -606,6 +682,15 @@ struct FileUploadAuthorization {
     suffix: Option<String>,
     #[serde(rename = "uploadKey")]
     upload_key: Option<String>,
+}
+
+fn first_created_key(keys: Vec<String>) -> ZotResult<String> {
+    keys.into_iter().next().ok_or_else(|| ZotError::Remote {
+        code: "create-item".to_string(),
+        message: "Unexpected create item response".to_string(),
+        hint: None,
+        status: None,
+    })
 }
 
 fn guess_content_type(filename: &str) -> &'static str {
