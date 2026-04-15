@@ -19,6 +19,10 @@ test:
 build:
   cargo build --release -p zot-cli
 
+docs:
+  npm --prefix docs install
+  npm --prefix docs run dev
+
 install:
   cargo install --path src/zot-cli --locked --force
 
