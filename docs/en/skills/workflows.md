@@ -10,18 +10,38 @@ zot --json item get ATTN001
 zot item cite ATTN001 --style apa
 ```
 
-## B: Build a persistent topic workspace
+## B: Jump directly by citation key
 
-Goal: create a long-lived paper set for later query and retrieval.
+Goal: locate a single item quickly when you already know the citekey.
 
 ```bash
-zot --json workspace new mechinterp --description "Mechanistic interpretability papers"
-zot --json workspace import mechinterp --search "mechanistic interpretability"
-zot --json workspace index mechinterp
-zot --json workspace query mechinterp "What methods are used to identify circuits?" --limit 5
+zot --json doctor
+zot --json library citekey Smith2024
+zot item cite ATTN001 --style nature
 ```
 
-## C: Modify Zotero directly
+## C: Build a library-level semantic index and search it
+
+Goal: index the whole library or one collection, then run semantic or hybrid search.
+
+```bash
+zot --json doctor
+zot --json library semantic-index --fulltext
+zot --json library semantic-search "mechanistic interpretability" --mode hybrid --limit 5
+```
+
+## D: Inspect and create PDF annotations
+
+Goal: confirm prerequisites, find the attachment, then create a highlight or area annotation.
+
+```bash
+zot --json doctor
+zot --json item children ATTN001
+zot --json item annotation list --item-key ATTN001
+zot --json item annotation create ATCH005 --page 1 --text "attention mechanisms"
+```
+
+## E: Modify Zotero directly
 
 Goal: write tags, notes, collection membership, or status updates.
 

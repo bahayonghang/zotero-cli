@@ -6,10 +6,10 @@
 
 | 参数 | 含义 |
 | --- | --- |
-| `--json` | 输出标准 JSON envelope，适合脚本与 Agent |
+| `--json` | 返回标准 JSON envelope，适合脚本和 Agent |
 | `--profile <name>` | 选择配置 profile |
-| `--library <scope>` | 选择库范围，支持 `user` 或 `group:<id>` |
-| `--verbose` | 打开更详细日志 |
+| `--library <scope>` | 选择库范围，只支持 `user` 或 `group:<id>` |
+| `--verbose` | 输出更详细日志 |
 
 ## 顶层命令
 
@@ -40,19 +40,32 @@
 ## 推荐运行习惯
 
 1. 新环境先跑 `doctor`
-2. 写操作前先确认凭据
-3. 需要自动处理时优先加 `--json`
-4. 整轮会话只选一种调用路径：`zot ...` 或 `cargo run -q -p zot-cli -- ...`
+2. 写操作前确认凭据和 doctor 输出
+3. 自动化场景优先加 `--json`
+4. 整轮任务只选一种调用路径：`zot ...` 或 `cargo run -q -p zot-cli -- ...`
+5. feed 不走全局 `--library` 切换，而是显式用 `library feeds` / `library feed-items`
 
 ## 常见起步命令
 
 ```bash
 zot --json doctor
-zot --json library search "attention"
+zot --json library search "attention" --tag transformer --creator Vaswani --year 2017
+zot --json library citekey Smith2024
+zot --json library semantic-status
 zot --json item get ATTN001
-zot --json workspace new llm-safety --description "LLM safety papers"
-zot --json sync update-status --apply --limit 20
+zot --json item children ATTN001
+zot --json collection search Transform
+zot --json workspace query llm-safety "What are the main failure modes?" --mode hybrid --limit 5
 ```
+
+## 命令分工
+
+- `library`：默认只读入口；负责搜索、枚举、semantic、feeds、duplicates
+- `item`：单条目读取和大多数写操作；也包括 annotation / Scite
+- `collection`：维护真实 Zotero collection
+- `workspace`：维护本地 reading workspace
+- `sync`：检查 preprint 是否已正式发表
+- `mcp`：当前只有占位命令，不是可用工作流
 
 ## 子命令导航
 

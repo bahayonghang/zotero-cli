@@ -3,27 +3,43 @@
 ## 这些动作默认视为有副作用
 
 - `item create`
+- `item add-doi`
+- `item add-url`
+- `item add-file`
 - `item update`
 - `item trash`
 - `item restore`
 - `item attach`
-- `item note add/update`
-- `item tag add/remove`
-- `collection create/rename/delete/add-item/remove-item`
+- `item note add`
+- `item note update`
+- `item note delete`
+- `item tag add`
+- `item tag remove`
+- `item tag batch`
+- `item annotation create`
+- `item annotation create-area`
+- `collection create`
+- `collection rename`
+- `collection delete`
+- `collection add-item`
+- `collection remove-item`
+- `library duplicates-merge --confirm`
 - `sync update-status --apply`
 
 ## 执行规则
 
-1. 用户已经明确要求执行：可以做
-2. 用户只是“分析一下”“看看”：不要偷偷写库
-3. 破坏性动作要确认意图明确：
+1. 如果用户明确要求执行，可以做
+2. 如果用户只是想“分析”“看看”，不要偷偷写库
+3. 这些动作要确认意图已经明确：
    - `item trash`
+   - `item note delete`
    - `collection delete`
+   - `library duplicates-merge --confirm`
    - `sync update-status --apply`
 
 ## 读写边界
 
-- 本地读：`zotero.sqlite` 与附件 storage
+- 本地读：`zotero.sqlite`、附件 storage、本地索引 sidecar
 - 远端写：Zotero Web API
 
 **永远不要直接改 `zotero.sqlite`。**
@@ -35,3 +51,8 @@
 - 停在只读分析
 - 明确告诉用户缺少什么
 - 不要假装操作已经成功
+
+## annotation 与 attach_mode 的额外说明
+
+- annotation 创建需要本地可读 PDF 和写权限同时可用
+- `attach-mode auto` 找不到开放获取 PDF，不等于整个命令失败

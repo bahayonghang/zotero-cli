@@ -1,6 +1,6 @@
 # workspace 命令
 
-`workspace` 用来组织主题论文集合，并支持本地检索与 RAG 查询。
+`workspace` 用来维护主题化 paper set，并支持本地搜索与 RAG-style query。
 
 ## 存储约定
 
@@ -23,6 +23,8 @@ zot --json workspace import llm-safety --tag safety
 zot --json workspace import llm-safety --search "reward hacking"
 zot --json workspace search llm-safety "alignment"
 zot workspace export llm-safety --format markdown
+zot workspace export llm-safety --format json
+zot workspace export llm-safety --format bibtex
 zot --json workspace index llm-safety
 zot --json workspace query llm-safety "What are the main causes of reward hacking?" --mode hybrid --limit 5
 ```
@@ -30,9 +32,13 @@ zot --json workspace query llm-safety "What are the main causes of reward hackin
 ## query 模式
 
 - `bm25`
+- `semantic`
 - `hybrid`
 
-如果 embedding 未配置，语义查询会退化到可用模式，不需要自己造额外流程。
+说明：
+
+- embedding 未配置时，不要假设 `semantic` / `hybrid` 一定有语义结果
+- workspace query 与 library semantic-search 复用同一套索引实现
 
 ## 推荐工作流
 
@@ -41,4 +47,4 @@ zot --json workspace query llm-safety "What are the main causes of reward hackin
 3. `workspace index`
 4. `workspace query`
 
-这套流程适合“围绕一个主题长期整理并问答检索”的需求。
+这套流程适合“围绕一个主题长期整理并持续问答检索”的需求。

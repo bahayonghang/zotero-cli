@@ -1,50 +1,76 @@
-# zot (Rust)
+# zot
 
-Rust workspace for a Zotero CLI that combines:
+[English](./README.md) | [简体中文](./README.zh-CN.md) | [Docs (EN)](./docs/en/index.md) | [文档（中文）](./docs/index.md)
 
-- local SQLite reads from `zotero.sqlite`
-- local PDF and workspace/RAG utilities
-- Zotero Web API writes
-- Semantic Scholar preprint status checks
+`zot` is a Rust-first Zotero CLI for local library reads, PDF extraction, workspace retrieval, and authenticated Zotero Web API writes. It is designed as a CLI-first substitute for the older `ref/zotero-mcp` capability surface, while keeping the workflow centered on `library`, `item`, `collection`, `workspace`, and `sync`.
 
-## Workspace
+## Highlights
 
-All workspace crates live under `src/`:
+- Read local Zotero data from `zotero.sqlite` and attachment storage
+- Search by query, exact tag, creator, year, type, collection, or citation key
+- Enumerate tags, libraries, feeds, and feed items
+- Extract PDF text, annotations, and outlines; inspect item children in one call
+- Build library-level semantic indexes and run semantic or hybrid search
+- Create items from DOI, URL, or file with `attach_mode`-controlled OA PDF attachment
+- Manage notes, tags, collections, duplicate merge flows, and Scite checks
+- Maintain local reading workspaces with BM25, semantic, or hybrid retrieval
+
+## Workspace Layout
+
+The Rust workspace lives under `src/`:
 
 - `src/zot-core`: shared config, models, errors, JSON envelope
-- `src/zot-local`: SQLite reads, PDF, citation export, workspace/RAG
-- `src/zot-remote`: Zotero Web API, Semantic Scholar, embedding client
-- `src/zot-cli`: `zot` binary and command surface
+- `src/zot-local`: SQLite reads, PDF helpers, workspace and local index logic
+- `src/zot-remote`: Zotero Web API, Better BibTeX, OA PDF resolution, Scite, embeddings
+- `src/zot-cli`: the `zot` binary and command surface
 
-## Build
+## Quick Start
+
+Build and install:
 
 ```bash
 just build
+just install
 ```
 
-Install to Cargo's local bin directory:
+Run a first environment check:
 
 ```bash
-just install
+zot --json doctor
+```
+
+If `zot` is not installed yet:
+
+```bash
+cargo run -q -p zot-cli -- --json doctor
 ```
 
 ## Common Commands
 
 ```bash
 zot --json doctor
-zot --json library search "attention"
+zot --json library search "attention" --tag transformer --creator Vaswani --year 2017
+zot --json library citekey Smith2024
+zot --json library semantic-status
+zot --json library semantic-index --fulltext
+zot --json library semantic-search "mechanistic interpretability" --mode hybrid --limit 5
 zot --json item get ATTN001
-zot workspace new my-topic --description "paper set"
-zot sync update-status --apply
+zot --json item children ATTN001
+zot --json item outline ATTN001
+zot --json item add-doi 10.1038/nature12373 --tag reading --attach-mode auto
+zot --json item annotation list --item-key ATTN001
+zot --json item scite report --item-key ATTN001
+zot --json collection search Transform
+zot --json workspace query llm-safety "What are the main failure modes?" --mode hybrid --limit 5
 ```
 
-## Config
+## Configuration
 
 Config file:
 
 - `~/.config/zot/config.toml`
 
-Environment variables:
+Common environment variables:
 
 - `ZOT_DATA_DIR`
 - `ZOT_LIBRARY_ID`
@@ -52,20 +78,36 @@ Environment variables:
 - `ZOT_EMBEDDING_URL`
 - `ZOT_EMBEDDING_KEY`
 - `ZOT_EMBEDDING_MODEL`
-- `S2_API_KEY`
 - `SEMANTIC_SCHOLAR_API_KEY`
+- `S2_API_KEY`
 
-## Status
+Optional integration and test overrides:
 
-Implemented:
+- `ZOT_BBT_PORT`
+- `ZOT_BBT_URL`
+- `ZOT_SCITE_API_BASE`
+- `ZOT_CROSSREF_API_BASE`
+- `ZOT_UNPAYWALL_API_BASE`
+- `ZOT_PMC_API_BASE`
+- `ZOT_SEMANTIC_SCHOLAR_GRAPH_BASE`
 
-- command surface for doctor, library, item, collection, workspace, sync
-- local search/read/stats/duplicates/related
-- local citation export and formatting
-- remote item/note/tag/collection writes
-- attachment upload flow
-- workspace indexing/query with BM25 and optional embedding lookup
+## Docs
 
-Current gap:
+- Getting started: [docs/en/guide/getting-started.md](./docs/en/guide/getting-started.md)
+- CLI overview: [docs/en/cli/overview.md](./docs/en/cli/overview.md)
+- Skill routing and safety: [docs/en/skills/overview.md](./docs/en/skills/overview.md)
+- Chinese docs home: [docs/index.md](./docs/index.md)
 
-- `zot mcp serve` is scaffolded in the command surface but currently returns a structured `unsupported` error until RMCP tool wiring is added.
+## Current Boundary
+
+- `zot mcp serve` is still scaffold-only and returns an unsupported result
+- The old MCP connector-style `search` / `fetch` tools are intentionally mapped onto CLI workflows instead of separate commands
+- Annotation creation is PDF-first and depends on local PDF availability plus write credentials
+
+## Verification
+
+Repository validation runs through:
+
+```bash
+just ci
+```

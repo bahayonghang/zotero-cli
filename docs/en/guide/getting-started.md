@@ -1,15 +1,16 @@
 # Getting Started
 
-## What this project contains
+## What this project is
 
-This repository is a Rust workspace that provides a Zotero-focused CLI for:
+This repository is a Rust workspace for a CLI-first Zotero toolchain:
 
-- reading local `zotero.sqlite`
-- reading PDFs and workspace content
-- performing writes through the Zotero Web API
-- indexing/querying workspaces and syncing preprint status
+- read local `zotero.sqlite` data and attachment storage
+- extract PDF text, outlines, and annotations
+- perform authenticated writes through the Zotero Web API
+- run library-level semantic index/search and workspace retrieval
+- support Better BibTeX citation-key lookup, Scite checks, and preprint status sync
 
-The real command entrypoint is `src/zot-cli/src/main.rs`, and this documentation follows that source.
+The command surface is defined by `src/zot-cli/src/main.rs`.
 
 ## Two invocation paths
 
@@ -30,16 +31,28 @@ cargo run -q -p zot-cli -- --json doctor
 Run `doctor` first when:
 
 - you are in a new environment
-- you are about to perform writes
-- PDF extraction is failing
+- you are about to mutate the library
+- the task depends on PDF / outline / annotation support
+- you want library semantic indexing or search
 - workspace indexing or query is failing
-- the user reports “why is this broken”
+- you are doing citation-key lookup through Better BibTeX
+- the user says “why is this broken”
 
 Recommended command:
 
 ```bash
 zot --json doctor
 ```
+
+Pay special attention to:
+
+- `write_credentials.configured`
+- `pdf_backend.available`
+- `better_bibtex.available`
+- `libraries.feeds_available`
+- `semantic_index`
+- `annotation_support`
+- `embedding.configured`
 
 ## Build and install
 
@@ -58,7 +71,7 @@ just ci
 3. `cargo clippy --workspace --all-targets -- -D warnings`
 4. `cargo test --workspace`
 
-## Configuration locations
+## Configuration
 
 - Config file: `~/.config/zot/config.toml`
 - Workspace root: `~/.config/zot/workspaces`
@@ -74,9 +87,19 @@ Common environment variables:
 - `SEMANTIC_SCHOLAR_API_KEY`
 - `S2_API_KEY`
 
-## Run the docs site locally
+Optional integration overrides:
 
-The docs site itself lives in `docs/` and uses VitePress:
+- `ZOT_BBT_PORT`
+- `ZOT_BBT_URL`
+- `ZOT_SCITE_API_BASE`
+- `ZOT_CROSSREF_API_BASE`
+- `ZOT_UNPAYWALL_API_BASE`
+- `ZOT_PMC_API_BASE`
+- `ZOT_SEMANTIC_SCHOLAR_GRAPH_BASE`
+
+## Preview the docs site locally
+
+The docs site lives in `docs/` and uses VitePress:
 
 ```bash
 cd docs
@@ -94,5 +117,6 @@ npm run build
 ## Read next
 
 - [CLI Overview](/en/cli/overview)
+- [library command](/en/cli/library)
+- [item command](/en/cli/item)
 - [Skills Overview](/en/skills/overview)
-- [Troubleshooting](/en/cli/troubleshooting)

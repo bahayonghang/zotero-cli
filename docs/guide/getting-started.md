@@ -1,25 +1,26 @@
 # 快速开始
 
-## 项目包含什么
+## 项目是什么
 
-这个仓库是一个 Rust workspace，核心目标是提供一个围绕 Zotero 的 CLI：
+这个仓库是一个 Rust workspace，用来提供一个 CLI-first 的 Zotero 工具链：
 
-- 本地读取 `zotero.sqlite`
-- 读取 PDF 与工作区内容
+- 本地读取 `zotero.sqlite` 和附件 storage
+- 提取 PDF 文本、outline、批注
 - 通过 Zotero Web API 执行写操作
-- 做 workspace / RAG / preprint 状态同步
+- 做 library-level semantic index/search 和 workspace 检索
+- 执行 Better BibTeX citation key lookup、Scite 检查、preprint 状态同步
 
-命令入口在 `src/zot-cli/src/main.rs`，文档中的命令面与它保持一致。
+命令入口以 `src/zot-cli/src/main.rs` 为准。
 
 ## 两种启动方式
 
-优先选择一种调用路径，并在同一轮任务里保持一致：
+同一轮任务里只选一种调用路径：
 
 ```bash
 zot --json doctor
 ```
 
-如果系统里还没有安装 `zot`：
+如果还没有安装 `zot`：
 
 ```bash
 cargo run -q -p zot-cli -- --json doctor
@@ -27,12 +28,14 @@ cargo run -q -p zot-cli -- --json doctor
 
 ## 什么时候先跑 doctor
 
-以下情况都建议先执行 `doctor`：
+以下场景默认先执行 `doctor`：
 
 - 第一次接触当前环境
 - 任何写操作前
-- PDF 提取有问题
-- workspace 索引或 query 出现问题
+- PDF / outline / annotation 相关任务
+- library semantic index/search
+- workspace index/query 异常
+- Better BibTeX citekey 查询
 - 用户反馈“为什么不工作”
 
 推荐命令：
@@ -41,7 +44,17 @@ cargo run -q -p zot-cli -- --json doctor
 zot --json doctor
 ```
 
-## 本地构建与安装
+重点关注这些字段：
+
+- `write_credentials.configured`
+- `pdf_backend.available`
+- `better_bibtex.available`
+- `libraries.feeds_available`
+- `semantic_index`
+- `annotation_support`
+- `embedding.configured`
+
+## 构建与安装
 
 项目根目录常用命令：
 
@@ -61,9 +74,9 @@ just ci
 ## 配置位置
 
 - 配置文件：`~/.config/zot/config.toml`
-- 工作区目录：`~/.config/zot/workspaces`
+- workspace 根目录：`~/.config/zot/workspaces`
 
-常见环境变量：
+常用环境变量：
 
 - `ZOT_DATA_DIR`
 - `ZOT_LIBRARY_ID`
@@ -74,9 +87,19 @@ just ci
 - `SEMANTIC_SCHOLAR_API_KEY`
 - `S2_API_KEY`
 
+可选集成覆盖：
+
+- `ZOT_BBT_PORT`
+- `ZOT_BBT_URL`
+- `ZOT_SCITE_API_BASE`
+- `ZOT_CROSSREF_API_BASE`
+- `ZOT_UNPAYWALL_API_BASE`
+- `ZOT_PMC_API_BASE`
+- `ZOT_SEMANTIC_SCHOLAR_GRAPH_BASE`
+
 ## 文档站本地预览
 
-文档站本身基于 VitePress，位于 `docs/`：
+文档站基于 VitePress，位于 `docs/`：
 
 ```bash
 cd docs
@@ -94,5 +117,6 @@ npm run build
 ## 下一步阅读
 
 - [CLI 总览](/cli/overview)
+- [library 命令](/cli/library)
+- [item 命令](/cli/item)
 - [Skills 总览](/skills/overview)
-- [故障排查](/cli/troubleshooting)

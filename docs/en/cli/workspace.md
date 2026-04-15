@@ -1,6 +1,6 @@
 # workspace command
 
-`workspace` organizes topic-based paper sets and supports local search and RAG-style query.
+`workspace` manages topic-based paper sets and supports local search plus RAG-style query.
 
 ## Storage conventions
 
@@ -23,6 +23,8 @@ zot --json workspace import llm-safety --tag safety
 zot --json workspace import llm-safety --search "reward hacking"
 zot --json workspace search llm-safety "alignment"
 zot workspace export llm-safety --format markdown
+zot workspace export llm-safety --format json
+zot workspace export llm-safety --format bibtex
 zot --json workspace index llm-safety
 zot --json workspace query llm-safety "What are the main causes of reward hacking?" --mode hybrid --limit 5
 ```
@@ -30,9 +32,13 @@ zot --json workspace query llm-safety "What are the main causes of reward hackin
 ## query modes
 
 - `bm25`
+- `semantic`
 - `hybrid`
 
-If embeddings are not configured, semantic retrieval naturally falls back to the available mode.
+Notes:
+
+- do not assume `semantic` or `hybrid` is meaningful when embeddings are unavailable
+- workspace query and library semantic search reuse the same local index implementation
 
 ## Recommended workflow
 
@@ -41,4 +47,4 @@ If embeddings are not configured, semantic retrieval naturally falls back to the
 3. `workspace index`
 4. `workspace query`
 
-This is the right flow for “build a persistent topic set and query it later”.
+This is the right flow for a long-lived topic set that you want to keep querying over time.

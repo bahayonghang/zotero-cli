@@ -21,10 +21,18 @@ zot --json sync update-status --apply --limit 20
 
 ## mcp serve
 
-`zot mcp serve` currently exists only as a reserved command surface and returns an unsupported status.
+`zot mcp serve` currently exists only as a reserved command surface and returns an unsupported result.
+
+Also note that the old reference-MCP connector-style `search` / `fetch` tools are intentionally not exposed as standalone CLI commands. In the Rust CLI they map to workflows such as:
+
+- `library search`
+- `library citekey`
+- `item get`
+- `item pdf` / `item fulltext` / `item children`
+- `workspace query`
 
 Practical takeaway:
 
-- document that it exists
-- do not build workflows around it yet
-- use the CLI directly for actual work
+- document that `mcp` exists
+- do not build workflows around `mcp serve`
+- use the CLI directly for real work

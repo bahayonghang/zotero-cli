@@ -2,7 +2,7 @@
 
 ## A：找论文并给出引用
 
-目标：先检索，再读取单条目，最后输出引用。
+目标：先搜索，再读取单条目，最后输出引用。
 
 ```bash
 zot --json library search "reward hacking" --limit 5
@@ -10,20 +10,40 @@ zot --json item get ATTN001
 zot item cite ATTN001 --style apa
 ```
 
-## B：建立长期使用的主题工作区
+## B：按 citation key 直接定位
 
-目标：围绕一组论文构建持续可用的查询空间。
+目标：已知 citekey，快速定位单篇条目。
 
 ```bash
-zot --json workspace new mechinterp --description "Mechanistic interpretability papers"
-zot --json workspace import mechinterp --search "mechanistic interpretability"
-zot --json workspace index mechinterp
-zot --json workspace query mechinterp "What methods are used to identify circuits?" --limit 5
+zot --json doctor
+zot --json library citekey Smith2024
+zot item cite ATTN001 --style nature
 ```
 
-## C：直接修改 Zotero
+## C：建立库级 semantic index 并检索
 
-目标：写入标签、笔记、collection 关系或状态更新。
+目标：对整个库或某个 collection 建索引，然后做 semantic / hybrid search。
+
+```bash
+zot --json doctor
+zot --json library semantic-index --fulltext
+zot --json library semantic-search "mechanistic interpretability" --mode hybrid --limit 5
+```
+
+## D：查看并创建 PDF annotation
+
+目标：先确认附件和前置条件，再创建高亮或区域批注。
+
+```bash
+zot --json doctor
+zot --json item children ATTN001
+zot --json item annotation list --item-key ATTN001
+zot --json item annotation create ATCH005 --page 1 --text "attention mechanisms"
+```
+
+## E：直接修改 Zotero
+
+目标：写入 tags、notes、collection 关系或状态更新。
 
 ```bash
 zot --json doctor

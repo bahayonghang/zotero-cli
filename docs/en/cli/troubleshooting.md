@@ -16,35 +16,66 @@ cargo run -q -p zot-cli -- --json doctor
 
 ### 1. Cannot write to Zotero
 
-Check the write-credential status from `doctor`. The usual missing pieces are:
+Check `doctor` output under `write_credentials`. The usual missing pieces are:
 
 - `ZOT_API_KEY`
 - `ZOT_LIBRARY_ID`
 
 Without them, only local read-only analysis is available.
 
-### 2. PDF extraction fails
+### 2. `library citekey` returns nothing
 
-Check the PDF backend status in `doctor`. If no backend is available, do not assume PDF text or annotations can be extracted.
+Check `doctor` for `better_bibtex.available`:
 
-### 3. workspace query is not semantic enough
+- when available, citekey lookup can use Better BibTeX JSON-RPC
+- when unavailable, lookup falls back to citation keys stored in the Extra field
 
-Check embedding configuration:
+### 3. PDF / outline / annotation actions fail
 
-- `ZOT_EMBEDDING_URL`
-- `ZOT_EMBEDDING_KEY`
-- `ZOT_EMBEDDING_MODEL`
+Check these `doctor` fields:
 
-Without embeddings, query falls back to BM25 or the available mode.
+- `pdf_backend.available`
+- `annotation_support.pdf_outline`
+- `annotation_support.annotation_creation`
 
-### 4. How to target a group library
+Without a working backend, do not assume PDF text, outlines, or annotation creation are available.
+
+### 4. semantic search is not very semantic
+
+Check:
+
+- `embedding.configured`
+- `semantic_index`
+
+Without embeddings, library and workspace retrieval degrade to BM25 or the available mode.
+
+### 5. feeds do not show up
+
+Check `doctor` for `libraries.feeds_available`. Also remember:
+
+- feeds are not targeted through `--library`
+- use `library feeds`
+- then use `library feed-items <library-id>`
+
+### 6. `attach-mode auto` did not attach a PDF
+
+That is not always an error. `auto` tries the OA cascade in this order:
+
+1. Unpaywall
+2. arXiv relation
+3. Semantic Scholar
+4. PubMed Central
+
+If no open-access PDF exists, the item may still be created successfully.
+
+### 7. How to target a group library
 
 `--library` only supports:
 
 - `user`
 - `group:<id>`
 
-### 5. Why MCP is unavailable
+### 8. Why MCP is unavailable
 
 Because `zot mcp serve` is still scaffolding only and does not have a usable implementation yet.
 

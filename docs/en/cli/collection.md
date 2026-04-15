@@ -1,12 +1,13 @@
 # collection command
 
-`collection` is used to inspect or maintain Zotero collections.
+`collection` is used to inspect, search, and maintain real Zotero collections.
 
 ## Subcommands
 
 ```bash
 zot --json collection list
 zot --json collection items COLL001
+zot --json collection search Transform --limit 20
 zot --json collection create "New Project"
 zot --json collection rename COLL001 "Renamed Project"
 zot --json collection delete COLL001
@@ -17,15 +18,15 @@ zot --json collection remove-item COLL001 ATTN001
 ## When to use collection
 
 - You are organizing the actual Zotero library structure
-- You need to attach items to an existing collection
+- You need to place items into a real collection
 - You explicitly want to modify remote Zotero collections
 
 ## Difference from workspace
 
 - `collection`: changes a real Zotero collection
-- `workspace`: maintains a local reading/retrieval workspace without directly changing Zotero collections
+- `workspace`: maintains a local reading or retrieval workspace without directly changing Zotero collections
 
-If you want a persistent topic set for reading and query, prefer [workspace](/en/cli/workspace).
+If you want a long-lived topic set for reading and query, prefer [workspace](/en/cli/workspace).
 
 ## Deletion warning
 

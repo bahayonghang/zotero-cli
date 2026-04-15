@@ -17,14 +17,22 @@ zot --json sync update-status --apply --limit 20
 - 只想看分析结果：不要加 `--apply`
 - 用户明确要求把状态写回 Zotero：再加 `--apply`
 
-`--apply` 属于会改库的动作，应按写操作标准处理。
+`--apply` 会改库，应按写操作标准处理。
 
 ## mcp serve
 
-`zot mcp serve` 目前只在命令面上占位，当前实现返回未支持状态。
+`zot mcp serve` 目前只在命令面上占位，实际会返回未支持状态。
+
+另外，reference MCP 里的 connector 风格 `search` / `fetch` 也不会被搬成独立 CLI 命令；它们在 Rust 版里映射到这些工作流：
+
+- `library search`
+- `library citekey`
+- `item get`
+- `item pdf` / `item fulltext` / `item children`
+- `workspace query`
 
 结论：
 
-- 可以在文档里提到它存在
-- 不要围绕它设计实际流程
+- 可以在文档里提到 `mcp` 命令存在
+- 不要围绕 `mcp serve` 设计实际流程
 - 当前可用工作流仍然应该基于 CLI 本身
