@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "prompt": "帮我在 Zotero 里找跟 reward hacking 相关的论文，挑一篇最相关的给我看详情，然后给我一个 APA 格式引用。",
+    "expected": "先做 library search，再读取单条目，最后给出 cite 结果，而不是只贴命令。"
+  },
+  {
+    "id": 2,
+    "prompt": "我想围绕 mechanistic interpretability 搭一个持续使用的阅读工作区，把相关文献整理进去，并准备后面做问答检索。",
+    "expected": "选择 workspace new/import/index/query 这一套流程，识别这不是单次 library search。"
+  },
+  {
+    "id": 3,
+    "prompt": "把 Zotero 里 ATTN001 这个条目标上 priority 标签；如果当前环境没有写权限，就先告诉我缺什么，不要假装成功。",
+    "expected": "先检查 doctor/写权限，再决定执行 item tag add 或返回缺少的凭据说明。"
+  }
+]
