@@ -36,6 +36,7 @@ const zhSidebar = [
       { text: '路由策略', link: '/skills/routing' },
       { text: '安全边界', link: '/skills/safety' },
       { text: '典型工作流', link: '/skills/workflows' },
+      { text: '示例主线', link: '/skills/examples' },
       { text: 'Fallback', link: '/skills/fallback' },
     ],
   },

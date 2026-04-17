@@ -40,4 +40,5 @@
 - [路由策略](/skills/routing)
 - [安全边界](/skills/safety)
 - [典型工作流](/skills/workflows)
+- [示例主线](/skills/examples)
 - [Fallback](/skills/fallback)
