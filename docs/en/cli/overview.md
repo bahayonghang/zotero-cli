@@ -9,7 +9,6 @@
 | `--json` | Return the standard JSON envelope for scripts and agents |
 | `--profile <name>` | Select a config profile |
 | `--library <scope>` | Select library scope; only `user` or `group:<id>` is supported |
-| `--verbose` | Enable more verbose logging |
 
 ## Top-level commands
 

@@ -9,7 +9,6 @@
 | `--json` | 返回标准 JSON envelope，适合脚本和 Agent |
 | `--profile <name>` | 选择配置 profile |
 | `--library <scope>` | 选择库范围，只支持 `user` 或 `group:<id>` |
-| `--verbose` | 输出更详细日志 |
 
 ## 顶层命令
 

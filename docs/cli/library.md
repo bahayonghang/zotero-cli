@@ -80,6 +80,8 @@ zot --json library semantic-search "mechanistic interpretability" --mode hybrid 
 - library-level semantic index 使用本地 sidecar 数据库
 - 与 workspace 检索复用同一套索引实现，但不是同一个索引文件
 - embedding 未配置时，不要假设 semantic / hybrid 一定可用
+- `semantic-index` 默认走**替换式增量**：不加 `--force-rebuild` 时，只重建本次命中的条目，并清理库里已经删除的旧 key
+- `--force-rebuild` 会在写入前清空整个索引文件，仅在需要彻底重建（例如换了 embedding 模型）时使用
 
 ## duplicates 与 merge
 

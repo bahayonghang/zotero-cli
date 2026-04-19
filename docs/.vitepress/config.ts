@@ -71,9 +71,12 @@ const enSidebar = [
   },
 ]
 
+const base = process.env.VITEPRESS_BASE ?? '/'
+
 export default defineConfig({
   title: 'zot',
   description: 'Rust Zotero CLI and zot-skills documentation',
+  base,
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {

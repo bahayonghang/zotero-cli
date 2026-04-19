@@ -80,6 +80,8 @@ Notes:
 - the library-level semantic index is stored in a local sidecar SQLite file
 - it reuses the same index implementation as workspace retrieval, but not the same file
 - do not assume `semantic` or `hybrid` is meaningful when embeddings are not configured
+- `semantic-index` uses **replace-style incremental indexing** by default: without `--force-rebuild`, it rebuilds only the selected items and removes keys that no longer exist in the library
+- `--force-rebuild` clears the entire index file before writing; reserve it for real rebuilds (for example, after changing the embedding model)
 
 ## duplicates and merge
 
