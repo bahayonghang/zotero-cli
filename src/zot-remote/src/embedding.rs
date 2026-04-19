@@ -56,11 +56,14 @@ impl EmbeddingClient {
             .json()
             .await
             .map_err(remote_err("embedding-json"))?;
-        Ok(payload
-            .data
-            .into_iter()
-            .map(|entry| entry.embedding)
-            .collect())
+        validate_embeddings(
+            texts.len(),
+            payload
+                .data
+                .into_iter()
+                .map(|entry| entry.embedding)
+                .collect(),
+        )
     }
 }
 
@@ -80,5 +83,45 @@ fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
         message: err.to_string(),
         hint: None,
         status: err.status().map(|status| status.as_u16()),
+    }
+}
+
+fn validate_embeddings(requested: usize, embeddings: Vec<Vec<f32>>) -> ZotResult<Vec<Vec<f32>>> {
+    if requested == 0 || embeddings.len() == requested {
+        return Ok(embeddings);
+    }
+
+    Err(ZotError::Remote {
+        code: "embedding-count-mismatch".to_string(),
+        message: format!(
+            "Embedding service returned {} vectors for {} inputs",
+            embeddings.len(),
+            requested
+        ),
+        hint: Some("Check embedding service health or response format".to_string()),
+        status: None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_embeddings;
+    use zot_core::ZotError;
+
+    #[test]
+    fn accepts_matching_embedding_counts() {
+        let embeddings = vec![vec![0.1_f32, 0.2_f32], vec![0.3_f32, 0.4_f32]];
+        let validated = validate_embeddings(2, embeddings.clone()).expect("matching counts");
+        assert_eq!(validated, embeddings);
+    }
+
+    #[test]
+    fn rejects_mismatched_embedding_counts() {
+        let err = validate_embeddings(2, vec![vec![0.1_f32, 0.2_f32]])
+            .expect_err("mismatched counts should fail");
+        match err {
+            ZotError::Remote { code, .. } => assert_eq!(code, "embedding-count-mismatch"),
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 }

@@ -218,36 +218,15 @@ impl LocalLibrary {
         }
 
         if let Some(tag) = options.tag.as_deref() {
-            let tag_lc = tag.to_lowercase();
-            item_ids.retain(|item_id| {
-                self.get_item_tags(*item_id)
-                    .map(|tags| {
-                        tags.iter()
-                            .any(|existing| existing.to_lowercase() == tag_lc)
-                    })
-                    .unwrap_or(false)
-            });
+            item_ids = self.filter_item_ids_by_tag(item_ids, tag)?;
         }
 
         if let Some(creator) = options.creator.as_deref() {
-            let creator_lc = creator.to_lowercase();
-            item_ids.retain(|item_id| {
-                self.get_item_creators(*item_id)
-                    .map(|creators| {
-                        creators.iter().any(|existing| {
-                            existing.full_name().to_lowercase().contains(&creator_lc)
-                        })
-                    })
-                    .unwrap_or(false)
-            });
+            item_ids = self.filter_item_ids_by_creator(item_ids, creator)?;
         }
 
         if let Some(year) = options.year.as_deref() {
-            item_ids.retain(|item_id| {
-                self.get_item_by_id(*item_id)
-                    .map(|item| item.date.as_deref().unwrap_or_default().starts_with(year))
-                    .unwrap_or(false)
-            });
+            item_ids = self.filter_item_ids_by_year(item_ids, year)?;
         }
 
         let total = item_ids.len();
@@ -1410,14 +1389,316 @@ impl LocalLibrary {
     }
 
     fn get_items_batch(&self, item_ids: &[i64]) -> ZotResult<Vec<Item>> {
-        let excluded_ids = self.excluded_type_ids()?;
-        let mut items = Vec::new();
+        if item_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        const CHUNK: usize = 500;
+
+        let mut items_by_id = HashMap::new();
+        for chunk in item_ids.chunks(CHUNK) {
+            let base_rows = self.load_item_rows_batch(chunk)?;
+            let chunk_ids = base_rows.keys().copied().collect::<Vec<_>>();
+            let fields_by_id = self.load_item_fields_batch(&chunk_ids)?;
+            let creators_by_id = self.load_item_creators_batch(&chunk_ids)?;
+            let tags_by_id = self.load_item_tags_batch(&chunk_ids)?;
+            let collections_by_id = self.load_item_collection_keys_batch(&chunk_ids)?;
+
+            for (item_id, base) in base_rows {
+                let fields = fields_by_id.get(&item_id).cloned().unwrap_or_default();
+                let creators = creators_by_id.get(&item_id).cloned().unwrap_or_default();
+                let tags = tags_by_id.get(&item_id).cloned().unwrap_or_default();
+                let collections = collections_by_id.get(&item_id).cloned().unwrap_or_default();
+
+                items_by_id.insert(
+                    item_id,
+                    Item {
+                        key: base.key,
+                        item_type: base.item_type,
+                        title: fields.get("title").cloned().unwrap_or_default(),
+                        creators,
+                        abstract_note: fields.get("abstractNote").cloned(),
+                        date: fields.get("date").cloned(),
+                        url: fields.get("url").cloned(),
+                        doi: fields.get("DOI").cloned(),
+                        tags,
+                        collections,
+                        date_added: base.date_added,
+                        date_modified: base.date_modified,
+                        extra: fields
+                            .into_iter()
+                            .filter(|(field, _)| {
+                                !matches!(
+                                    field.as_str(),
+                                    "title" | "abstractNote" | "date" | "url" | "DOI"
+                                )
+                            })
+                            .collect(),
+                    },
+                );
+            }
+        }
+
+        let mut seen = HashSet::new();
+        let mut items = Vec::with_capacity(items_by_id.len());
         for item_id in item_ids {
-            if !self.is_excluded_item(*item_id, &excluded_ids)? {
-                items.push(self.get_item_by_id(*item_id)?);
+            if seen.insert(*item_id)
+                && let Some(item) = items_by_id.remove(item_id)
+            {
+                items.push(item);
             }
         }
         Ok(items)
+    }
+
+    fn load_item_rows_batch(&self, item_ids: &[i64]) -> ZotResult<HashMap<i64, BatchItemRow>> {
+        if item_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let placeholders = repeat_placeholders(item_ids.len());
+        let sql = format!(
+            "SELECT i.itemID, i.key, it.typeName, i.dateAdded, i.dateModified
+             FROM items i
+             JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+             WHERE i.libraryID = ? AND i.itemID IN ({placeholders})"
+        );
+        let mut params = Vec::with_capacity(item_ids.len() + 1);
+        params.push(rusqlite::types::Value::from(self.library_id));
+        params.extend(item_ids.iter().copied().map(rusqlite::types::Value::from));
+
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(sql_err("item-rows-batch"))?;
+        let rows = stmt
+            .query_map(params_from_iter(params.iter()), |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    BatchItemRow {
+                        key: row.get::<_, String>(1)?,
+                        item_type: row.get::<_, String>(2)?,
+                        date_added: row.get::<_, Option<String>>(3)?,
+                        date_modified: row.get::<_, Option<String>>(4)?,
+                    },
+                ))
+            })
+            .map_err(sql_err("item-rows-batch"))?;
+
+        let mut batch = HashMap::new();
+        for row in rows {
+            let (item_id, entry) = row.map_err(sql_err("item-rows-batch"))?;
+            if EXCLUDED_TYPE_NAMES.contains(&entry.item_type.as_str()) {
+                continue;
+            }
+            batch.insert(item_id, entry);
+        }
+        Ok(batch)
+    }
+
+    fn load_item_fields_batch(
+        &self,
+        item_ids: &[i64],
+    ) -> ZotResult<HashMap<i64, BTreeMap<String, String>>> {
+        if item_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders = repeat_placeholders(item_ids.len());
+        let sql = format!(
+            "SELECT id.itemID, f.fieldName, iv.value
+             FROM itemData id
+             JOIN fields f ON id.fieldID = f.fieldID
+             JOIN itemDataValues iv ON id.valueID = iv.valueID
+             WHERE id.itemID IN ({placeholders})"
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(sql_err("item-fields-batch"))?;
+        let rows = stmt
+            .query_map(params_from_iter(item_ids.iter()), |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(sql_err("item-fields-batch"))?;
+
+        let mut fields = HashMap::<i64, BTreeMap<String, String>>::new();
+        for row in rows {
+            let (item_id, field, value) = row.map_err(sql_err("item-fields-batch"))?;
+            fields.entry(item_id).or_default().insert(field, value);
+        }
+        Ok(fields)
+    }
+
+    fn load_item_creators_batch(&self, item_ids: &[i64]) -> ZotResult<HashMap<i64, Vec<Creator>>> {
+        if item_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders = repeat_placeholders(item_ids.len());
+        let sql = format!(
+            "SELECT ic.itemID, c.firstName, c.lastName, ct.creatorType
+             FROM itemCreators ic
+             JOIN creators c ON ic.creatorID = c.creatorID
+             JOIN creatorTypes ct ON ic.creatorTypeID = ct.creatorTypeID
+             WHERE ic.itemID IN ({placeholders})
+             ORDER BY ic.itemID, ic.orderIndex"
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(sql_err("item-creators-batch"))?;
+        let rows = stmt
+            .query_map(params_from_iter(item_ids.iter()), |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    Creator {
+                        first_name: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                        last_name: row.get::<_, String>(2)?,
+                        creator_type: row.get::<_, String>(3)?,
+                    },
+                ))
+            })
+            .map_err(sql_err("item-creators-batch"))?;
+
+        let mut creators = HashMap::<i64, Vec<Creator>>::new();
+        for row in rows {
+            let (item_id, creator) = row.map_err(sql_err("item-creators-batch"))?;
+            creators.entry(item_id).or_default().push(creator);
+        }
+        Ok(creators)
+    }
+
+    fn load_item_tags_batch(&self, item_ids: &[i64]) -> ZotResult<HashMap<i64, Vec<String>>> {
+        if item_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders = repeat_placeholders(item_ids.len());
+        let sql = format!(
+            "SELECT it.itemID, t.name
+             FROM itemTags it
+             JOIN tags t ON it.tagID = t.tagID
+             WHERE it.itemID IN ({placeholders})
+             ORDER BY it.itemID, t.name ASC"
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(sql_err("item-tags-batch"))?;
+        let rows = stmt
+            .query_map(params_from_iter(item_ids.iter()), |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(sql_err("item-tags-batch"))?;
+
+        let mut tags = HashMap::<i64, Vec<String>>::new();
+        for row in rows {
+            let (item_id, tag) = row.map_err(sql_err("item-tags-batch"))?;
+            tags.entry(item_id).or_default().push(tag);
+        }
+        Ok(tags)
+    }
+
+    fn load_item_collection_keys_batch(
+        &self,
+        item_ids: &[i64],
+    ) -> ZotResult<HashMap<i64, Vec<String>>> {
+        if item_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders = repeat_placeholders(item_ids.len());
+        let sql = format!(
+            "SELECT ci.itemID, c.key
+             FROM collectionItems ci
+             JOIN collections c ON ci.collectionID = c.collectionID
+             WHERE ci.itemID IN ({placeholders})
+             ORDER BY ci.itemID, c.collectionName ASC"
+        );
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(sql_err("item-collection-keys-batch"))?;
+        let rows = stmt
+            .query_map(params_from_iter(item_ids.iter()), |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(sql_err("item-collection-keys-batch"))?;
+
+        let mut collections = HashMap::<i64, Vec<String>>::new();
+        for row in rows {
+            let (item_id, collection_key) = row.map_err(sql_err("item-collection-keys-batch"))?;
+            collections.entry(item_id).or_default().push(collection_key);
+        }
+        Ok(collections)
+    }
+
+    fn filter_item_ids_by_tag(&self, item_ids: HashSet<i64>, tag: &str) -> ZotResult<HashSet<i64>> {
+        self.filter_item_ids_by_exact_name(
+            item_ids,
+            "SELECT DISTINCT it.itemID FROM itemTags it JOIN tags t ON it.tagID = t.tagID WHERE LOWER(t.name) = ? AND it.itemID IN",
+            tag.to_lowercase(),
+            "tag-filter-batch",
+        )
+    }
+
+    fn filter_item_ids_by_creator(
+        &self,
+        item_ids: HashSet<i64>,
+        creator: &str,
+    ) -> ZotResult<HashSet<i64>> {
+        self.filter_item_ids_by_exact_name(
+            item_ids,
+            "SELECT DISTINCT ic.itemID FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE LOWER(TRIM(COALESCE(c.firstName, '') || ' ' || c.lastName)) LIKE ? AND ic.itemID IN",
+            format!("%{}%", creator.to_lowercase()),
+            "creator-filter-batch",
+        )
+    }
+
+    fn filter_item_ids_by_year(
+        &self,
+        item_ids: HashSet<i64>,
+        year: &str,
+    ) -> ZotResult<HashSet<i64>> {
+        self.filter_item_ids_by_exact_name(
+            item_ids,
+            "SELECT DISTINCT id.itemID FROM itemData id JOIN fields f ON id.fieldID = f.fieldID JOIN itemDataValues iv ON id.valueID = iv.valueID WHERE f.fieldName = 'date' AND iv.value LIKE ? AND id.itemID IN",
+            format!("{year}%"),
+            "year-filter-batch",
+        )
+    }
+
+    fn filter_item_ids_by_exact_name(
+        &self,
+        item_ids: HashSet<i64>,
+        sql_prefix: &str,
+        filter_value: String,
+        context: &'static str,
+    ) -> ZotResult<HashSet<i64>> {
+        if item_ids.is_empty() {
+            return Ok(item_ids);
+        }
+
+        const CHUNK: usize = 500;
+        let candidate_ids = item_ids.into_iter().collect::<Vec<_>>();
+        let mut matched = HashSet::new();
+        for chunk in candidate_ids.chunks(CHUNK) {
+            let placeholders = repeat_placeholders(chunk.len());
+            let sql = format!("{sql_prefix} ({placeholders})");
+            let mut params = Vec::with_capacity(chunk.len() + 1);
+            params.push(rusqlite::types::Value::from(filter_value.clone()));
+            params.extend(chunk.iter().copied().map(rusqlite::types::Value::from));
+
+            let mut stmt = self.conn.prepare(&sql).map_err(sql_err(context))?;
+            let rows = stmt
+                .query_map(params_from_iter(params.iter()), |row| row.get::<_, i64>(0))
+                .map_err(sql_err(context))?;
+            for row in rows {
+                matched.insert(row.map_err(sql_err(context))?);
+            }
+        }
+        Ok(matched)
     }
 
     fn get_item_by_id(&self, item_id: i64) -> ZotResult<Item> {
@@ -1683,11 +1964,17 @@ impl LocalLibrary {
     }
 }
 
+#[derive(Debug)]
+struct BatchItemRow {
+    key: String,
+    item_type: String,
+    date_added: Option<String>,
+    date_modified: Option<String>,
+}
+
 fn sort_items(items: &mut [Item], sort: Option<SortField>, direction: SortDirection) {
     match sort {
-        Some(SortField::Title) => {
-            items.sort_by(|left, right| left.title.to_lowercase().cmp(&right.title.to_lowercase()))
-        }
+        Some(SortField::Title) => items.sort_by_key(|item| item.title.to_lowercase()),
         Some(SortField::Creator) => items.sort_by(|left, right| {
             let left_name = left
                 .creators

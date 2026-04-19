@@ -4,8 +4,12 @@ use zot_core::{
     Workspace, ZotError,
 };
 
+pub fn to_pretty_json<T: serde::Serialize>(value: &T) -> anyhow::Result<String> {
+    Ok(serde_json::to_string_pretty(value)?)
+}
+
 pub fn print_json<T: serde::Serialize>(value: &T) -> anyhow::Result<()> {
-    println!("{}", serde_json::to_string_pretty(value)?);
+    println!("{}", to_pretty_json(value)?);
     Ok(())
 }
 
@@ -137,5 +141,30 @@ pub fn print_query_chunks(chunks: &[QueryChunk]) {
         );
         println!("{}", chunk.content);
         println!();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use zot_core::CliEnvelope;
+
+    use super::to_pretty_json;
+
+    #[test]
+    fn serializes_success_envelope_with_meta() {
+        let json = to_pretty_json(&CliEnvelope::ok_with_meta(
+            serde_json::json!({ "hello": "world" }),
+            zot_core::EnvelopeMeta {
+                count: Some(1),
+                total: Some(1),
+                profile: Some("default".to_string()),
+            },
+        ))
+        .expect("serialize envelope");
+
+        assert!(json.contains("\"ok\": true"));
+        assert!(json.contains("\"data\""));
+        assert!(json.contains("\"count\": 1"));
+        assert!(json.contains("\"profile\": \"default\""));
     }
 }

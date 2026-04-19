@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use serde::{Deserialize, Serialize};
 use zot_core::{Item, QueryChunk, Workspace, WorkspaceItem, ZotError, ZotResult};
 
@@ -72,7 +73,34 @@ impl WorkspaceStore {
             hint: None,
         })?;
         let path = self.path_for(&workspace.name);
-        std::fs::write(&path, raw).map_err(|source| ZotError::Io { path, source })
+        let mut temp =
+            tempfile::NamedTempFile::new_in(&self.root).map_err(|source| ZotError::Io {
+                path: self.root.clone(),
+                source,
+            })?;
+        temp.write_all(raw.as_bytes())
+            .map_err(|source| ZotError::Io {
+                path: temp.path().to_path_buf(),
+                source,
+            })?;
+        temp.as_file_mut()
+            .sync_all()
+            .map_err(|source| ZotError::Io {
+                path: temp.path().to_path_buf(),
+                source,
+            })?;
+        #[cfg(target_os = "windows")]
+        if path.exists() {
+            std::fs::remove_file(&path).map_err(|source| ZotError::Io {
+                path: path.clone(),
+                source,
+            })?;
+        }
+        temp.persist(&path).map_err(|err| ZotError::Io {
+            path: path.clone(),
+            source: err.error,
+        })?;
+        Ok(())
     }
 
     pub fn load(&self, name: &str) -> ZotResult<Workspace> {
@@ -165,6 +193,12 @@ impl RagIndex {
             message: err.to_string(),
             hint: None,
         })?;
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;")
+            .map_err(|err| ZotError::Database {
+                code: "rag-pragma-wal".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS chunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -216,6 +250,38 @@ impl RagIndex {
                 hint: None,
             })?;
         Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn remove_item_chunks(&self, item_key: &str) -> ZotResult<()> {
+        let tx = self
+            .conn
+            .unchecked_transaction()
+            .map_err(|err| ZotError::Database {
+                code: "rag-delete-chunks-tx".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
+        tx.execute(
+            "DELETE FROM bm25_terms WHERE chunk_id IN (SELECT id FROM chunks WHERE item_key = ?1)",
+            params![item_key],
+        )
+        .map_err(|err| ZotError::Database {
+            code: "rag-delete-terms".to_string(),
+            message: err.to_string(),
+            hint: None,
+        })?;
+        tx.execute("DELETE FROM chunks WHERE item_key = ?1", params![item_key])
+            .map_err(|err| ZotError::Database {
+                code: "rag-delete-chunks".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
+        tx.commit().map_err(|err| ZotError::Database {
+            code: "rag-delete-chunks-commit".to_string(),
+            message: err.to_string(),
+            hint: None,
+        })?;
+        Ok(())
     }
 
     pub fn insert_terms(&self, chunk_id: i64, terms: &HashMap<String, f32>) -> ZotResult<()> {
@@ -353,16 +419,13 @@ impl RagIndex {
         if query_terms.is_empty() {
             return Ok(Vec::new());
         }
-        let chunks = self.load_chunks()?;
-        let avg_doc_len = if chunks.is_empty() {
-            1.0
-        } else {
-            chunks
-                .iter()
-                .map(|chunk| tokenize(&chunk.content).len() as f32)
-                .sum::<f32>()
-                / chunks.len() as f32
-        };
+        let candidate_ids = self.matching_chunk_ids(&query_terms)?;
+        if candidate_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let chunks = self.load_chunks_by_ids(&candidate_ids)?;
+        let avg_doc_len = self.average_doc_len()?;
+        let terms_by_chunk = self.load_terms_for_chunks(&candidate_ids)?;
         let mut df = HashMap::new();
         for term in &query_terms {
             let count = self
@@ -378,11 +441,11 @@ impl RagIndex {
             df.insert(term.clone(), count as f32);
         }
 
-        let total_docs = chunks.len() as f32;
+        let total_docs = self.chunk_count()?.max(1) as f32;
         let mut scored = Vec::new();
         for chunk in chunks {
             let doc_len = tokenize(&chunk.content).len() as f32;
-            let terms = self.load_terms(chunk.id)?;
+            let terms = terms_by_chunk.get(&chunk.id);
             let mut score = 0.0_f32;
             for term in &query_terms {
                 let Some(df_value) = df.get(term) else {
@@ -391,7 +454,10 @@ impl RagIndex {
                 if *df_value == 0.0 {
                     continue;
                 }
-                let tf = *terms.get(term).unwrap_or(&0.0);
+                let tf = terms
+                    .and_then(|values| values.get(term))
+                    .copied()
+                    .unwrap_or(0.0);
                 let idf = ((total_docs - *df_value + 0.5) / (*df_value + 0.5) + 1.0).ln();
                 score +=
                     idf * (tf * 2.5) / (tf + 1.5 * (1.0 - 0.75 + 0.75 * doc_len / avg_doc_len));
@@ -415,7 +481,7 @@ impl RagIndex {
     }
 
     fn score_semantic(&self, embedding: &[f32]) -> ZotResult<Vec<QueryChunk>> {
-        let chunks = self.load_chunks()?;
+        let chunks = self.load_all_chunks()?;
         let mut scored = Vec::new();
         for chunk in chunks {
             if let Some(chunk_embedding) = chunk.embedding.as_deref() {
@@ -437,7 +503,7 @@ impl RagIndex {
         Ok(scored)
     }
 
-    fn load_chunks(&self) -> ZotResult<Vec<ChunkRow>> {
+    fn load_all_chunks(&self) -> ZotResult<Vec<ChunkRow>> {
         let mut stmt = self
             .conn
             .prepare("SELECT id, item_key, source, content, embedding FROM chunks")
@@ -460,20 +526,96 @@ impl RagIndex {
             .map_err(db_err("rag-load-chunks"))
     }
 
-    fn load_terms(&self, chunk_id: i64) -> ZotResult<HashMap<String, f32>> {
+    fn average_doc_len(&self) -> ZotResult<f32> {
         let mut stmt = self
             .conn
-            .prepare("SELECT term, tf FROM bm25_terms WHERE chunk_id = ?1")
-            .map_err(db_err("rag-load-terms"))?;
+            .prepare("SELECT content FROM chunks")
+            .map_err(db_err("rag-avg-doc-len"))?;
         let rows = stmt
-            .query_map(params![chunk_id], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, f32>(1)?))
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(db_err("rag-avg-doc-len"))?;
+        let mut total_docs = 0usize;
+        let mut total_tokens = 0usize;
+        for row in rows {
+            let content = row.map_err(db_err("rag-avg-doc-len"))?;
+            total_docs += 1;
+            total_tokens += tokenize(&content).len();
+        }
+        if total_docs == 0 {
+            Ok(1.0)
+        } else {
+            Ok(total_tokens as f32 / total_docs as f32)
+        }
+    }
+
+    fn matching_chunk_ids(&self, query_terms: &[String]) -> ZotResult<Vec<i64>> {
+        let placeholders = repeat_placeholders(query_terms.len());
+        let sql =
+            format!("SELECT DISTINCT chunk_id FROM bm25_terms WHERE term IN ({placeholders})");
+        let mut stmt = self
+            .conn
+            .prepare(&sql)
+            .map_err(db_err("rag-bm25-candidates"))?;
+        let rows = stmt
+            .query_map(params_from_iter(query_terms.iter()), |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(db_err("rag-bm25-candidates"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(db_err("rag-bm25-candidates"))
+    }
+
+    fn load_chunks_by_ids(&self, chunk_ids: &[i64]) -> ZotResult<Vec<ChunkRow>> {
+        if chunk_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders = repeat_placeholders(chunk_ids.len());
+        let sql = format!(
+            "SELECT id, item_key, source, content, embedding FROM chunks WHERE id IN ({placeholders})"
+        );
+        let mut stmt = self.conn.prepare(&sql).map_err(db_err("rag-load-chunks"))?;
+        let rows = stmt
+            .query_map(params_from_iter(chunk_ids.iter()), |row| {
+                let embedding_raw = row.get::<_, Option<String>>(4)?;
+                let embedding =
+                    embedding_raw.and_then(|raw| serde_json::from_str::<Vec<f32>>(&raw).ok());
+                Ok(ChunkRow {
+                    id: row.get::<_, i64>(0)?,
+                    item_key: row.get::<_, String>(1)?,
+                    source: row.get::<_, String>(2)?,
+                    content: row.get::<_, String>(3)?,
+                    embedding,
+                })
+            })
+            .map_err(db_err("rag-load-chunks"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(db_err("rag-load-chunks"))
+    }
+
+    fn load_terms_for_chunks(
+        &self,
+        chunk_ids: &[i64],
+    ) -> ZotResult<HashMap<i64, HashMap<String, f32>>> {
+        if chunk_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders = repeat_placeholders(chunk_ids.len());
+        let sql =
+            format!("SELECT chunk_id, term, tf FROM bm25_terms WHERE chunk_id IN ({placeholders})");
+        let mut stmt = self.conn.prepare(&sql).map_err(db_err("rag-load-terms"))?;
+        let rows = stmt
+            .query_map(params_from_iter(chunk_ids.iter()), |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, f32>(2)?,
+                ))
             })
             .map_err(db_err("rag-load-terms"))?;
-        let mut terms = HashMap::new();
+        let mut terms = HashMap::<i64, HashMap<String, f32>>::new();
         for row in rows {
-            let (term, tf) = row.map_err(db_err("rag-load-terms"))?;
-            terms.insert(term, tf);
+            let (chunk_id, term, tf) = row.map_err(db_err("rag-load-terms"))?;
+            terms.entry(chunk_id).or_default().insert(term, tf);
         }
         Ok(terms)
     }
@@ -556,6 +698,12 @@ fn default_workspaces_dir() -> PathBuf {
     zot_core::AppConfig::config_dir().join("workspaces")
 }
 
+fn repeat_placeholders(count: usize) -> String {
+    std::iter::repeat_n("?", count)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 fn ensure_workspace_name(name: &str) -> ZotResult<()> {
     let valid =
         regex::Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").map_err(|err| ZotError::InvalidInput {
@@ -636,5 +784,185 @@ fn db_err(code: &'static str) -> impl Fn(rusqlite::Error) -> ZotError {
         code: code.to_string(),
         message: err.to_string(),
         hint: None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::{
+        HybridMode, RagIndex, WorkspaceStore, build_metadata_chunk, compute_term_frequencies,
+        tokenize,
+    };
+    use zot_core::{Creator, Item, Workspace, WorkspaceItem};
+
+    #[test]
+    fn workspace_store_save_round_trips_updates() {
+        let dir = tempdir().expect("tempdir");
+        let store = WorkspaceStore::new(Some(dir.path().to_path_buf()));
+        let mut workspace = Workspace {
+            name: "llm-safety".to_string(),
+            created: "2026-01-01T00:00:00Z".to_string(),
+            description: "initial".to_string(),
+            items: Vec::new(),
+        };
+
+        store.save(&workspace).expect("first save");
+        workspace.description = "updated".to_string();
+        workspace.items.push(WorkspaceItem {
+            key: "ATTN001".to_string(),
+            title: "Attention Is All You Need".to_string(),
+            added: "2026-01-02T00:00:00Z".to_string(),
+        });
+        store.save(&workspace).expect("overwrite save");
+
+        let loaded = store.load("llm-safety").expect("load workspace");
+        assert_eq!(loaded.description, "updated");
+        assert_eq!(loaded.items.len(), 1);
+    }
+
+    #[test]
+    fn rag_index_bm25_query_returns_matching_chunks() {
+        let dir = tempdir().expect("tempdir");
+        let index = RagIndex::open(dir.path().join("query.idx.sqlite")).expect("open index");
+
+        let first = "transformer attention mechanism".to_string();
+        let first_id = index
+            .insert_chunk("ATTN001", "metadata", &first)
+            .expect("insert first chunk");
+        index
+            .insert_terms(first_id, &compute_term_frequencies(&tokenize(&first)))
+            .expect("insert first terms");
+
+        let second = "protein folding benchmark".to_string();
+        let second_id = index
+            .insert_chunk("PROT001", "metadata", &second)
+            .expect("insert second chunk");
+        index
+            .insert_terms(second_id, &compute_term_frequencies(&tokenize(&second)))
+            .expect("insert second terms");
+
+        let results = index
+            .query("attention", HybridMode::Bm25, None, 10)
+            .expect("bm25 query");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].item_key, "ATTN001");
+    }
+
+    #[test]
+    fn metadata_chunk_includes_authors_and_tags() {
+        let item = Item {
+            key: "ATTN001".to_string(),
+            item_type: "journalArticle".to_string(),
+            title: "Attention Is All You Need".to_string(),
+            creators: vec![Creator {
+                first_name: "Ashish".to_string(),
+                last_name: "Vaswani".to_string(),
+                creator_type: "author".to_string(),
+            }],
+            abstract_note: Some("We propose a new architecture.".to_string()),
+            date: Some("2017".to_string()),
+            url: None,
+            doi: None,
+            tags: vec!["transformer".to_string()],
+            collections: Vec::new(),
+            date_added: None,
+            date_modified: None,
+            extra: Default::default(),
+        };
+
+        let chunk = build_metadata_chunk(&item);
+        assert!(chunk.contains("Authors: Ashish Vaswani"));
+        assert!(chunk.contains("Tags: transformer"));
+    }
+
+    #[test]
+    fn rag_index_open_enables_wal_journal_mode() {
+        let dir = tempdir().expect("tempdir");
+        let index = RagIndex::open(dir.path().join("wal.idx.sqlite")).expect("open index");
+        let mode: String = index
+            .conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .expect("query journal_mode");
+        assert_eq!(mode.to_lowercase(), "wal");
+    }
+
+    #[test]
+    fn rag_index_reopen_preserves_prior_chunks_without_clear() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("persistent.idx.sqlite");
+
+        {
+            let index = RagIndex::open(&path).expect("initial open");
+            index
+                .insert_chunk("ATTN001", "metadata", "transformer attention")
+                .expect("insert chunk");
+            assert_eq!(index.chunk_count().expect("count after insert"), 1);
+        }
+
+        let reopened = RagIndex::open(&path).expect("reopen");
+        assert_eq!(
+            reopened.chunk_count().expect("count after reopen"),
+            1,
+            "RagIndex::open must not wipe existing chunks"
+        );
+    }
+
+    #[test]
+    fn rag_index_remove_item_chunks_clears_previous_versions() {
+        let dir = tempdir().expect("tempdir");
+        let index = RagIndex::open(dir.path().join("replace.idx.sqlite")).expect("open index");
+
+        let first = "transformer attention mechanism".to_string();
+        let first_id = index
+            .insert_chunk("ATTN001", "metadata", &first)
+            .expect("insert first chunk");
+        index
+            .insert_terms(first_id, &compute_term_frequencies(&tokenize(&first)))
+            .expect("insert first terms");
+
+        index
+            .remove_item_chunks("ATTN001")
+            .expect("remove prior item chunks");
+
+        let second = "updated transformer summary".to_string();
+        let second_id = index
+            .insert_chunk("ATTN001", "metadata", &second)
+            .expect("insert replacement chunk");
+        index
+            .insert_terms(second_id, &compute_term_frequencies(&tokenize(&second)))
+            .expect("insert replacement terms");
+
+        assert_eq!(index.chunk_count().expect("chunk count after replace"), 1);
+        assert_eq!(index.indexed_keys().expect("indexed keys"), vec!["ATTN001"]);
+    }
+
+    #[test]
+    fn bm25_average_doc_len_uses_full_corpus() {
+        let dir = tempdir().expect("tempdir");
+        let index = RagIndex::open(dir.path().join("avg.idx.sqlite")).expect("open index");
+
+        let matching = "attention".to_string();
+        let matching_id = index
+            .insert_chunk("ATTN001", "metadata", &matching)
+            .expect("insert matching chunk");
+        index
+            .insert_terms(matching_id, &compute_term_frequencies(&tokenize(&matching)))
+            .expect("insert matching terms");
+
+        let non_matching = ["protein"; 9].join(" ");
+        let non_matching_id = index
+            .insert_chunk("PROT001", "metadata", &non_matching)
+            .expect("insert non-matching chunk");
+        index
+            .insert_terms(
+                non_matching_id,
+                &compute_term_frequencies(&tokenize(&non_matching)),
+            )
+            .expect("insert non-matching terms");
+
+        assert_eq!(index.average_doc_len().expect("average doc length"), 5.0);
     }
 }
