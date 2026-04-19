@@ -3,7 +3,10 @@ name = "zot-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
 rust-version.workspace = true
+description = "The Rust-first Zotero CLI for researchers, terminal-lovers, and AI agents."
 
 [[bin]]
 name = "zot"
@@ -23,6 +26,6 @@ serde_json.workspace = true
 tokio.workspace = true
 toml.workspace = true
 uuid.workspace = true
-zot-core = { path = "../zot-core" }
-zot-local = { path = "../zot-local" }
-zot-remote = { path = "../zot-remote" }
+zot-core = { version = "0.1.0", path = "../zot-core" }
+zot-local = { version = "0.1.0", path = "../zot-local" }
+zot-remote = { version = "0.1.0", path = "../zot-remote" }

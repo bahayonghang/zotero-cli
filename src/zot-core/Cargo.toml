@@ -3,7 +3,10 @@ name = "zot-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
 rust-version.workspace = true
+description = "Shared config, models, errors, and JSON envelope support for zot."
 
 [dependencies]
 chrono.workspace = true
