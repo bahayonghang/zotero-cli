@@ -63,14 +63,19 @@ If you have ever tried to grep, RAG, or LLM-summarize your Zotero library and gi
 
 ## Install
 
-### From source (recommended today)
+### Install the CLI from GitHub
 
 ```bash
-git clone <this-repo>
-cd zotero-cli
-just build     # cargo build --release -p zot-cli
-just install   # cargo install --path src/zot-cli --locked --force
+cargo install --git https://github.com/bahayonghang/zotero-cli.git zot-cli --locked
 ```
+
+### Install the `zot-skills` skill
+
+```bash
+npx skills add https://github.com/bahayonghang/zotero-cli --skill zot-skills
+```
+
+This installs the bundled skill from [`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md) into a compatible agent runtime.
 
 ### First run
 
@@ -137,7 +142,7 @@ Every command honors `--json`. The envelope is stable:
 
 ## AI-agent-native
 
-`zot` ships a Claude Code skill at [`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md). Drop it into any agent runtime and natural-language requests route to `zot` automatically:
+`zot` ships a Claude Code skill at [`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md). Install it with `npx skills add`, then natural-language requests route to `zot` automatically:
 
 - _"find papers tagged `transformer` by Vaswani in 2017"_ → `library search`
 - _"pull the annotations out of ATTN001"_ → `item annotation list`
