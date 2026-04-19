@@ -481,8 +481,12 @@ impl ZoteroRemote {
     }
 
     pub async fn get_item_json(&self, key: &str) -> ZotResult<Value> {
+        self.get_item_flat(key).await
+    }
+
+    pub async fn get_item_flat(&self, key: &str) -> ZotResult<Value> {
         let item = self.get_item_data(key).await?;
-        Ok(item.data)
+        Ok(item.into_flat_value())
     }
 
     pub async fn list_children(&self, key: &str) -> ZotResult<Vec<Value>> {
@@ -495,7 +499,25 @@ impl ZoteroRemote {
         self.ensure_json(response, "list-children").await
     }
 
+    pub async fn list_children_flat(&self, key: &str) -> ZotResult<Vec<Value>> {
+        let response = self
+            .client
+            .request(Method::GET, self.endpoint(&format!("items/{key}/children")))
+            .send()
+            .await
+            .map_err(remote_err("list-children"))?;
+        let children: Vec<EditableObject> = self.ensure_json(response, "list-children").await?;
+        Ok(children
+            .into_iter()
+            .map(EditableObject::into_flat_value)
+            .collect())
+    }
+
     pub async fn update_item_value(&self, item: &Value) -> ZotResult<()> {
+        self.update_flat_item_value(item).await
+    }
+
+    pub async fn update_flat_item_value(&self, item: &Value) -> ZotResult<()> {
         let key =
             item.get("key")
                 .and_then(Value::as_str)
@@ -516,7 +538,7 @@ impl ZoteroRemote {
             .client
             .put(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", version.to_string())
-            .json(item)
+            .json(&sanitize_flat_item_value(item))
             .send()
             .await
             .map_err(remote_err("update-item-value"))?;
@@ -766,15 +788,23 @@ struct WriteEntry {
 
 #[derive(Debug, Deserialize)]
 struct EditableObject {
+    key: String,
+    version: i64,
     data: Value,
 }
 
 impl EditableObject {
     fn version(&self) -> i64 {
-        self.data
-            .get("version")
-            .and_then(Value::as_i64)
-            .unwrap_or(0)
+        self.version
+    }
+
+    fn into_flat_value(self) -> Value {
+        let mut data = self.data;
+        if let Some(object) = data.as_object_mut() {
+            object.insert("key".to_string(), Value::String(self.key));
+            object.insert("version".to_string(), Value::Number(self.version.into()));
+        }
+        data
     }
 }
 
@@ -835,6 +865,15 @@ fn first_created_key(keys: Vec<String>) -> ZotResult<String> {
         hint: None,
         status: None,
     })
+}
+
+fn sanitize_flat_item_value(item: &Value) -> Value {
+    let mut payload = item.clone();
+    if let Some(object) = payload.as_object_mut() {
+        object.remove("key");
+        object.remove("version");
+    }
+    payload
 }
 
 fn guess_content_type(filename: &str) -> &'static str {

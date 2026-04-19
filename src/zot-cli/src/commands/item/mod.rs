@@ -1,4 +1,5 @@
 pub(crate) mod annotation;
+pub(crate) mod merge;
 pub(crate) mod note;
 pub(crate) mod read;
 pub(crate) mod scite;
@@ -28,6 +29,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemCommand) -> Result<()>
         ItemCommand::AddDoi(args) => write::handle_add_doi(ctx, args).await,
         ItemCommand::AddUrl(args) => write::handle_add_url(ctx, args).await,
         ItemCommand::AddFile(args) => write::handle_add_file(ctx, args).await,
+        ItemCommand::Merge(args) => write::handle_merge(ctx, args).await,
         ItemCommand::Update(args) => write::handle_update(ctx, args).await,
         ItemCommand::Trash(args) => write::handle_trash(ctx, args).await,
         ItemCommand::Restore(args) => write::handle_restore(ctx, args).await,

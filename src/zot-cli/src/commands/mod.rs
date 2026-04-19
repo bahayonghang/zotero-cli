@@ -8,8 +8,9 @@ pub(crate) mod sync;
 pub(crate) mod workspace;
 
 use anyhow::Result;
+use clap::CommandFactory;
 
-use crate::cli::Commands;
+use crate::cli::{Cli, Commands};
 use crate::context::AppContext;
 
 pub(crate) async fn dispatch(ctx: &AppContext, command: Commands) -> Result<()> {
@@ -22,5 +23,9 @@ pub(crate) async fn dispatch(ctx: &AppContext, command: Commands) -> Result<()> 
         Commands::Workspace { command } => workspace::handle(ctx, command).await,
         Commands::Sync { command } => sync::handle(ctx, command).await,
         Commands::Mcp { command } => mcp::handle(ctx, command).await,
+        Commands::Completions { shell } => {
+            clap_complete::generate(shell, &mut Cli::command(), "zot", &mut std::io::stdout());
+            Ok(())
+        }
     }
 }

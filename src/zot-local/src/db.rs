@@ -999,6 +999,27 @@ impl LocalLibrary {
         self.get_items_batch(&item_ids)
     }
 
+    pub fn get_recent_items_by_count(&self, count: usize) -> ZotResult<Vec<Item>> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT itemID FROM items
+                 WHERE libraryID = ?1
+                 ORDER BY dateAdded DESC
+                 LIMIT ?2",
+            )
+            .map_err(sql_err("recent-items-by-count"))?;
+        let rows = stmt
+            .query_map(params![self.library_id, count as i64], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(sql_err("recent-items-by-count"))?;
+        let item_ids = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("recent-items-by-count"))?;
+        self.get_items_batch(&item_ids)
+    }
+
     pub fn get_trash_items(&self, limit: usize) -> ZotResult<Vec<Item>> {
         let mut stmt = self.conn.prepare(
             "SELECT i.itemID FROM items i JOIN deletedItems d ON i.itemID = d.itemID WHERE i.libraryID = ?1 ORDER BY d.dateDeleted DESC LIMIT ?2",
@@ -2504,6 +2525,23 @@ Original Date: 2017');
         };
         assert_eq!(citekey.source, "extra");
         assert_eq!(citekey.item.key, "ATTN001");
+    }
+
+    #[test]
+    fn returns_recent_items_by_count_in_date_added_order() {
+        let fixture = rich_fixture_library();
+        let lib = &fixture.lib;
+
+        let items = match lib.get_recent_items_by_count(3) {
+            Ok(items) => items,
+            Err(err) => panic!("recent by count failed: {err}"),
+        };
+
+        let keys = items
+            .iter()
+            .map(|item| item.key.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(keys, vec!["DUPE008", "SCAL006", "DEEP003"]);
     }
 
     #[test]

@@ -279,3 +279,40 @@ pub struct RetractionCheckResult {
     pub item: Item,
     pub notices: Vec<EditorialNotice>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MergeFieldFill {
+    pub field: String,
+    pub source_key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MergePreview {
+    pub keeper_key: String,
+    pub source_keys: Vec<String>,
+    pub metadata_fields_to_fill: Vec<MergeFieldFill>,
+    pub tags_to_add: Vec<String>,
+    pub collections_to_add: Vec<String>,
+    pub children_to_reparent: usize,
+    pub skipped_duplicate_attachments: usize,
+    pub confirm_required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MergeApplyResult {
+    pub keeper_key: String,
+    pub source_keys_trashed: Vec<String>,
+    pub metadata_fields_filled: Vec<String>,
+    pub tags_added: Vec<String>,
+    pub collections_added: Vec<String>,
+    pub children_reparented: usize,
+    pub skipped_duplicate_attachments: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "status", rename_all = "kebab-case")]
+pub enum MergeOperation {
+    Preview(MergePreview),
+    Applied(MergeApplyResult),
+}

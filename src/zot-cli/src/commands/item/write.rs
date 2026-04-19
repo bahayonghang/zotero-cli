@@ -7,9 +7,10 @@ use zot_local::{PdfBackend, PdfiumBackend};
 use zot_remote::oa::CreatorName;
 use zot_remote::{OaClient, ZoteroRemote, normalize_arxiv_id, normalize_doi};
 
+use super::merge::merge_item_set;
 use crate::cli::{
     AddByDoiArgs, AddByUrlArgs, AddFromFileArgs, AttachModeArg, ItemAttachArgs, ItemCreateArgs,
-    ItemKeyArgs, ItemUpdateArgs,
+    ItemKeyArgs, ItemMergeArgs, ItemUpdateArgs,
 };
 use crate::context::AppContext;
 use crate::format::print_enveloped;
@@ -95,6 +96,37 @@ pub(crate) async fn handle_add_file(ctx: &AppContext, args: AddFromFileArgs) -> 
         print_enveloped(serde_json::json!({ "key": key }), None)?;
     } else {
         println!("Created item: {key}");
+    }
+    Ok(())
+}
+
+pub(crate) async fn handle_merge(ctx: &AppContext, args: ItemMergeArgs) -> Result<()> {
+    let keeper_key = match args.keep.as_deref() {
+        Some(key) if key == args.key1 => args.key1.as_str(),
+        Some(key) if key == args.key2 => args.key2.as_str(),
+        Some(key) => {
+            return Err(zot_core::ZotError::InvalidInput {
+                code: "item-merge".to_string(),
+                message: format!(
+                    "--keep must match one of the provided keys ('{}' or '{}'), got '{}'",
+                    args.key1, args.key2, key
+                ),
+                hint: None,
+            }
+            .into());
+        }
+        None => args.key1.as_str(),
+    };
+    let source_keys = [args.key1.clone(), args.key2.clone()]
+        .into_iter()
+        .filter(|key| key != keeper_key)
+        .collect::<Vec<_>>();
+    let operation = merge_item_set(&ctx.remote()?, keeper_key, &source_keys, args.confirm).await?;
+
+    if ctx.json {
+        print_enveloped(operation, None)?;
+    } else {
+        println!("{}", serde_json::to_string_pretty(&operation)?);
     }
     Ok(())
 }

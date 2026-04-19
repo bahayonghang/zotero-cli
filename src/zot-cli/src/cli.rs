@@ -47,6 +47,10 @@ pub(crate) enum Commands {
         #[command(subcommand)]
         command: McpCommand,
     },
+    Completions {
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 }
 
 #[derive(Subcommand)]
@@ -89,6 +93,7 @@ pub(crate) enum ItemCommand {
     AddDoi(AddByDoiArgs),
     AddUrl(AddByUrlArgs),
     AddFile(AddFromFileArgs),
+    Merge(ItemMergeArgs),
     Update(ItemUpdateArgs),
     Trash(ItemKeyArgs),
     Restore(ItemKeyArgs),
@@ -278,7 +283,9 @@ pub(crate) struct LibraryListArgs {
 
 #[derive(Args)]
 pub(crate) struct LibraryRecentArgs {
-    pub(crate) since: String,
+    pub(crate) since: Option<String>,
+    #[arg(long, conflicts_with = "since")]
+    pub(crate) count: Option<usize>,
     #[arg(long, default_value = "date-added")]
     pub(crate) sort: SortFieldArg,
     #[arg(long, default_value_t = 50)]
@@ -488,6 +495,16 @@ pub(crate) struct ItemAttachArgs {
     pub(crate) key: String,
     #[arg(long)]
     pub(crate) file: PathBuf,
+}
+
+#[derive(Args)]
+pub(crate) struct ItemMergeArgs {
+    pub(crate) key1: String,
+    pub(crate) key2: String,
+    #[arg(long)]
+    pub(crate) keep: Option<String>,
+    #[arg(long)]
+    pub(crate) confirm: bool,
 }
 
 #[derive(Args)]
@@ -855,6 +872,8 @@ mod tests {
             ["zot", "config", "profiles", "use", "work"].as_slice(),
             ["zot", "library", "semantic-status"].as_slice(),
             ["zot", "library", "citekey", "Smith2024"].as_slice(),
+            ["zot", "library", "recent", "--count", "10"].as_slice(),
+            ["zot", "library", "recent", "2026-04-01", "--limit", "20"].as_slice(),
             ["zot", "library", "duplicates", "--method", "both"].as_slice(),
             ["zot", "library", "saved-search", "list"].as_slice(),
             [
@@ -870,6 +889,18 @@ mod tests {
             .as_slice(),
             ["zot", "item", "children", "ATTN001"].as_slice(),
             ["zot", "item", "download", "ATCH005"].as_slice(),
+            ["zot", "item", "merge", "KEEP001", "DUPE001"].as_slice(),
+            [
+                "zot",
+                "item",
+                "merge",
+                "KEEP001",
+                "DUPE001",
+                "--keep",
+                "DUPE001",
+                "--confirm",
+            ]
+            .as_slice(),
             ["zot", "item", "versions", "--since", "12"].as_slice(),
             ["zot", "item", "deleted", "--limit", "10"].as_slice(),
             ["zot", "item", "annotation", "search", "core"].as_slice(),
@@ -888,6 +919,7 @@ mod tests {
             ["zot", "collection", "subcollections", "COLTR02"].as_slice(),
             ["zot", "collection", "item-count", "COLTR02"].as_slice(),
             ["zot", "collection", "tags", "COLTR02"].as_slice(),
+            ["zot", "completions", "powershell"].as_slice(),
         ] {
             if let Err(err) = Cli::try_parse_from(argv) {
                 panic!("cli parse failed for {:?}: {err}", argv);

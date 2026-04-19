@@ -13,6 +13,7 @@ use crate::cli::{
     LibraryCommand, LibrarySavedSearchCommand, LibrarySavedSearchCreateArgs,
     LibrarySavedSearchDeleteArgs, LibrarySemanticIndexArgs, LibrarySemanticSearchArgs,
 };
+use crate::commands::item::merge::merge_item_set;
 use crate::context::AppContext;
 use crate::format::{print_enveloped, print_items, print_stats};
 use crate::util::{maybe_embed_query, parse_json_input};
@@ -62,7 +63,13 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             }
         }
         LibraryCommand::Recent(args) => {
-            let items = library.get_recent_items(&args.since, args.sort.into(), args.limit)?;
+            let items = if let Some(count) = args.count {
+                library.get_recent_items_by_count(count)?
+            } else if let Some(since) = args.since.as_deref() {
+                library.get_recent_items(since, args.sort.into(), args.limit)?
+            } else {
+                library.get_recent_items_by_count(10)?
+            };
             if ctx.json {
                 print_enveloped(&items, None)?;
             } else {
@@ -531,9 +538,8 @@ async fn merge_duplicates(
     keeper_key: &str,
     duplicate_keys: &[String],
     confirm: bool,
-) -> Result<serde_json::Value> {
-    let remote = ctx.remote()?;
-    let mut duplicates = duplicate_keys
+) -> Result<zot_core::MergeOperation> {
+    let duplicates = duplicate_keys
         .iter()
         .filter(|key| key.as_str() != keeper_key)
         .cloned()
@@ -546,140 +552,7 @@ async fn merge_duplicates(
         }
         .into());
     }
-
-    let mut keeper = remote.get_item_json(keeper_key).await?;
-    let keeper_children = remote.list_children(keeper_key).await?;
-    let mut tags = keeper
-        .get("tags")
-        .and_then(|value| value.as_array())
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|tag| {
-            tag.get("tag")
-                .and_then(|value| value.as_str())
-                .map(ToOwned::to_owned)
-        })
-        .collect::<HashSet<_>>();
-    let mut collections = keeper
-        .get("collections")
-        .and_then(|value| value.as_array())
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|value| value.as_str().map(ToOwned::to_owned))
-        .collect::<HashSet<_>>();
-    let keeper_signatures = keeper_children
-        .iter()
-        .filter_map(attachment_signature)
-        .collect::<HashSet<_>>();
-    let mut child_items = Vec::new();
-    let mut skipped_attachments = 0usize;
-    for key in &duplicates {
-        let item = remote.get_item_json(key).await?;
-        let children = remote.list_children(key).await?;
-        for tag in item
-            .get("tags")
-            .and_then(|value| value.as_array())
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|tag| {
-                tag.get("tag")
-                    .and_then(|value| value.as_str())
-                    .map(ToOwned::to_owned)
-            })
-        {
-            tags.insert(tag);
-        }
-        for collection in item
-            .get("collections")
-            .and_then(|value| value.as_array())
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|value| value.as_str().map(ToOwned::to_owned))
-        {
-            collections.insert(collection);
-        }
-        for child in children {
-            if let Some(signature) = attachment_signature(&child) {
-                if keeper_signatures.contains(&signature) {
-                    skipped_attachments += 1;
-                    continue;
-                }
-            }
-            child_items.push(child);
-        }
-    }
-
-    if !confirm {
-        duplicates.sort();
-        return Ok(serde_json::json!({
-            "keeper": keeper_key,
-            "duplicates": duplicates,
-            "tags": tags,
-            "collections": collections,
-            "child_items_to_reparent": child_items.len(),
-            "skipped_duplicate_attachments": skipped_attachments,
-            "confirm_required": true,
-        }));
-    }
-
-    keeper["tags"] = serde_json::Value::Array(
-        tags.into_iter()
-            .map(|tag| serde_json::json!({ "tag": tag }))
-            .collect(),
-    );
-    remote.update_item_value(&keeper).await?;
-    for collection in collections {
-        remote
-            .add_item_to_collection(keeper_key, &collection)
-            .await?;
-    }
-    for mut child in child_items {
-        child["parentItem"] = serde_json::Value::String(keeper_key.to_string());
-        remote.update_item_value(&child).await?;
-    }
-    for key in &duplicates {
-        remote.set_deleted(key, true).await?;
-    }
-    Ok(serde_json::json!({
-        "keeper": keeper_key,
-        "duplicates_trashed": duplicates,
-        "skipped_duplicate_attachments": skipped_attachments,
-    }))
-}
-
-fn attachment_signature(value: &serde_json::Value) -> Option<(String, String, String, String)> {
-    (value
-        .get("itemType")
-        .and_then(|item_type| item_type.as_str())
-        == Some("attachment"))
-    .then(|| {
-        (
-            value
-                .get("contentType")
-                .and_then(|entry| entry.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            value
-                .get("filename")
-                .and_then(|entry| entry.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            value
-                .get("md5")
-                .and_then(|entry| entry.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            value
-                .get("url")
-                .and_then(|entry| entry.as_str())
-                .unwrap_or_default()
-                .to_string(),
-        )
-    })
+    merge_item_set(&ctx.remote()?, keeper_key, &duplicates, confirm).await
 }
 
 #[cfg(test)]
