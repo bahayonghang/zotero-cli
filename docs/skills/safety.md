@@ -23,8 +23,13 @@
 - `collection delete`
 - `collection add-item`
 - `collection remove-item`
+- `library saved-search create`
+- `library saved-search delete`
 - `library duplicates-merge --confirm`
 - `sync update-status --apply`
+- `config init`
+- `config set`
+- `config profiles use`
 
 ## 执行规则
 
@@ -34,6 +39,7 @@
    - `item trash`
    - `item note delete`
    - `collection delete`
+   - `library saved-search delete`
    - `library duplicates-merge --confirm`
    - `sync update-status --apply`
 
@@ -51,6 +57,12 @@
 - 停在只读分析
 - 明确告诉用户缺少什么
 - 不要假装操作已经成功
+
+如果任务是配置排障：
+
+- 先看 `config show`
+- 需要写配置时再执行 `config init` / `config set`
+- profile 切换也算有副作用
 
 ## annotation 与 attach_mode 的额外说明
 

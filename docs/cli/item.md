@@ -13,6 +13,9 @@ zot --json item pdf ATTN001
 zot --json item pdf ATTN001 --pages 1-3
 zot --json item fulltext ATTN001
 zot --json item children ATTN001
+zot --json item download ATCH005
+zot --json item deleted --limit 20
+zot --json item versions --since 1200
 zot --json item outline ATTN001
 zot item export ATTN001 --format bibtex
 zot item cite ATTN001 --style nature
@@ -23,6 +26,9 @@ zot item cite ATTN001 --style nature
 - `item pdf` / `item fulltext` 当前都走 PDF 文本提取路径
 - `item pdf --annotations` 用于读取 PDF 内已有批注
 - `item children` 会批量返回 notes、attachments、annotations
+- `item download` 需要 attachment key，不是父条目 key
+- `item deleted` 用于看当前 Trash 里的条目
+- `item versions` 返回远端 item version map，适合同步或排障
 - `item outline` 依赖本地 PDF 可读且文档本身带有书签结构
 
 支持的 citation style：
@@ -69,6 +75,7 @@ zot --json item update ATTN001 --title "New Title" --field publicationTitle=Natu
 zot --json item trash ATTN001
 zot --json item restore ATTN001
 zot --json item attach ATTN001 --file supplement.pdf
+zot --json item download ATCH005 --output downloads/
 ```
 
 这些命令会改库。执行前应先确认：
@@ -76,6 +83,11 @@ zot --json item attach ATTN001 --file supplement.pdf
 1. `doctor` 已通过
 2. 已配置 `ZOT_API_KEY`
 3. 已配置 `ZOT_LIBRARY_ID`
+
+注意：
+
+- `item attach` 是上传新附件
+- `item download` 是下载已有附件
 
 ## note / tag / annotation / scite
 

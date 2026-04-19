@@ -1,29 +1,100 @@
 # 快速开始
 
-## 项目是什么
+## 先记住这个定位
 
-这个仓库是一个 Rust workspace，用来提供一个 CLI-first 的 Zotero 工具链：
+这个仓库的主交互面是 `zot-skills`，不是命令列表。
 
-- 本地读取 `zotero.sqlite` 和附件 storage
-- 提取 PDF 文本、outline、批注
-- 通过 Zotero Web API 执行写操作
-- 做 library-level semantic index/search 和 workspace 检索
-- 执行 Better BibTeX citation key lookup、Scite 检查、preprint 状态同步
+- `zot-skills` 负责理解用户想从 Zotero 里拿什么内容
+- Rust `zot` 负责真正执行读取、检索、索引和写入
+- CLI 页面是参考面，主要给排障、脚本化和直接调用使用
 
-命令入口以 `src/zot-cli/src/main.rs` 为准。
+如果你是让 Agent 去“找文献、读 PDF、提取批注、整理主题 workspace、更新条目”，就按 skill-first 的方式启动。
 
-## 两种启动方式
+## 这个 skill 能从 Zotero 里拿到什么
 
-同一轮任务里只选一种调用路径：
+- 条目元数据：title、creator、year、item type、citation、children
+- 证据内容：PDF fulltext、outline、annotations、notes
+- 组织结构：tags、collections、libraries、feeds
+- 主题工作面：workspace、semantic index、semantic query/search
+- 受控写入：notes、tags、collections、imports、duplicate merge、publication status sync
+
+## 推荐启动顺序
+
+### 1. 安装 skill
+
+```bash
+npx skills add https://github.com/bahayonghang/zotero-cli --skill zot-skills
+```
+
+### 2. 提供运行时
+
+```bash
+cargo install --git https://github.com/bahayonghang/zotero-cli.git zot-cli --locked
+```
+
+### 3. 先跑一次 doctor
 
 ```bash
 zot --json doctor
 ```
 
-如果还没有安装 `zot`：
+如果你正在这个仓库里开发，而 `zot` 还没有安装到 `PATH`：
 
 ```bash
 cargo run -q -p zot-cli -- --json doctor
+```
+
+同一轮任务固定一种调用路径，不要混用。
+
+### 4. 需要远端写入或保存查询时，先配 config
+
+如果你后面要做这些事：
+
+- 写 note / tag / collection
+- 保存或删除 saved search
+- 做 publication status sync
+
+可以先初始化配置：
+
+```bash
+zot config init --library-id <你的 library id> --api-key <你的 api key>
+```
+
+如果你想给一个独立 profile 配置：
+
+```bash
+zot config init --target-profile work --library-id <你的 library id> --api-key <你的 api key> --make-default
+```
+
+## 可以直接怎么提需求
+
+- “找出我库里 reward hacking 相关的论文”
+- “把这篇论文的 PDF 批注和 note 拿出来”
+- “给我建一个 llm-safety workspace，再把相关论文导进去”
+- “检查这篇预印本是否已经正式发表”
+- “给这篇文献加一条 note，再打上 priority 标签”
+
+这些都是 `zot-skills` 应该直接接管的请求。
+
+更完整的开口方式，见：[Agent 用法](/skills/agent-usage)
+
+## 什么时候退回直接命令
+
+以下场景更适合直接跑运行时：
+
+- 你在排环境问题
+- 你在验证某个子命令的实际返回
+- 你在写脚本或回归测试
+- 你需要确认 `doctor`、索引、写权限等前置状态
+
+常见起点：
+
+```bash
+zot --json doctor
+zot --json library search "reward hacking" --limit 10
+zot --json item get ATTN001
+zot --json item annotation list --item-key ATTN001
+zot --json workspace query llm-safety "主要的失败模式有哪些？" --mode hybrid --limit 5
 ```
 
 ## 什么时候先跑 doctor
@@ -38,14 +109,9 @@ cargo run -q -p zot-cli -- --json doctor
 - Better BibTeX citekey 查询
 - 用户反馈“为什么不工作”
 
-推荐命令：
-
-```bash
-zot --json doctor
-```
-
 重点关注这些字段：
 
+- `db_exists`
 - `write_credentials.configured`
 - `pdf_backend.available`
 - `better_bibtex.available`
@@ -54,7 +120,7 @@ zot --json doctor
 - `annotation_support`
 - `embedding.configured`
 
-## 构建与安装
+## 仓库开发命令
 
 项目根目录常用命令：
 
@@ -116,7 +182,8 @@ npm run build
 
 ## 下一步阅读
 
-- [CLI 总览](/cli/overview)
-- [library 命令](/cli/library)
-- [item 命令](/cli/item)
+- [Agent 用法](/skills/agent-usage)
 - [Skills 总览](/skills/overview)
+- [典型工作流](/skills/workflows)
+- [路由策略](/skills/routing)
+- [CLI 总览](/cli/overview)

@@ -15,6 +15,7 @@
 当前顶层命令来自 `src/zot-cli/src/main.rs`：
 
 - `doctor`
+- `config`
 - `library`
 - `item`
 - `collection`
@@ -48,10 +49,12 @@
 
 ```bash
 zot --json doctor
+zot --json config show
 zot --json library search "attention" --tag transformer --creator Vaswani --year 2017
 zot --json library citekey Smith2024
 zot --json library semantic-status
 zot --json item get ATTN001
+zot --json item download ATCH005
 zot --json item children ATTN001
 zot --json collection search Transform
 zot --json workspace query llm-safety "What are the main failure modes?" --mode hybrid --limit 5
@@ -59,15 +62,17 @@ zot --json workspace query llm-safety "What are the main failure modes?" --mode 
 
 ## 命令分工
 
+- `config`：查看和修改运行时配置、profile、写凭据
 - `library`：默认只读入口；负责搜索、枚举、semantic、feeds、duplicates
-- `item`：单条目读取和大多数写操作；也包括 annotation / Scite
-- `collection`：维护真实 Zotero collection
+- `item`：单条目读取、大多数写操作、附件下载、annotation、Scite
+- `collection`：维护真实 Zotero collection，也负责 collection 细粒度读取
 - `workspace`：维护本地 reading workspace
 - `sync`：检查 preprint 是否已正式发表
 - `mcp`：当前只有占位命令，不是可用工作流
 
 ## 子命令导航
 
+- [config](/cli/config)
 - [library](/cli/library)
 - [item](/cli/item)
 - [collection](/cli/collection)

@@ -6,7 +6,11 @@
 
 ```bash
 zot --json collection list
+zot --json collection get COLL001
+zot --json collection subcollections COLL001
 zot --json collection items COLL001
+zot --json collection item-count COLL001
+zot --json collection tags COLL001
 zot --json collection search Transform --limit 20
 zot --json collection create "New Project"
 zot --json collection rename COLL001 "Renamed Project"
@@ -19,6 +23,7 @@ zot --json collection remove-item COLL001 ATTN001
 
 - 你在整理 Zotero 库本身的分组结构
 - 你需要把条目挂到某个真实 collection 下
+- 你想读某个 collection 的子 collection、条目数量或常见标签
 - 你明确想修改远端 Zotero collection
 
 ## 与 workspace 的区别

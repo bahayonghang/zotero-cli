@@ -18,6 +18,9 @@
 - `library semantic-status`
 - `library duplicates`
 - `library duplicates-merge`
+- `library saved-search list`
+- `library saved-search create`
+- `library saved-search delete`
 
 ## search
 
@@ -101,6 +104,21 @@ zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --dupli
 - re-parent child items
 - 尝试跳过重复 attachment
 - 把 duplicate 送入 Trash
+
+## saved search
+
+```bash
+zot --json library saved-search list
+zot --json library saved-search create --name "Recent RL" --conditions conditions.json
+zot --json library saved-search delete SRCH0001
+```
+
+说明：
+
+- `saved-search list` 返回的是保存查询的元数据和条件
+- `saved-search create` 的 `--conditions` 可以是 JSON 字符串，也可以是 JSON 文件路径
+- `saved-search delete` 删除的是保存查询本身，不会删除条目
+- Zotero Web API 当前不直接返回 saved search 的结果集
 
 ## 推荐配合方式
 

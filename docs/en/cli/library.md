@@ -18,6 +18,9 @@
 - `library semantic-status`
 - `library duplicates`
 - `library duplicates-merge`
+- `library saved-search list`
+- `library saved-search create`
+- `library saved-search delete`
 
 ## search
 
@@ -101,6 +104,21 @@ zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --dupli
 - re-parent child items
 - skip obviously duplicate attachments when possible
 - move duplicate items to Trash
+
+## saved search
+
+```bash
+zot --json library saved-search list
+zot --json library saved-search create --name "Recent RL" --conditions conditions.json
+zot --json library saved-search delete SRCH0001
+```
+
+Notes:
+
+- `saved-search list` returns saved-search metadata and conditions
+- `saved-search create` accepts `--conditions` as either a JSON string or a JSON file path
+- `saved-search delete` removes the saved search itself, not the items
+- Zotero Web API does not currently return saved-search results directly
 
 ## Recommended flow
 

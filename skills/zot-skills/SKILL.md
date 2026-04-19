@@ -1,49 +1,142 @@
 ---
 name: zot-skills
-description: 当用户想在本机已有的 Zotero 文献库或 reading workspace 上完成实际操作时，必须使用这个 skill，并把 Rust `zot` CLI 作为默认执行面，即使用户没有显式提到 `zot`。适用于库内搜索/浏览条目、按 citation key/tag/creator/year 查找、读取 metadata/fulltext/PDF/outline/children/annotations、管理 tags/notes/collections、查看 libraries/feeds、建立或查询 workspace、做 semantic index/search、运行 `doctor`、做 Scite 检查、或执行明确授权的 Zotero Web API 写操作。不要把它用于泛化找论文、论文总结、普通 bibliography 指导、非 Zotero 的 PDF 阅读/整理，除非用户明确要把结果落到 `zot` / Zotero 库 / workspace 中。
+description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障，以及明确授权的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。
 ---
 
 # zot-skills
 
-这个 skill 的工作不是背命令，而是把用户的 Zotero 任务稳定地路由到本仓库的 Rust `zot` CLI。
+这个 skill 的目标不是展示命令面，而是把用户的自然语言 Zotero 任务稳稳落到正确的运行时路径，再把真正有用的结果带回来。
 
-优先级规则：
+## 先抓住这几个原则
 
 - 只要任务的真实目标是操作**已有的本地 Zotero 库**或**已有/将创建的 reading workspace**，就用本 skill，即使用户没说 `zot`。
-- 如果用户只是想“找论文”“总结论文”“讲讲引用格式”“读一个不在 Zotero 里的 PDF”，默认不要用本 skill。
-- 把 `zot` 视为唯一执行面。`ref/` 里的旧参考实现和 `zot mcp serve` 都不是当前可依赖入口。
+- 用户在 Claude Code、Codex 里应该直接说需求，不应该先背命令。skill 负责把需求翻成运行时动作。
+- `zot` 是唯一执行面。`ref/` 里的旧 Python 参考实现和 `zot mcp serve` 都不是当前主路径。
+- 回答先给结论、证据、变更或失败原因。不要先把 raw JSON 倒给用户。
 
-## 先判断什么
+## 先按意图分桶
 
-- 这是只读任务，还是会改 Zotero 库。
-- 这是单条/少量条目操作，还是要建一个持续使用的 workspace。
-- 这是字段搜索，还是 citation key / semantic / annotation / Scite 这类专门工作流。
-- 是否需要先跑 `doctor`。
+### 1. 查条目
 
-## 路由矩阵
+用户通常会说：
 
-| 任务 | 首选命令面 | 说明 |
-| --- | --- | --- |
-| 关键词、tag、creator、year、collection 搜索 | `library search` | 默认的库内只读入口 |
-| 按 citation key 查条目 | `library citekey` | 先走 Extra fallback；Better BibTeX 可用时自动补强 |
-| 看 tags / libraries / feeds | `library tags` / `library libraries` / `library feeds` | feeds 不走 `--library` scope 切换 |
-| 看某个 feed 的条目 | `library feed-items <library_id>` | feed library id 来自 `library libraries` 或 `library feeds` |
-| 看元数据、children、fulltext、PDF、outline、引用 | `item ...` | 单篇条目主入口 |
-| 新增条目（DOI / URL） | `item add-doi` / `item add-url` | 支持 `--attach-mode` |
-| 上传本地文件建条目 | `item add-file` | 可选 `--doi` 辅助建条目；**不支持** `--attach-mode` |
-| 管 notes / tags / annotations | `item note ...` / `item tag ...` / `item annotation ...` | 写操作要过安全门 |
-| 看 collection / 调整 collection 成员 | `collection ...` | `collection search` 常用于先定位 |
-| 建主题工作区并长期维护 | `workspace new` / `add` / `import` / `index` / `query` | workspace 不等于 Zotero collection |
-| 已有 workspace 的关键词检索 | `workspace search` | 文本/关键词检索，不是问答 |
-| 已有 workspace 的问答式检索 | `workspace query` | 依赖索引；优先用于问答 |
-| 库级 semantic 状态 / 建索引 / 检索 | `library semantic-status` / `semantic-index` / `semantic-search` | 与 workspace 索引共享底层索引能力 |
-| 查重复 / 合并重复 | `library duplicates` / `duplicates-merge` | merge 默认先 dry-run，`--confirm` 才执行 |
-| Scite tally / retractions | `item scite ...` | 基于库内条目，不改写成网页搜索 |
-| 检查 preprint 是否已正式发表 | `sync update-status` | `--apply` 有副作用 |
+- “找我库里 reward hacking 相关的论文”
+- “按 Smith2024 找到那篇论文”
+- “看这个 collection 里有哪些条目”
+- “列出当前库里的 feeds”
+
+优先路由：
+
+- 普通库内检索：`library search`
+- citation key 直达：`library citekey`
+- collection 细粒度读取：`collection get` / `subcollections` / `items` / `item-count` / `tags`
+- 库级组织信息：`library tags` / `libraries` / `feeds` / `feed-items`
+
+### 2. 取证据
+
+用户通常会说：
+
+- “把这篇文献的详情、children、引用拿出来”
+- “把 PDF 批注、outline、note 都拉出来”
+- “把附件下载到本地”
+
+优先路由：
+
+- 单篇主入口：`item get` / `related` / `children` / `cite` / `export`
+- PDF 证据：`item pdf` / `fulltext` / `outline`
+- annotation：`item annotation list` / `search`
+- 附件下载：`item download <attachment-key>`
+
+### 3. 建 workspace
+
+用户通常会说：
+
+- “给我建一个 llm-safety workspace”
+- “把 mechanistic interpretability 相关论文整理进一个长期工作区”
+- “后面我要在这个主题里做问答检索”
+
+优先路由：
+
+- 建与维护：`workspace new` / `add` / `import` / `remove` / `delete`
+- 索引与查询：`workspace index` / `search` / `query`
+
+注意：
+
+- workspace 名必须是 kebab-case，例如 `llm-safety`
+- `workspace search` 是关键词检索
+- `workspace query` 是问答式检索
+
+### 4. 保存查询
+
+用户通常会说：
+
+- “把这个筛选条件存成一个 Zotero saved search”
+- “列出我现在有哪些保存查询”
+- “删掉这个过期的 saved search”
+
+优先路由：
+
+- `library saved-search list`
+- `library saved-search create`
+- `library saved-search delete`
+
+边界：
+
+- Zotero Web API 当前只提供 saved search 的元数据和条件，不直接返回搜索结果
+- 要解释保存的是“查询条件”，不是“动态结果集快照”
+
+### 5. 下载附件
+
+用户通常会说：
+
+- “把 ATCH005 这个附件下载出来”
+- “把这篇条目的 PDF 拉到当前目录”
+
+优先路由：
+
+- 已知 attachment key：`item download`
+- 只知道父条目时：先 `item children`，再确定 attachment key
+
+不要做的事：
+
+- 不要把附件下载伪装成 `item attach`
+- 不要把上传和下载混成一个动作
+
+### 6. 安全写入
+
+用户通常会说：
+
+- “给这篇文献加一条 note”
+- “打上 priority 标签”
+- “把这个条目挂到某个 collection”
+- “合并重复条目”
+- “把 preprint 的正式发表信息写回去”
+
+优先路由：
+
+- 条目与标签：`item note ...` / `item tag ...` / `item update`
+- 导入：`item add-doi` / `add-url` / `add-file`
+- collection 关系：`collection add-item` / `remove-item` / `create` / `rename` / `delete`
+- duplicates：`library duplicates` / `duplicates-merge`
+- 状态同步：`sync update-status`
+
+### 7. 配置排障
+
+用户通常会说：
+
+- “为什么这个环境不能写 Zotero”
+- “先帮我看看配置是不是对的”
+- “把当前 profile 切到 work”
+- “初始化一个新的 config profile”
+
+优先路由：
+
+- 诊断：`doctor`
+- 配置：`config show` / `init` / `set` / `profiles list` / `profiles use`
 
 ## 调用顺序
 
-1. 如果系统已安装 `zot`，优先用 `zot --json ...`。
+1. 如果系统已安装 `zot`，优先用 `zot --json ...`
 2. 只有在开发仓库环境且 `zot` 不在 `PATH` 时，才退回：
 
 ```bash
@@ -58,9 +151,10 @@ cargo run -q -p zot-cli -- ...
 
 - 第一次接触这个环境
 - 任何写操作
-- PDF / outline / annotation 相关任务
+- PDF / outline / annotation / attachment 相关任务
 - semantic index / semantic search / workspace query
 - citation key 查询
+- saved search / 配置排障 / profile 切换
 - 用户说“为什么不工作”
 
 首选：
@@ -77,24 +171,27 @@ cargo run -q -p zot-cli -- --json doctor
 
 重点看这些字段：
 
-- `db_exists`: 本地 Zotero 数据是否可读
-- `write_credentials.configured`: 是否允许 Web API 写操作
-- `pdf_backend.available`: 是否支持 PDF 文本和 outline 相关能力
-- `better_bibtex.available`: citation key 直查是否有 BBT 支持
-- `libraries.feeds_available`: feeds 是否可读
-- `semantic_index`: 当前库级 semantic index 是否已存在
-- `annotation_support.pdf_outline` / `annotation_support.annotation_creation`: outline 与 PDF annotation 是否可用
-- `embedding.configured`: semantic search 和 workspace hybrid query 是否具备 embedding
+- `db_exists`
+- `write_credentials.configured`
+- `pdf_backend.available`
+- `better_bibtex.available`
+- `libraries.feeds_available`
+- `semantic_index`
+- `annotation_support`
+- `embedding.configured`
+- `config_file`
 
-## 硬约束与安全门
+## 硬约束
 
-真实约束：
+- `--library` 只接受 `user` 或 `group:<id>`
+- workspace 名必须是 kebab-case
+- `zot mcp serve` 当前不可用
+- `item add-file` 不支持 `--attach-mode`
+- `item annotation create` / `create-area` 只适用于 PDF attachment
+- `library saved-search` 处理的是保存查询的条件，不是结果项
+- 永远不要直接修改 `zotero.sqlite`
 
-- `--library` 只接受 `user` 或 `group:<id>`。
-- workspace 名必须是 kebab-case，例如 `llm-safety`。
-- `zot mcp serve` 目前不可用，不要把它纳入备选路径。
-- `item add-file` 不支持 `--attach-mode`。
-- `item annotation create` / `create-area` 只适用于 PDF attachment。
+## 安全门
 
 默认视为有副作用的动作：
 
@@ -119,8 +216,13 @@ cargo run -q -p zot-cli -- --json doctor
 - `collection delete`
 - `collection add-item`
 - `collection remove-item`
+- `library saved-search create`
+- `library saved-search delete`
 - `library duplicates-merge --confirm`
 - `sync update-status --apply`
+- `config init`
+- `config set`
+- `config profiles use`
 
 执行规则：
 
@@ -130,47 +232,49 @@ cargo run -q -p zot-cli -- --json doctor
    - `item trash`
    - `item note delete`
    - `collection delete`
+   - `library saved-search delete`
    - `library duplicates-merge --confirm`
    - `sync update-status --apply`
-4. 永远不要直接修改 `zotero.sqlite`。Rust 版写路径只走 Web API。
+4. 写权限缺失时停在只读分析，不要假装成功。
 
 ## 常见语义差异
 
-- `workspace search`: 在已存在 workspace 内做文本/关键词检索。
-- `workspace query`: 对已索引 workspace 做问答式检索。
-- `library semantic-search`: 直接针对库级 semantic index，不等价于 workspace query。
-- `item add-doi` / `item add-url` / `item create --doi|--url|--pdf`: 支持 `--attach-mode auto|linked-url|none`。
-- `item add-file`: 上传本地文件，可能结合 `--doi` 建出更好元数据，但不接受 `--attach-mode`。
-- feeds 不通过 `--library group:<id>` 访问，使用 `library feeds` / `library feed-items <library_id>`。
+- `workspace search` 是关键词检索，`workspace query` 是问答检索
+- `library semantic-search` 是库级语义检索，不等价于 workspace query
+- `item add-doi` / `item add-url` / `item create --doi|--url|--pdf` 支持 `--attach-mode`
+- `item add-file` 可以带 `--doi` 补元数据，但不接受 `--attach-mode`
+- feeds 不通过 `--library group:<id>` 访问，而是用 `library feeds` / `feed-items`
+- `item download` 下载本地附件文件，`item attach` 上传新附件
+- `config show` 是看有效配置，`config profiles use` 是切换默认 profile
 
-## 高价值模板命令
+## 自然语言到动作的典型映射
 
-```bash
-zot --json library search "reward hacking" --limit 10
-zot --json library citekey Smith2024
-zot --json item get ATTN001
-zot --json item note add ATTN001 --content "Key finding: ..."
-zot --json item tag add ATTN001 --tag priority
-zot --json item add-doi 10.1038/s41586-023-06139-9 --tag reading --attach-mode auto
-zot --json item add-file paper.pdf --doi 10.1038/nature12373 --tag imported
-zot --json workspace new mechinterp
-zot --json workspace import mechinterp --search "mechanistic interpretability"
-zot --json workspace index mechinterp
-zot --json workspace query mechinterp "What methods are used to identify circuits?" --mode hybrid --limit 5
-zot --json library semantic-status
-zot --json library semantic-search "mechanistic interpretability methods" --mode hybrid --limit 10
-zot --json library feeds
-zot --json library feed-items 3 --limit 20
-```
+- “找我库里 reward hacking 相关的论文，再挑一篇最相关的给我引用”  
+  先 `library search`，再 `item get` / `item cite`
+
+- “把这篇论文的 PDF 批注和 notes 拉出来”  
+  先 `doctor`，再 `item get` / `item children` / `item annotation list`
+
+- “给我建一个 llm-safety workspace，后面我要做问答”  
+  先 `workspace new` / `import`，再 `index` / `query`
+
+- “把这个筛选条件存成保存查询”  
+  走 `library saved-search create`
+
+- “把附件 ATCH005 下载出来”  
+  走 `item download`
+
+- “我现在这个环境为什么不能写 Zotero”  
+  先 `doctor`，必要时 `config show`
 
 ## 失败时的 fallback
 
-- 没有 `zot`：在开发仓库里退回 `cargo run -q -p zot-cli -- ...`；普通环境直接说明 CLI 不在 `PATH`
-- 没有写权限：停在只读分析，并告诉用户缺 `ZOT_API_KEY` / `ZOT_LIBRARY_ID`
-- 没有 Better BibTeX：`library citekey` 仅做 Extra fallback；未命中时要明确说明，不要假装查过 BBT
-- 没有 Pdfium：不要承诺 fulltext / outline / text-position / annotation
-- 没有 embedding：semantic 检索要说明会降级；workspace 问答改用 `--mode bm25`
-- `attach-mode auto` 没找到 OA PDF：条目仍可能创建成功，这不是硬错误
+- 没有 `zot`：开发仓库里退回 `cargo run -q -p zot-cli -- ...`
+- 没有写权限：明确告诉用户缺 `ZOT_API_KEY` / `ZOT_LIBRARY_ID`
+- 没有 Better BibTeX：`library citekey` 只走 Extra fallback
+- 没有 Pdfium：不要承诺 fulltext / outline / annotation / PDF 下载后的文本处理
+- 没有 embedding：semantic 检索说明会降级；workspace 问答改用 `--mode bm25`
+- `attach-mode auto` 没找到 OA PDF：条目仍可能创建成功
 
 ## 输出契约
 
@@ -181,4 +285,4 @@ zot --json library feed-items 3 --limit 20
 - 如果失败，明确告诉用户缺什么、下一步是什么
 - 默认不要倾倒 raw JSON；先读 envelope，再转述有效信息
 
-这个 skill 的目标不是展示命令面有多大，而是把 Zotero / workspace 任务路由到**最稳、最短、最少副作用**的 `zot` 工作流。
+这个 skill 的目标不是把 CLI 解释得更完整，而是让 Claude Code、Codex 等 agent 用自然语言稳定完成 Zotero 工作流。

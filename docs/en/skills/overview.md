@@ -1,43 +1,72 @@
 # Skills Overview
 
-Here, “skills” refers to `skills/zot-skills/SKILL.md`. It is not another CLI. It is an operational playbook for AI systems, agents, and human operators.
+Here, “skills” means `skills/zot-skills/SKILL.md`.
 
-## What this skill solves
+It is not a second CLI tutorial. It is the Zotero workflow contract for Claude Code, Codex, and similar agents.
 
-It helps the operator decide:
+If your goal is to:
 
-- which command family should handle the task: `library`, `item`, `collection`, `workspace`, or `sync`
-- whether the task is read-only or will mutate the Zotero library
-- when to run `doctor` first
-- when to use advanced flows such as citation-key lookup, semantic search, feeds, annotations, or Scite
+- find items in Zotero
+- pull PDF text, annotations, notes, or child items
+- build a long-lived workspace
+- save a search
+- download attachments
+- update the library safely
 
-## Trigger scope
+start from the skill, not the command list.
 
-This skill should trigger only when the user explicitly wants to work through `zot`, a Zotero library, or a local workspace, for example:
+## Read this before the CLI pages
 
-- searching inside an existing Zotero library, exporting citations, reading PDFs, or inspecting annotations
-- looking up an item by citation key
-- building a semantic index or running semantic search
-- listing libraries, feeds, or feed items
-- managing notes, tags, collections, or duplicate merge flows
-- creating annotations, checking Scite data, or syncing preprint status
+Recommended order:
 
-It is **not** the default skill for generic literature search or paper summarization.
+1. [Agent Usage](/en/skills/agent-usage)
+2. [Routing](/en/skills/routing)
+3. [Safety](/en/skills/safety)
+4. [Workflows](/en/skills/workflows)
+5. Only then, if needed, [CLI Overview](/en/cli/overview)
 
-## How to use it
+## What the skill treats as first-class
 
-1. Treat it as the operational playbook for Zotero work
-2. route by user intent to the right command family
-3. run `doctor` first for new environments, writes, PDF tasks, semantic flows, Better BibTeX lookup, and failure reports
+- Item metadata: title, creators, year, item type, citation, child items
+- Evidence: PDF full text, outline, annotations, notes
+- Organization: tags, collections, libraries, feeds, saved searches
+- Working sets: workspaces, semantic indexing, semantic query/search
+- Configuration and troubleshooting: doctor, config, profiles
+- Controlled writes: notes, tags, collections, imports, duplicate merge, publication-status sync
+
+## How the agent should think about it
+
+The skill decides four things first:
+
+1. what Zotero content the user actually wants
+2. whether the task is read-only or mutating
+3. whether `doctor` should run first
+4. whether the reply should return results, evidence, boundaries, or a failure reason
+
+From the user side, the right move is not:
+
+- “Which command should I run?”
+
+It is:
+
+- “Find papers in my Zotero library about …”
+- “Pull the annotations and notes for this item”
+- “Create a workspace and make it ready for Q&A”
+- “Show me the current config and default profile first”
+
+## When this skill should not trigger
+
+By default, do not use it for:
+
+- generic literature search
+- ordinary paper summarization
+- bibliography-format teaching
+- PDF work that does not depend on Zotero or a local workspace
+
+Those requests do not treat Zotero as the primary content source.
 
 ## Related files
 
 - Main skill file: `skills/zot-skills/SKILL.md`
 - Regression prompts: `skills/zot-skills/test-prompts.json`
-
-Continue with:
-
-- [Routing](/en/skills/routing)
-- [Safety](/en/skills/safety)
-- [Workflows](/en/skills/workflows)
-- [Fallbacks](/en/skills/fallback)
+- Eval set: `skills/zot-skills/evals/evals.json`

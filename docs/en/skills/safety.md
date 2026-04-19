@@ -23,8 +23,13 @@
 - `collection delete`
 - `collection add-item`
 - `collection remove-item`
+- `library saved-search create`
+- `library saved-search delete`
 - `library duplicates-merge --confirm`
 - `sync update-status --apply`
+- `config init`
+- `config set`
+- `config profiles use`
 
 ## Execution rules
 
@@ -34,6 +39,7 @@
    - `item trash`
    - `item note delete`
    - `collection delete`
+   - `library saved-search delete`
    - `library duplicates-merge --confirm`
    - `sync update-status --apply`
 
@@ -51,6 +57,12 @@ If `doctor` shows missing credentials:
 - stay in read-only mode
 - tell the user exactly what is missing
 - do not pretend the action succeeded
+
+If the task is configuration troubleshooting:
+
+- inspect with `config show` first
+- use `config init` or `config set` only when the user wants the environment changed
+- treat profile switching as a side effect too
 
 ## Extra notes for annotations and attach mode
 

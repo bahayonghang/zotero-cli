@@ -1,29 +1,100 @@
 # Getting Started
 
-## What this project is
+## Keep this framing in mind
 
-This repository is a Rust workspace for a CLI-first Zotero toolchain:
+The primary interface in this repository is `zot-skills`, not the subcommand list.
 
-- read local `zotero.sqlite` data and attachment storage
-- extract PDF text, outlines, and annotations
-- perform authenticated writes through the Zotero Web API
-- run library-level semantic index/search and workspace retrieval
-- support Better BibTeX citation-key lookup, Scite checks, and preprint status sync
+- `zot-skills` decides what kind of Zotero content the user is asking for
+- Rust `zot` performs the actual reads, retrieval, indexing, and writes
+- The CLI pages remain reference material for debugging, scripts, and direct invocation
 
-The command surface is defined by `src/zot-cli/src/main.rs`.
+If the agent is supposed to find papers, read PDFs, extract annotations, build a topic workspace, or update Zotero items, start from the skill-first path.
 
-## Two invocation paths
+## What the skill can surface from Zotero
 
-Pick one invocation path and keep it consistent for a session:
+- Item metadata: title, creators, year, item type, citation, child items
+- Evidence: PDF full text, outline, annotations, notes
+- Organization: tags, collections, libraries, feeds
+- Working sets: workspace creation, semantic indexing, semantic query/search
+- Controlled writes: notes, tags, collections, imports, duplicate merge, publication-status sync
+
+## Recommended startup sequence
+
+### 1. Install the skill
+
+```bash
+npx skills add https://github.com/bahayonghang/zotero-cli --skill zot-skills
+```
+
+### 2. Provide the runtime
+
+```bash
+cargo install --git https://github.com/bahayonghang/zotero-cli.git zot-cli --locked
+```
+
+### 3. Run one doctor check
 
 ```bash
 zot --json doctor
 ```
 
-If `zot` is not installed yet:
+If you are developing inside this repository and `zot` is not installed on `PATH`:
 
 ```bash
 cargo run -q -p zot-cli -- --json doctor
+```
+
+Pick one invocation path and keep it consistent for the session.
+
+### 4. Configure writes and saved-search support when needed
+
+If you plan to:
+
+- write notes, tags, or collection membership
+- create or delete saved searches
+- run publication-status sync
+
+initialize config first:
+
+```bash
+zot config init --library-id <your library id> --api-key <your api key>
+```
+
+If you want a separate named profile:
+
+```bash
+zot config init --target-profile work --library-id <your library id> --api-key <your api key> --make-default
+```
+
+## What users can ask directly
+
+- “Find papers in my library about reward hacking.”
+- “Pull the PDF annotations and notes for this paper.”
+- “Create an `llm-safety` workspace and import the relevant papers.”
+- “Check whether this preprint has an official publication record now.”
+- “Add a note and a `priority` tag to this item.”
+
+These are all first-class `zot-skills` requests.
+
+For fuller phrasing patterns, read [Agent Usage](/en/skills/agent-usage).
+
+## When to drop to direct commands
+
+Direct runtime calls are more appropriate when:
+
+- you are debugging the environment
+- you want to verify a specific subcommand response
+- you are writing scripts or regression tests
+- you need to inspect `doctor`, indexing, or write prerequisites explicitly
+
+Common starting points:
+
+```bash
+zot --json doctor
+zot --json library search "reward hacking" --limit 10
+zot --json item get ATTN001
+zot --json item annotation list --item-key ATTN001
+zot --json workspace query llm-safety "What are the main failure modes?" --mode hybrid --limit 5
 ```
 
 ## When to run doctor first
@@ -35,17 +106,12 @@ Run `doctor` first when:
 - the task depends on PDF / outline / annotation support
 - you want library semantic indexing or search
 - workspace indexing or query is failing
-- you are doing citation-key lookup through Better BibTeX
+- you are doing Better BibTeX citekey lookup
 - the user says “why is this broken”
-
-Recommended command:
-
-```bash
-zot --json doctor
-```
 
 Pay special attention to:
 
+- `db_exists`
 - `write_credentials.configured`
 - `pdf_backend.available`
 - `better_bibtex.available`
@@ -54,7 +120,7 @@ Pay special attention to:
 - `annotation_support`
 - `embedding.configured`
 
-## Build and install
+## Repository commands
 
 Common repository commands from the root:
 
@@ -116,7 +182,8 @@ npm run build
 
 ## Read next
 
-- [CLI Overview](/en/cli/overview)
-- [library command](/en/cli/library)
-- [item command](/en/cli/item)
+- [Agent Usage](/en/skills/agent-usage)
 - [Skills Overview](/en/skills/overview)
+- [Workflows](/en/skills/workflows)
+- [Routing](/en/skills/routing)
+- [CLI Overview](/en/cli/overview)

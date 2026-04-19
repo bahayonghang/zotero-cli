@@ -6,7 +6,11 @@
 
 ```bash
 zot --json collection list
+zot --json collection get COLL001
+zot --json collection subcollections COLL001
 zot --json collection items COLL001
+zot --json collection item-count COLL001
+zot --json collection tags COLL001
 zot --json collection search Transform --limit 20
 zot --json collection create "New Project"
 zot --json collection rename COLL001 "Renamed Project"
@@ -19,6 +23,7 @@ zot --json collection remove-item COLL001 ATTN001
 
 - You are organizing the actual Zotero library structure
 - You need to place items into a real collection
+- You want subcollections, item counts, or collection-level tags
 - You explicitly want to modify remote Zotero collections
 
 ## Difference from workspace

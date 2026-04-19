@@ -3,45 +3,52 @@ layout: home
 
 hero:
   name: zot
-  text: Rust Zotero CLI Docs
-  tagline: Bilingual guides for the CLI, workspaces, and zot-skills
+  text: "Agent-First Zotero Docs"
+  tagline: "Bilingual guides for using zot-skills to query, read, organize, and safely update Zotero content"
+  image:
+    src: /images/zot-icon.png
+    alt: zot icon
+    width: 220
   actions:
     - theme: brand
-      text: Get Started
-      link: /en/guide/getting-started
-    - theme: alt
-      text: CLI Usage
-      link: /en/cli/overview
-    - theme: alt
-      text: Skills Usage
+      text: "Skills Quickstart"
       link: /en/skills/overview
+    - theme: alt
+      text: "Workflows"
+      link: /en/skills/workflows
+    - theme: alt
+      text: "CLI Reference"
+      link: /en/cli/overview
 
 features:
-  - title: Source aligned
-    details: The docs track `src/zot-cli/src/main.rs`, `skills/zot-skills/SKILL.md`, and the root READMEs.
-  - title: Covers the expanded surface
-    details: Includes citation-key lookup, feeds, semantic search, annotations, Scite, duplicate merge, and attach-mode workflows.
-  - title: Explicit boundaries
-    details: The docs call out doctor preconditions, write-safety rules, and the current `mcp serve` limitation directly.
+  - title: "Start from Zotero content"
+    details: "The docs begin with items, PDFs, annotations, notes, collections, feeds, and workspaces, then fall through to command reference."
+  - title: "Skill first, runtime second"
+    details: "`skills/zot-skills/SKILL.md` is the workflow contract for agents. The Rust `zot` CLI is the execution layer behind it."
+  - title: "Explicit write boundaries"
+    details: "Doctor gates, Web API write credentials, safety checks, and the current `mcp serve` limitation are documented directly."
 ---
 
 ## Start here
 
-- New to the project: read [Getting Started](/en/guide/getting-started)
-- Ready to run commands: read [CLI Overview](/en/cli/overview)
-- Guiding an AI or operator workflow: read [Skills Overview](/en/skills/overview)
+- Want to know how to ask in Claude Code or Codex: read [Agent Usage](/en/skills/agent-usage)
+- Want to know what the skill can surface from Zotero: read [Skills Overview](/en/skills/overview)
+- Want one end-to-end flow: read [Workflows](/en/skills/workflows)
+- Want the manual command reference: read [CLI Overview](/en/cli/overview)
 
 ## Scope
 
-This site focuses on two things:
+This site focuses on three things, in that order:
 
-1. The Rust `zot` CLI command surface, prerequisites, and limits
-2. The routing, safety, and fallback rules in `skills/zot-skills/SKILL.md`
+1. How agents use `zot-skills` to work with Zotero metadata, notes, PDFs, annotations, collections, feeds, and workspaces
+2. How users should ask for Zotero work in Claude Code, Codex, and similar agent environments
+3. The runtime prerequisites, safety boundaries, and response contracts of the Rust `zot` layer
+4. Where to look when you need direct CLI debugging or manual invocation
 
 If the docs ever disagree with the implementation, prefer:
 
-- `src/zot-cli/src/main.rs`
+- `skills/zot-skills/SKILL.md`
 - `README.md`
 - `README.zh-CN.md`
-- `skills/zot-skills/SKILL.md`
+- `src/zot-cli/src/main.rs`
 - `AGENTS.md`

@@ -7,118 +7,130 @@
       "expected_output": "先做库内搜索，再读取单条目详情，最后给出 APA 引用，而不是只贴命令。",
       "files": [],
       "expectations": [
-        "Routes the request to library/item commands instead of generic web or paper-search tooling.",
-        "Uses or references `doctor` only if environment preflight is needed, not as unrelated filler.",
-        "Explains the chosen item and citation result in user-facing language rather than dumping raw JSON.",
-        "Does not stop at a command list; it completes search -> detail -> citation as one workflow."
+        "Routes the request to Zotero-first search and item detail workflows.",
+        "Returns the result in user-facing language instead of dumping raw JSON first.",
+        "Completes search -> detail -> citation as one flow."
       ]
     },
     {
       "id": 2,
       "prompt": "我只有一个 citation key：Smith2024。帮我把对应文献找出来，如果能找到就给我元数据和 Nature 风格引用。",
-      "expected_output": "优先走 library citekey，并正确解释 Better BibTeX / Extra fallback 的作用。",
+      "expected_output": "优先走 citation key 工作流，并在需要时说明 Better BibTeX / Extra fallback。",
       "files": [],
       "expectations": [
-        "Chooses `library citekey` as the primary route instead of broad full-text search.",
-        "Mentions or checks citation-key-specific prerequisites such as Better BibTeX or Extra fallback when relevant.",
-        "Returns metadata plus a Nature-style citation if the item is found.",
-        "If the lookup fails, explains the failure mode honestly instead of pretending the key was resolved."
+        "Chooses citation-key lookup before broad full-text or metadata search.",
+        "Mentions fallback behavior honestly when Better BibTeX is unavailable.",
+        "Returns metadata plus a Nature-style citation on success."
       ]
     },
     {
       "id": 3,
       "prompt": "我想围绕 mechanistic interpretability 搭一个持续使用的阅读工作区，把相关文献整理进去，并准备后面做问答检索。",
-      "expected_output": "选择 workspace new/import/index/query 这一套流程，并强调 workspace 名和索引前提。",
+      "expected_output": "选择 workspace 主线，识别这不是一次性搜索。",
       "files": [],
       "expectations": [
-        "Routes to workspace commands rather than treating the task as a one-off library search.",
-        "Calls out that workspace names must be kebab-case or chooses a kebab-case name automatically.",
-        "Distinguishes workspace import/index/query roles instead of collapsing them into one vague step.",
-        "Mentions indexing and query prerequisites before promising workspace Q&A."
+        "Treats the request as a long-lived workspace task instead of a one-off search.",
+        "Calls out workspace naming and indexing prerequisites.",
+        "Distinguishes import, index, and query stages."
       ]
     },
     {
       "id": 4,
       "prompt": "把 Zotero 里 ATTN001 这个条目标上 priority 标签；如果当前环境没有写权限，就先告诉我缺什么，不要假装成功。",
-      "expected_output": "先做 doctor/写权限判断，再决定执行 item tag add 或停在缺失凭据说明。",
+      "expected_output": "先检查 doctor/写权限，再决定执行写入或停在缺失凭据说明。",
       "files": [],
       "expectations": [
-        "Treats the request as a write operation and checks or references write prerequisites first.",
-        "Uses the item tag workflow rather than unrelated update commands.",
-        "If credentials are missing, stops and explains the missing configuration instead of claiming success.",
-        "If it proceeds, clearly states what tag change will happen or did happen."
+        "Treats the request as a write operation.",
+        "Checks or references write prerequisites before writing.",
+        "Stops with a clear missing-credentials explanation when needed."
       ]
     },
     {
       "id": 5,
       "prompt": "帮我看看我这个 Zotero 库有没有 semantic index；如果没有，就给我建立一个，然后按语义搜一下 reward hacking 的工作。",
-      "expected_output": "先看 doctor 或 semantic-status，再按 semantic-index / semantic-search 顺序路由，并根据 embedding 配置决定降级说明。",
+      "expected_output": "先看状态，再决定建索引，再做 semantic search，并根据 embedding 配置决定是否降级。",
       "files": [],
       "expectations": [
-        "Checks or references semantic preflight via `doctor` or `library semantic-status` before indexing/searching.",
-        "Keeps the sequence status -> index (if needed) -> semantic search.",
-        "Explains embedding-related limitations or fallback behavior when semantic capability is unavailable.",
-        "Does not confuse library-level semantic search with workspace query."
+        "Keeps the sequence status -> index if needed -> semantic search.",
+        "Explains embedding-related fallback behavior.",
+        "Does not confuse library semantic search with workspace query."
       ]
     },
     {
       "id": 6,
       "prompt": "把附件 ATCH005 第 1 页里 'attention mechanisms' 这句话高亮成绿色；如果当前环境不支持 PDF annotation，就直接告诉我。",
-      "expected_output": "先经过 doctor / annotation_support，再走 item annotation create；若条件不满足则明确停止。",
+      "expected_output": "先过 doctor / annotation_support，再走 annotation 创建；条件不满足时明确停止。",
       "files": [],
       "expectations": [
-        "Recognizes this as a PDF attachment annotation workflow, not a generic note/tag update.",
-        "Checks or references PDF/annotation capability before attempting creation.",
-        "Stops with a clear explanation if annotation support is unavailable.",
-        "Uses `item annotation create` rather than inventing a non-existent command or editing the database directly."
+        "Recognizes this as a PDF attachment annotation task.",
+        "Checks PDF and write prerequisites first.",
+        "Stops cleanly if annotation support is unavailable."
       ]
     },
     {
       "id": 7,
       "prompt": "给我列出当前库里的 feeds，然后把 feed library 3 里的条目看一下。",
-      "expected_output": "识别 feed 不走 --library scope，而是使用 library feeds 和 library feed-items。",
+      "expected_output": "识别 feed 不走 --library scope，而是使用 feeds / feed-items。",
       "files": [],
       "expectations": [
-        "Uses `library feeds` followed by `library feed-items <library_id>`.",
-        "Does not try to reach feeds by switching `--library` scope.",
-        "Explains the special-case routing in user-facing language.",
-        "Keeps the task within Zotero/feed data rather than rewriting it as external RSS browsing."
+        "Keeps feeds as a special Zotero route.",
+        "Does not rewrite the task as generic RSS browsing.",
+        "Uses the feed library id instead of a library scope switch."
       ]
     },
     {
       "id": 8,
       "prompt": "帮我检查 Attention 相关条目里有没有被撤稿的，优先看 Zotero 里已有的条目，不要去外面重新搜。",
-      "expected_output": "走基于库内条目的 Scite/retractions 工作流，而不是改写成通用网页搜索。",
+      "expected_output": "走基于库内条目的 Scite / retractions 工作流，而不是改写成通用网页搜索。",
       "files": [],
       "expectations": [
-        "Keeps the task scoped to existing Zotero items rather than external literature search.",
-        "Routes to item Scite report/search/retractions behavior as appropriate.",
-        "Explains any external API dependency without replacing the core Zotero-first workflow.",
-        "Does not answer with generic search advice when a library-scoped route exists."
+        "Keeps the task scoped to existing Zotero items.",
+        "Routes to the Scite or retraction surface rather than external search.",
+        "Explains external dependency only as a backing service, not the main workflow."
       ]
     },
     {
       "id": 9,
-      "prompt": "我有个本地 PDF 叫 paper.pdf，想把它放进 Zotero；如果能结合 DOI 提升元数据就更好，但别给我用错参数。",
-      "expected_output": "正确区分 item add-file 与 attach-mode：说明 add-file 可配 DOI，但不接受 --attach-mode。",
+      "prompt": "把这组筛选条件保存成一个 Zotero saved search，名字叫 Recent RL：title contains reward，date is in the last 30 days。",
+      "expected_output": "识别这是保存查询条件，不是马上返回搜索结果；应走 saved-search create。",
       "files": [],
       "expectations": [
-        "Chooses `item add-file` as the primary route for a local PDF import.",
-        "Correctly states that `item add-file` can use `--doi` but does not support `--attach-mode`.",
-        "Does not suggest `--attach-mode` on add-file or otherwise invent unsupported flags.",
-        "Explains how DOI improves metadata without changing the core file-upload route."
+        "Treats the task as saved-search creation.",
+        "Explains that the saved search stores conditions, not results.",
+        "Does not collapse the request into an immediate library search."
       ]
     },
     {
       "id": 10,
-      "prompt": "去 group:42 这个共享库里找 reward hacking 相关的条目；如果 library scope 写法不对就直接指出来。",
-      "expected_output": "正确使用 `--library group:42`，并明确 scope 只允许 user 或 group:<id>。",
+      "prompt": "把附件 ATCH005 下载到当前目录；如果我给的是父条目 key，你要先指出还缺 attachment key。",
+      "expected_output": "识别下载面是 item download，并区分 attachment key 和父条目 key。",
       "files": [],
       "expectations": [
-        "Uses the group library scope in the form `group:42` rather than inventing alternate syntax.",
-        "Mentions that valid scopes are `user` or `group:<id>` when explaining constraints.",
-        "Keeps the rest of the workflow in the normal library search path once scope is set.",
-        "If scope syntax is invalid, explains the constraint instead of silently correcting to something else."
+        "Uses the attachment-download workflow.",
+        "Distinguishes an attachment key from a parent item key.",
+        "Does not confuse download with upload or attach."
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "帮我看看 Transformers 这个 collection 的子 collection、条目数量和常见标签。",
+      "expected_output": "识别这是 collection 的细粒度只读工作流，而不是 workspace 或普通 library search。",
+      "files": [],
+      "expectations": [
+        "Routes to collection read surfaces.",
+        "Keeps collection structure separate from workspace concepts.",
+        "Returns subcollections, count, and tags as distinct collection facts."
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "我在 Codex 里要开始写 Zotero 相关任务了，先帮我看当前配置和默认 profile；如果没有 profile 也直接说。",
+      "expected_output": "优先走 config show / profiles list 这类配置排障路径，而不是直接要求用户背环境变量。",
+      "files": [],
+      "expectations": [
+        "Treats the request as configuration inspection.",
+        "Surfaces the selected/default profile state clearly.",
+        "Uses config tooling before falling back to raw env-var advice."
       ]
     }
   ]

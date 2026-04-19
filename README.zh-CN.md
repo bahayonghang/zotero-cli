@@ -10,17 +10,19 @@
 
 # zot
 
-**面向研究者、终端爱好者与 AI Agent 的 Rust 原生 Zotero 命令行。**
+**面向 Agent 的 Zotero skill 运行时，用来查询、阅读并安全更新库里的内容。**
 
-用一个二进制文件搜索本地 Zotero 文献库、提取 PDF 正文与批注、维护语义检索 workspace、并通过 Zotero Web API 执行受控写操作。
+把已有的 Zotero 文献库变成稳定的 AI 工作面：找条目、读 PDF 证据、提取批注和笔记、建立主题 workspace、并在安全门下执行 Zotero Web API 写操作。
+
+<img src="./docs/public/images/zot-icon.png" alt="zot 图标" width="180" />
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust)](./Cargo.toml)
 [![MSRV](https://img.shields.io/badge/MSRV-1.85-red.svg?logo=rust)](./Cargo.toml)
-[![平台](https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-lightgrey.svg)](#安装)
+[![平台](https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-lightgrey.svg)](#推荐的-agent-启动方式)
 [![Zotero](https://img.shields.io/badge/Zotero-7-CC2936.svg)](https://www.zotero.org)
 [![文档](https://img.shields.io/badge/docs-VitePress-42b883.svg)](./docs/index.md)
-[![Agent 原生](https://img.shields.io/badge/agent--native-JSON_envelope-8A2BE2.svg)](#原生适配-ai-agent)
+[![Agent 原生](https://img.shields.io/badge/agent--native-JSON_envelope-8A2BE2.svg)](#直接用自然语言提出-zotero-任务)
 [![欢迎 PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#贡献)
 
 [English](./README.md) · [简体中文](./README.zh-CN.md) · [文档（中文）](./docs/index.md) · [Docs (EN)](./docs/en/index.md)
@@ -29,106 +31,120 @@
 
 ---
 
-## 为什么是 zot
+## 这个仓库真正想解决什么
 
-Zotero 是最好的开源文献管理器，但它的命令行体验长期缺位。`zot` 补上这一块：
+`zot` 分两层：
 
-- **终端原生。** 一个 Rust 二进制，不依赖 Python 或 Node，装一次到处能脚本化。
-- **Agent 原生。** 每条命令都能返回稳定的 JSON envelope（`{"ok": true, "data": ...}`），Claude Code、Cursor 或任何 MCP 风格的 Agent 都能直接消费。
-- **库级直读。** 直接读 `zotero.sqlite` 和附件 `storage/`，不需要导出，也不依赖桌面端。
-- **PDF 可用。** 通过 Pdfium 提取正文、批注、outline，避免研究流程卡在“重新 OCR 一次”。
-- **检索齐全。** 库级和 workspace 级都支持 BM25、semantic、hybrid 三种检索模式。
-- **写入受控。** 所有写操作都走 Zotero Web API，配合 `doctor` 前置检查和 dry-run 分级，`zotero.sqlite` 永远不会被直接改。
-- **可嵌入 AI。** 自带 `zot-skills` skill，Claude Code agent 能把 Zotero 任务自动路由到正确命令。
+- `skills/zot-skills/SKILL.md` 是主交互面。你想让 Claude Code 或类似 Agent 用自然语言处理 Zotero 任务时，先装它。
+- Rust `zot` 二进制是 skill 背后的执行层。人也可以直接调用它做排障、脚本化或本地验证。
 
-如果你尝试过用 grep、RAG、LLM 处理自己的 Zotero 库但最后放弃了，`zot` 就是为这种人做的。
+如果你的真实目标是“把 Zotero 里已经有的论文、笔记、标签、PDF、批注、feeds 用起来”，就先从 skill 出发，不要先背子命令。
+
+这个定位和 Zotero 自己的能力边界一致：
+
+- Zotero 的库数据在 `zotero.sqlite` 和 `storage/` 附件目录里。
+- 条目本身携带 metadata、notes、tags、attachments 等结构化内容。
+- Zotero 批注可以进入 note，并带回源 PDF 页面的链接。
+- 写操作走 Web API，需要带写权限的凭证和版本控制。
+
+`zot` 做的事，就是把这套模型变成 Agent 可稳定调用的工作流：本地直读内容，远端受控写入，边界明确。
 
 ---
 
-## 核心能力
+## 这个 skill 能拿 Zotero 里的什么内容
 
-| 领域 | 能做什么 |
+| 你真正想做什么 | `zot-skills` 能提供什么 |
 | --- | --- |
-| **本地搜索** | 按 query、精确 tag、creator、year、item type、collection、Better BibTeX citation key 搜索 |
-| **库浏览** | 枚举 tags、libraries、groups、feeds、feed items |
-| **PDF 提取** | 正文、分页 annotation、outline、children |
-| **库级语义索引** | 建库级向量索引，`semantic-search` 支持 BM25 / semantic / hybrid |
-| **阅读 workspace** | 主题级 BM25 + 向量索引（`workspace new / add / import / index / query / search`） |
-| **条目新增** | DOI、URL、本地 PDF 三种路径，支持 `--attach-mode auto\|linked-url\|none` 和 OA PDF 解析 |
-| **写操作** | notes、tags、collection 成员、重复条目合并、Scite retractions、Semantic Scholar 补全 |
-| **诊断** | `doctor` 一次性报告 DB、PDF backend、Better BibTeX、embedding、写权限、feeds、annotation 能力 |
-| **AI skill** | `skills/zot-skills/SKILL.md` 把自然语言 Zotero 请求路由到正确的 `zot` 命令 |
+| 找到对的文献 | 按 query、tag、creator、year、collection、citation key、library、feed 找条目 |
+| 读取证据面 | 返回 item metadata、children、citation、PDF 正文、outline、notes、annotations |
+| 建一个主题工作面 | 创建 workspace、导入匹配论文、建索引、再做 query/search |
+| 复用整个文献库 | 建库级 semantic index，跑 BM25 / semantic / hybrid 检索 |
+| 安全改库 | 写 notes、tags、collection 关系、导入条目、合并重复项、同步发表状态 |
+| 让 Agent 不乱写 | 先跑 `doctor`、强制 dry-run、安全门、稳定 JSON envelope、绝不直接改 `zotero.sqlite` |
 
 ---
 
-## 安装
+## 推荐的 Agent 启动方式
 
-### 用 GitHub 安装 CLI
+先装 skill，再提供它调用的运行时。
 
-```bash
-cargo install --git https://github.com/bahayonghang/zotero-cli.git zot-cli --locked
-```
-
-### 用 `npx skills add` 安装 `zot-skills`
+### 1. 安装 skill
 
 ```bash
 npx skills add https://github.com/bahayonghang/zotero-cli --skill zot-skills
 ```
 
-这会从仓库里的 [`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md) 安装内置 skill。
+这会安装仓库里内置的工作流契约：[`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md)。
 
-### 首次运行
+### 2. 安装运行时
+
+```bash
+cargo install --git https://github.com/bahayonghang/zotero-cli.git zot-cli --locked
+```
+
+### 3. 跑一次环境检查
 
 ```bash
 zot --json doctor
 ```
 
-`doctor` 一次告诉你：SQLite 是否可读、Pdfium 是否可用、写权限是否就绪、是否已有 semantic index、Better BibTeX / embedding / feeds 是否配置好。
-
-### 未安装时
+如果你就在这个仓库里开发，而 `zot` 还没进 `PATH`，用：
 
 ```bash
 cargo run -q -p zot-cli -- --json doctor
 ```
 
----
+同一轮任务里固定一种调用方式，不要来回切。
 
-## 30 秒上手
+### 4. 需要写入或 saved search 时，先初始化 config
+
+如果你后面要写 note、tag、collection 关系、saved search 或 publication status：
 
 ```bash
-# 环境诊断
-zot --json doctor
-
-# 字段搜索
-zot --json library search "attention" \
-    --tag transformer --creator Vaswani --year 2017
-
-# 按 Better BibTeX citation key 直接定位
-zot --json library citekey Smith2024
-
-# 拉取单条目的 PDF、outline、annotation、children
-zot --json item get      ATTN001
-zot --json item outline  ATTN001
-zot --json item children ATTN001
-zot --json item annotation list --item-key ATTN001
-
-# 用 DOI 新增条目，有开放获取 PDF 时自动附上
-zot --json item add-doi 10.1038/nature12373 --tag reading --attach-mode auto
-
-# 库级语义检索
-zot --json library semantic-index  --fulltext
-zot --json library semantic-search "mechanistic interpretability" \
-    --mode hybrid --limit 5
-
-# 主题级 workspace + RAG 风格检索
-zot --json workspace new    llm-safety
-zot --json workspace import llm-safety --search "reward hacking"
-zot --json workspace index  llm-safety
-zot --json workspace query  llm-safety \
-    "主要的失败模式有哪些？" --mode hybrid --limit 5
+zot config init --library-id <你的 library id> --api-key <你的 api key>
 ```
 
-每条命令都支持 `--json`。envelope 固定：
+如果你想单独建一个 profile：
+
+```bash
+zot config init --target-profile work --library-id <你的 library id> --api-key <你的 api key> --make-default
+```
+
+---
+
+## 直接用自然语言提出 Zotero 任务
+
+装好 skill 后，首选交互面是用户请求，不是命令列表。
+
+- “找 2017 年 Vaswani 写的、带 `transformer` 标签的论文。”
+- “把 `ATTN001` 的 PDF 批注和子笔记都拉出来。”
+- “给我建一个 `llm-safety` workspace，把 reward hacking 相关论文都导进去。”
+- “查一下这篇预印本现在有没有正式发表版本。”
+- “给这篇文献加一条 note，再打上 `priority` 标签。”  
+  这类写操作要在用户明确授权后再做。
+
+skill 会把这些请求路由到 `library`、`item`、`collection`、`workspace` 或 `sync`，并决定是否先跑 `doctor`。
+
+更完整的自然语言开口方式，见：
+
+- Agent 用法（中文）：[docs/skills/agent-usage.md](./docs/skills/agent-usage.md)
+- Agent Usage (EN): [docs/en/skills/agent-usage.md](./docs/en/skills/agent-usage.md)
+
+---
+
+## 直接看运行时参考
+
+如果你要手动排障，或要直接驱动运行时，这几条通常是起点：
+
+```bash
+zot --json doctor
+zot --json library search "reward hacking" --limit 10
+zot --json item get ATTN001
+zot --json item annotation list --item-key ATTN001
+zot --json workspace query llm-safety "主要的失败模式有哪些？" --mode hybrid --limit 5
+```
+
+运行时的顶层 envelope 固定不变：
 
 ```json
 { "ok": true, "data": { "...": "..." }, "meta": { "...": "..." } }
@@ -140,100 +156,38 @@ zot --json workspace query  llm-safety \
 
 ---
 
-## 原生适配 AI Agent
+## 文档怎么读
 
-仓库自带 Claude Code skill：[`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md)。用上面的 `npx skills add` 装好后，自然语言请求就会自动落到 `zot`：
+双语文档站现在按 skill-first 的 Zotero 工作流来组织，CLI 页面只保留为参考面：
 
-- _“找 Vaswani 2017 年带 transformer 标签的论文”_ → `library search`
-- _“把 ATTN001 的批注全部拿出来”_ → `item annotation list`
-- _“给我整理一个 LLM 安全的 RAG 检索面”_ → `workspace new / import / index`
-- _“这篇预印本已经正式发表了吗？”_ → `sync update-status`
-
-skill 里同时写死了安全边界：`doctor` 前置、合并重复条目必须先 dry-run、写操作要显式授权、绝对不直接改 `zotero.sqlite`。
-
----
-
-## 能力对比
-
-| 能力 | `zot`（本项目） | Zotero 桌面端 | `pyzotero` 脚本 | `ref/zotero-mcp`（旧） |
-| --- | --- | --- | --- | --- |
-| 直接读本地 SQLite | 支持 | 不适用 | 不支持（只有 Web API） | 部分（Python） |
-| 原生 PDF 正文 + annotation + outline | 支持（Pdfium） | 需要手动复制 | 自己写 | 部分 |
-| BM25 + semantic + hybrid 检索 | 支持 | 不支持 | 自己写 | 部分 |
-| 主题 workspace + 索引 | 支持 | 不支持 | 自己写 | 不支持 |
-| DOI / URL 导入 + OA PDF attach-mode | 支持 | 部分 | 自己写 | 支持 |
-| Scite retractions / Semantic Scholar 补全 | 支持 | 不支持 | 自己写 | 支持 |
-| 稳定的 JSON envelope | 支持 | 不支持 | 自己写 | 部分 |
-| 内置 Claude Code skill | 支持 | 不支持 | 不支持 | 不支持 |
-| 单一静态二进制 | 支持（Rust） | GUI 程序 | 需要 Python 环境 | 需要 Python 环境 |
-
-`zot` 是旧 `ref/zotero-mcp` 原型的 CLI-first 继任者。旧的 MCP connector 风格接口被故意映射成显式的 `zot` 命令。
-
----
-
-## 工作区结构
-
-Rust workspace 位于 `src/`：
-
-| Crate | 职责 |
-| --- | --- |
-| [`src/zot-core`](./src/zot-core) | 共享配置、模型、错误、JSON envelope |
-| [`src/zot-local`](./src/zot-local) | SQLite 读取、PDF helper、workspace 与本地索引逻辑 |
-| [`src/zot-remote`](./src/zot-remote) | Zotero Web API、Better BibTeX、OA PDF 解析、Scite、embeddings |
-| [`src/zot-cli`](./src/zot-cli) | `zot` 二进制与命令入口 |
-
-仓库级 lint 禁用 `unsafe`、`dbg!`、`todo!`、`unwrap()`。
-
----
-
-## 配置
-
-配置文件：`~/.config/zot/config.toml`
-
-### 环境变量
-
-| 变量 | 用途 |
-| --- | --- |
-| `ZOT_DATA_DIR` | 覆盖 Zotero 数据目录 |
-| `ZOT_LIBRARY_ID` | Web API 写操作使用的库 id |
-| `ZOT_API_KEY` | Zotero Web API key（写操作必填） |
-| `ZOT_EMBEDDING_URL` | 兼容 OpenAI 协议的 embedding 端点 |
-| `ZOT_EMBEDDING_KEY` | embedding provider key |
-| `ZOT_EMBEDDING_MODEL` | embedding 模型名 |
-| `SEMANTIC_SCHOLAR_API_KEY` / `S2_API_KEY` | Semantic Scholar 访问 |
-
-### 可选覆盖
-
-`ZOT_BBT_PORT`、`ZOT_BBT_URL`、`ZOT_SCITE_API_BASE`、`ZOT_CROSSREF_API_BASE`、`ZOT_UNPAYWALL_API_BASE`、`ZOT_PMC_API_BASE`、`ZOT_SEMANTIC_SCHOLAR_GRAPH_BASE`。
-
----
-
-## 文档
-
-仓库自带双语 VitePress 文档站：
-
-- 中文快速开始：[docs/guide/getting-started.md](./docs/guide/getting-started.md)
-- 中文 CLI 总览：[docs/cli/overview.md](./docs/cli/overview.md)
-- 中文 Skills 总览：[docs/skills/overview.md](./docs/skills/overview.md)
-- English getting started: [docs/en/guide/getting-started.md](./docs/en/guide/getting-started.md)
-- English CLI overview: [docs/en/cli/overview.md](./docs/en/cli/overview.md)
+- Skills 总览（中文）：[docs/skills/overview.md](./docs/skills/overview.md)
+- Agent 用法（中文）：[docs/skills/agent-usage.md](./docs/skills/agent-usage.md)
+- 典型工作流（中文）：[docs/skills/workflows.md](./docs/skills/workflows.md)
+- 快速开始（中文）：[docs/guide/getting-started.md](./docs/guide/getting-started.md)
+- CLI 参考（中文）：[docs/cli/overview.md](./docs/cli/overview.md)
+- Skills overview (EN): [docs/en/skills/overview.md](./docs/en/skills/overview.md)
+- Agent Usage (EN): [docs/en/skills/agent-usage.md](./docs/en/skills/agent-usage.md)
+- Skill workflows (EN): [docs/en/skills/workflows.md](./docs/en/skills/workflows.md)
+- Getting started (EN): [docs/en/guide/getting-started.md](./docs/en/guide/getting-started.md)
+- CLI reference (EN): [docs/en/cli/overview.md](./docs/en/cli/overview.md)
 
 本地预览：
 
 ```bash
-just docs    # npm install + vitepress dev
+just docs
 ```
 
-正式版通过 [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml) 在 release 时自动部署到 GitHub Pages。
+正式文档通过 [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml) 发布到 GitHub Pages。
 
 ---
 
 ## 当前边界
 
-- `zot mcp serve` 仅是占位 scaffold，会返回 `mcp-not-implemented`，MCP 相关工作流暂时走 CLI。
-- annotation 创建是 PDF-first，依赖本地 PDF、Pdfium、写权限。
-- `library citekey` 优先用 Better BibTeX，不可用时会退回 Extra 字段解析。
-- 旧 MCP 原型里的 connector 风格 `search` / `fetch` 不会作为独立命令，而是映射到 `library search`、`item get` 等现有命令。
+- `zot mcp serve` 现在只是 scaffold，会返回 `mcp-not-implemented`。当前应走 skill + runtime。
+- 本地读取来自 Zotero 数据目录。写操作只走 Zotero Web API。
+- annotation 创建是 PDF-first，依赖本地 PDF、Pdfium 和写凭证。
+- citation key 查询优先走 Better BibTeX，可用时补强；否则退回兼容的本地解析。
+- 旧参考实现里的 `search` / `fetch` 这种 connector 心智模型，已经被显式映射到 `library`、`item`、`collection`、`workspace`、`sync` 这些工作流。
 
 ---
 
@@ -243,31 +197,31 @@ just docs    # npm install + vitepress dev
 just ci
 ```
 
-按顺序执行：`cargo fmt --all --check` → `cargo check --workspace` → `cargo clippy --workspace --all-targets -- -D warnings` → `cargo test --workspace`。
+会执行 `cargo fmt --all --check`、`cargo check --workspace`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`。
 
 ---
 
 ## 贡献
 
-欢迎 issue、可复现的 bug 报告和 PR。先看仓库的协作契约：[`AGENTS.md`](./AGENTS.md)，再使用 [`.github/ISSUE_TEMPLATE`](./.github/ISSUE_TEMPLATE) 和 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md) 里的模板。
+欢迎提 issue、可复现 bug 和 PR。先看 [`AGENTS.md`](./AGENTS.md) 里的协作约束，再使用 [`.github/ISSUE_TEMPLATE`](./.github/ISSUE_TEMPLATE) 和 [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md)。
 
 提 PR 前：
 
 1. 本地跑 `just ci`。
-2. 命令面改动同步更新 `docs/` 和 `docs/en/`。
-3. 保持 `skills/zot-skills/SKILL.md` 与 CLI 一致。
+2. 如果改了用户可见工作流，同步更新 `docs/` 和 `docs/en/`。
+3. 保持 [`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md) 和运行时行为一致。
 
 ---
 
 ## 致谢
 
-- [Zotero](https://www.zotero.org)：本项目依托的开源文献管理器。
-- [Better BibTeX](https://retorque.re/zotero-better-bibtex/)：citation key 与 JSON-RPC。
-- [Pdfium](https://pdfium.googlesource.com/pdfium/) / [`pdfium-render`](https://crates.io/crates/pdfium-render)：PDF 正文与 outline 提取。
-- [Semantic Scholar](https://www.semanticscholar.org)、[Scite](https://scite.ai)、[Unpaywall](https://unpaywall.org)、[Crossref](https://www.crossref.org)、[OA PMC](https://www.ncbi.nlm.nih.gov/pmc/)：远程补全与开放获取资源解析。
+- [Zotero](https://www.zotero.org)：本项目依托的开源文献管理器与数据模型。
+- [Better BibTeX](https://retorque.re/zotero-better-bibtex/)：citation key 工作流。
+- [Pdfium](https://pdfium.googlesource.com/pdfium/) / [`pdfium-render`](https://crates.io/crates/pdfium-render)：PDF 正文和 outline 提取。
+- [Semantic Scholar](https://www.semanticscholar.org)、[Scite](https://scite.ai)、[Unpaywall](https://unpaywall.org)、[Crossref](https://www.crossref.org)、[OA PMC](https://www.ncbi.nlm.nih.gov/pmc/)：补全和开放获取解析。
 
 ---
 
 ## 许可协议
 
-[MIT](./LICENSE) —— 研究工作应该能自由迁移。
+[MIT](./LICENSE) —— 文献工作流应该能自由迁移。

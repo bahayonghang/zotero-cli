@@ -21,6 +21,7 @@ const zhSidebar = [
     text: 'CLI',
     items: [
       { text: '总览', link: '/cli/overview' },
+      { text: 'config', link: '/cli/config' },
       { text: 'library', link: '/cli/library' },
       { text: 'item', link: '/cli/item' },
       { text: 'collection', link: '/cli/collection' },
@@ -33,6 +34,7 @@ const zhSidebar = [
     text: 'Skills',
     items: [
       { text: '总览', link: '/skills/overview' },
+      { text: 'Agent 用法', link: '/skills/agent-usage' },
       { text: '路由策略', link: '/skills/routing' },
       { text: '安全边界', link: '/skills/safety' },
       { text: '典型工作流', link: '/skills/workflows' },
@@ -51,6 +53,7 @@ const enSidebar = [
     text: 'CLI',
     items: [
       { text: 'Overview', link: '/en/cli/overview' },
+      { text: 'config', link: '/en/cli/config' },
       { text: 'library', link: '/en/cli/library' },
       { text: 'item', link: '/en/cli/item' },
       { text: 'collection', link: '/en/cli/collection' },
@@ -63,6 +66,7 @@ const enSidebar = [
     text: 'Skills',
     items: [
       { text: 'Overview', link: '/en/skills/overview' },
+      { text: 'Agent Usage', link: '/en/skills/agent-usage' },
       { text: 'Routing', link: '/en/skills/routing' },
       { text: 'Safety', link: '/en/skills/safety' },
       { text: 'Workflows', link: '/en/skills/workflows' },
@@ -77,9 +81,13 @@ export default defineConfig({
   title: 'zot',
   description: 'Rust Zotero CLI and zot-skills documentation',
   base,
+  head: [
+    ['link', { rel: 'icon', type: 'image/png', href: `${base}images/zot-icon.png` }],
+  ],
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {
+    logo: '/images/zot-icon.png',
     search: {
       provider: 'local',
     },

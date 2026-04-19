@@ -2,7 +2,7 @@
 
 这一页给出一个完整的 Zotero -> ZoteroSynth 文献综述主线示例，目标是让操作者快速理解：
 
-1. 先用 Rust `zot` CLI 做只读检索
+1. 先让 `zot-skills` 稳定拿到 Zotero 里的只读内容
 2. 再用 ZoteroSynth 的 `review` 工作流做主题综述
 3. 明确证据边界，不把 `metadata+abstract` 冒充成 `fulltext`
 

@@ -15,6 +15,7 @@
 The current top-level commands come from `src/zot-cli/src/main.rs`:
 
 - `doctor`
+- `config`
 - `library`
 - `item`
 - `collection`
@@ -48,10 +49,12 @@ Failure:
 
 ```bash
 zot --json doctor
+zot --json config show
 zot --json library search "attention" --tag transformer --creator Vaswani --year 2017
 zot --json library citekey Smith2024
 zot --json library semantic-status
 zot --json item get ATTN001
+zot --json item download ATCH005
 zot --json item children ATTN001
 zot --json collection search Transform
 zot --json workspace query llm-safety "What are the main failure modes?" --mode hybrid --limit 5
@@ -59,15 +62,17 @@ zot --json workspace query llm-safety "What are the main failure modes?" --mode 
 
 ## Command responsibilities
 
+- `config`: inspect and update runtime config, profiles, and write credentials
 - `library`: default read-first surface for search, enumeration, semantic flows, feeds, and duplicates
-- `item`: single-item inspection plus most write actions, annotations, and Scite
-- `collection`: maintenance of real Zotero collections
+- `item`: single-item inspection, most write actions, attachment download, annotations, and Scite
+- `collection`: maintenance of real Zotero collections plus fine-grained collection reads
 - `workspace`: local reading workspaces
 - `sync`: preprint publication-status checks
 - `mcp`: currently reserved, not a usable workflow
 
 ## Command guides
 
+- [config](/en/cli/config)
 - [library](/en/cli/library)
 - [item](/en/cli/item)
 - [collection](/en/cli/collection)

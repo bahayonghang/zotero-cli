@@ -13,6 +13,9 @@ zot --json item pdf ATTN001
 zot --json item pdf ATTN001 --pages 1-3
 zot --json item fulltext ATTN001
 zot --json item children ATTN001
+zot --json item download ATCH005
+zot --json item deleted --limit 20
+zot --json item versions --since 1200
 zot --json item outline ATTN001
 zot item export ATTN001 --format bibtex
 zot item cite ATTN001 --style nature
@@ -23,6 +26,9 @@ Notes:
 - `item pdf` and `item fulltext` currently share the PDF text-extraction path
 - `item pdf --annotations` reads annotations already embedded in the PDF
 - `item children` batches notes, attachments, and annotations together
+- `item download` requires an attachment key, not a parent item key
+- `item deleted` lists items currently in Trash
+- `item versions` returns the remote item-version map for sync or troubleshooting work
 - `item outline` depends on local PDF availability and the document actually containing bookmarks
 
 Supported citation styles:
@@ -69,6 +75,7 @@ zot --json item update ATTN001 --title "New Title" --field publicationTitle=Natu
 zot --json item trash ATTN001
 zot --json item restore ATTN001
 zot --json item attach ATTN001 --file supplement.pdf
+zot --json item download ATCH005 --output downloads/
 ```
 
 These commands mutate the library. Check first that:
@@ -76,6 +83,11 @@ These commands mutate the library. Check first that:
 1. `doctor` has been run
 2. `ZOT_API_KEY` is configured
 3. `ZOT_LIBRARY_ID` is configured
+
+Notes:
+
+- `item attach` uploads a new attachment
+- `item download` downloads an existing attachment
 
 ## note / tag / annotation / scite
 
