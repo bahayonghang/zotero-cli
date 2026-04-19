@@ -22,6 +22,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 
 - “找我库里 reward hacking 相关的论文”
 - “按 Smith2024 找到那篇论文”
+- “给我看最近 10 条刚进库的文献”
 - “看这个 collection 里有哪些条目”
 - “列出当前库里的 feeds”
 
@@ -29,6 +30,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 
 - 普通库内检索：`library search`
 - citation key 直达：`library citekey`
+- 最近入库条目：`library recent --count`
 - collection 细粒度读取：`collection get` / `subcollections` / `items` / `item-count` / `tags`
 - 库级组织信息：`library tags` / `libraries` / `feeds` / `feed-items`
 
@@ -109,6 +111,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 - “给这篇文献加一条 note”
 - “打上 priority 标签”
 - “把这个条目挂到某个 collection”
+- “先预览再合并这两篇文献”
 - “合并重复条目”
 - “把 preprint 的正式发表信息写回去”
 
@@ -116,6 +119,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 
 - 条目与标签：`item note ...` / `item tag ...` / `item update`
 - 导入：`item add-doi` / `add-url` / `add-file`
+- 手工合并：`item merge`
 - collection 关系：`collection add-item` / `remove-item` / `create` / `rename` / `delete`
 - duplicates：`library duplicates` / `duplicates-merge`
 - 状态同步：`sync update-status`
@@ -203,6 +207,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `item trash`
 - `item restore`
 - `item attach`
+- `item merge --confirm`
 - `item note add`
 - `item note update`
 - `item note delete`
@@ -231,6 +236,7 @@ cargo run -q -p zot-cli -- --json doctor
 3. 对这些高风险动作，先总结即将发生的变化，再执行：
    - `item trash`
    - `item note delete`
+   - `item merge --confirm`
    - `collection delete`
    - `library saved-search delete`
    - `library duplicates-merge --confirm`
@@ -240,17 +246,22 @@ cargo run -q -p zot-cli -- --json doctor
 ## 常见语义差异
 
 - `workspace search` 是关键词检索，`workspace query` 是问答检索
+- `library recent --count 10` 是最近 N 条，`library recent 2026-04-01 --limit 20` 是按时间边界筛
 - `library semantic-search` 是库级语义检索，不等价于 workspace query
 - `item add-doi` / `item add-url` / `item create --doi|--url|--pdf` 支持 `--attach-mode`
 - `item add-file` 可以带 `--doi` 补元数据，但不接受 `--attach-mode`
 - feeds 不通过 `--library group:<id>` 访问，而是用 `library feeds` / `feed-items`
 - `item download` 下载本地附件文件，`item attach` 上传新附件
+- `item merge` 是手工选 keeper/source 的通用合并，`library duplicates-merge` 是先找重复、再按 keeper 合并
 - `config show` 是看有效配置，`config profiles use` 是切换默认 profile
 
 ## 自然语言到动作的典型映射
 
 - “找我库里 reward hacking 相关的论文，再挑一篇最相关的给我引用”  
   先 `library search`，再 `item get` / `item cite`
+
+- “给我看最近 10 条刚进库的文献”  
+  走 `library recent --count 10`
 
 - “把这篇论文的 PDF 批注和 notes 拉出来”  
   先 `doctor`，再 `item get` / `item children` / `item annotation list`
@@ -264,8 +275,65 @@ cargo run -q -p zot-cli -- --json doctor
 - “把附件 ATCH005 下载出来”  
   走 `item download`
 
+- “先预览再合并 KEEP001 和 DUPE001，确认后再真的合并”  
+  先 `item merge KEEP001 DUPE001`，确认后再 `item merge ... --confirm`
+
 - “我现在这个环境为什么不能写 Zotero”  
   先 `doctor`，必要时 `config show`
+
+## 从 ref\zotero-cli 迁移过来时怎么理解
+
+- `search` -> `library search`
+- `get` -> `item get`
+- `annotations` -> `item annotation list` 或 `item pdf --annotations`
+- `notes` -> `item note list`
+- `collections` -> `collection list`
+- `collection <id>` -> `collection items <id>`
+- `add doi` / `add url` -> `item add-doi` / `item add-url`
+- `tags` -> `library tags`
+- `recent [n]` -> `library recent --count <n>`
+- `merge` -> `item merge`；如果是先找重复再合并，走 `library duplicates` / `duplicates-merge`
+
+不要迁回去的旧心智：
+
+- 不补 flat top-level alias
+- 不补 `--api-base`
+- 不补 compact JSON 默认输出
+- 不把 connector 风格 `search` / `fetch` 重新做成另一套主命令
+
+## 从 ref\zotagent 迁移过来时怎么理解
+
+先记住两点：
+
+- 当前 `zot` 没有照搬 `zotagent` 的 flat command 面
+- 当前 `sync` 只做 preprint publication status，同名但不是附件索引器
+
+已有覆盖或可替代的部分：
+
+- DOI / URL / 文件导入：`item add-doi` / `item add-url` / `item add-file` / `item create`
+- 库级语义检索：`library semantic-index` / `library semantic-search`
+- 单篇 PDF 提取：`item pdf` / `item fulltext` / `item outline`
+- citation key 入口：先 `library citekey`，再转到 `item get` / `item cite`
+
+当前没补齐，不能假装存在：
+
+- `s2`
+- `add --s2-paper-id`
+- `search-in`
+- `metadata`
+- `read`
+- `expand`
+- zotagent 风格 `status`
+- zotagent 风格 `sync` 全量附件索引
+- 按 `title` / `author` / `year` / `publication` 一次性手工建条目
+
+遇到这些请求时怎么处理：
+
+- `search-in` / `expand`：明确说当前没有等价命令，只能先 `item fulltext` / `item pdf` 拉文本，再做 agent 侧二次定位
+- `metadata`：说明当前没有 field-scoped metadata search；最多退到 `library search` 加已有 filter
+- `status`：用 `doctor` + `library semantic-status` 组合回答，不要把 `sync update-status` 说成索引状态
+- `s2` / `--s2-paper-id`：直接说明当前未实现，不要伪造替代命令
+- zotagent `sync`：说明当前只能用 `library semantic-index --fulltext` 或 `workspace index` 做部分替代，而且范围主要是 metadata + PDF
 
 ## 失败时的 fallback
 

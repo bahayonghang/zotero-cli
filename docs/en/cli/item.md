@@ -89,6 +89,22 @@ Notes:
 - `item attach` uploads a new attachment
 - `item download` downloads an existing attachment
 
+## merge
+
+```bash
+zot --json item merge KEEP001 DUPE001
+zot --json item merge KEEP001 DUPE001 --confirm
+zot --json item merge KEEP001 DUPE001 --keep DUPE001 --confirm
+```
+
+Notes:
+
+- it is preview-first by default; without `--confirm`, nothing is written
+- `--keep` selects which item survives; without it, the first key is kept
+- only top-level bibliographic items are supported
+- the preview reports metadata fills, added tags / collections, child re-parent count, and skipped duplicate attachments
+- if you are merging from duplicate-detection results first, `library duplicates-merge` remains available
+
 ## note / tag / annotation / scite
 
 ### notes

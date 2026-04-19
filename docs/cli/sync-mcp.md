@@ -4,6 +4,13 @@
 
 `sync update-status` 用于检查 preprint 是否已有正式发表版本。
 
+如果你是从 `ref/zotagent` 迁过来的，要先把这个语义分开：
+
+- `zotagent sync`：附件提取和索引
+- `zot sync update-status`：发表状态检查
+
+当前仓库里没有 zotagent 那个 `sync` 的等价命令。
+
 示例：
 
 ```bash

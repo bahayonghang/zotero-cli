@@ -132,6 +132,72 @@
         "Surfaces the selected/default profile state clearly.",
         "Uses config tooling before falling back to raw env-var advice."
       ]
+    },
+    {
+      "id": 13,
+      "prompt": "给我看最近 10 条刚进 Zotero 库的文献，不要按关键词搜。",
+      "expected_output": "识别这是 recent-N 工作流，优先走 library recent --count 10，而不是改写成 library search。",
+      "files": [],
+      "expectations": [
+        "Treats the request as recent-item enumeration, not keyword search.",
+        "Routes to the count-based recent workflow.",
+        "Keeps the result scoped to recently added library items."
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "先帮我预览合并 KEEP001 和 DUPE001 会改什么；如果我确认，再真的合并。",
+      "expected_output": "识别这是手工 item merge 工作流，先 preview，再等确认后才执行 confirm。",
+      "files": [],
+      "expectations": [
+        "Routes to item merge instead of only duplicate detection.",
+        "Explains preview-first behavior clearly.",
+        "Treats --confirm as a separate high-risk write step."
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "我以前用 ref\\zotero-cli 的 recent 和 merge。现在这个仓库里对应该怎么用？",
+      "expected_output": "给出 ref 命令到当前 zot 工作流的迁移映射，并明确哪些旧 connector 风格特性不再补。",
+      "files": [],
+      "expectations": [
+        "Maps recent to library recent --count.",
+        "Maps merge to item merge or duplicates-merge depending on intent.",
+        "States the non-goals around connector-style aliases or compact JSON."
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "我以前在 zotagent 里会用 search-in。现在帮我在 KG326EEI 这篇里搜 reward model，并把命中的上下文给我。",
+      "expected_output": "明确当前 zot 没有 search-in / expand 的原生命令，只能退到 item fulltext 或 item pdf 后做二次定位，不能编造不存在的命令。",
+      "files": [],
+      "expectations": [
+        "States honestly that search-in and expand are not implemented in the current CLI.",
+        "Falls back to item-level text extraction instead of inventing a direct equivalent.",
+        "Keeps the answer scoped to what the current runtime can actually do."
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "像 zotagent status 那样，帮我看下这个环境的本地索引状态。",
+      "expected_output": "区分 zotagent status 和当前 zot 的 doctor + library semantic-status 组合，不要把 sync update-status 当成索引状态。",
+      "files": [],
+      "expectations": [
+        "Explains the command-surface mismatch around sync/status clearly.",
+        "Uses doctor and semantic-status as the real current evidence sources.",
+        "Does not misroute the request to publication-status sync."
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "我想像 zotagent 一样先跑 s2 搜一下，再按 paperId 直接导入 Zotero。",
+      "expected_output": "明确当前 zot 没有 s2 / --s2-paper-id 能力，不要伪造支持；可以说明这是待补缺口。",
+      "files": [],
+      "expectations": [
+        "Does not claim the current CLI supports Semantic Scholar search-by-paperId import.",
+        "Calls out the gap as missing functionality rather than user error.",
+        "Keeps the response aligned with the current Rust CLI surface."
+      ]
     }
   ]
 }

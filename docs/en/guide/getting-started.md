@@ -10,6 +10,9 @@ The primary interface in this repository is `zot-skills`, not the subcommand lis
 
 If the agent is supposed to find papers, read PDFs, extract annotations, build a topic workspace, or update Zotero items, start from the skill-first path.
 
+If you are migrating from `ref/zotero-cli`, read [Migrating from ref\\zotero-cli](/en/guide/migrating-from-ref-zotero-cli) first.
+If you are migrating from `ref/zotagent`, also read [Migrating from ref\\zotagent](/en/guide/migrating-from-ref-zotagent).
+
 ## What the skill can surface from Zotero
 
 - Item metadata: title, creators, year, item type, citation, child items
@@ -186,4 +189,6 @@ npm run build
 - [Skills Overview](/en/skills/overview)
 - [Workflows](/en/skills/workflows)
 - [Routing](/en/skills/routing)
+- [Migrating from ref\zotero-cli](/en/guide/migrating-from-ref-zotero-cli)
+- [Migrating from ref\zotagent](/en/guide/migrating-from-ref-zotagent)
 - [CLI Overview](/en/cli/overview)

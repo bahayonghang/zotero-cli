@@ -139,9 +139,12 @@ If you need to debug or drive the runtime manually, these are the usual starting
 ```bash
 zot --json doctor
 zot --json library search "reward hacking" --limit 10
+zot --json library recent --count 10
 zot --json item get ATTN001
+zot --json item merge KEEP001 DUPE001
 zot --json item annotation list --item-key ATTN001
 zot --json workspace query llm-safety "What are the main failure modes?" --mode hybrid --limit 5
+zot completions powershell
 ```
 
 The runtime always returns the same top-level envelope:
@@ -164,11 +167,13 @@ The bilingual docs are organized around skill-first Zotero workflows, with CLI p
 - Agent usage (EN): [docs/en/skills/agent-usage.md](./docs/en/skills/agent-usage.md)
 - Skill workflows (EN): [docs/en/skills/workflows.md](./docs/en/skills/workflows.md)
 - Getting started (EN): [docs/en/guide/getting-started.md](./docs/en/guide/getting-started.md)
+- Migrating from ref\zotero-cli (EN): [docs/en/guide/migrating-from-ref-zotero-cli.md](./docs/en/guide/migrating-from-ref-zotero-cli.md)
 - CLI reference (EN): [docs/en/cli/overview.md](./docs/en/cli/overview.md)
 - Skills 总览（中文）：[docs/skills/overview.md](./docs/skills/overview.md)
 - Agent 用法（中文）：[docs/skills/agent-usage.md](./docs/skills/agent-usage.md)
 - 典型工作流（中文）：[docs/skills/workflows.md](./docs/skills/workflows.md)
 - 快速开始（中文）：[docs/guide/getting-started.md](./docs/guide/getting-started.md)
+- 从 ref\zotero-cli 迁移（中文）：[docs/guide/migrating-from-ref-zotero-cli.md](./docs/guide/migrating-from-ref-zotero-cli.md)
 - CLI 参考（中文）：[docs/cli/overview.md](./docs/cli/overview.md)
 
 Local preview:

@@ -139,9 +139,12 @@ skill 会把这些请求路由到 `library`、`item`、`collection`、`workspace
 ```bash
 zot --json doctor
 zot --json library search "reward hacking" --limit 10
+zot --json library recent --count 10
 zot --json item get ATTN001
+zot --json item merge KEEP001 DUPE001
 zot --json item annotation list --item-key ATTN001
 zot --json workspace query llm-safety "主要的失败模式有哪些？" --mode hybrid --limit 5
+zot completions powershell
 ```
 
 运行时的顶层 envelope 固定不变：
@@ -164,11 +167,13 @@ zot --json workspace query llm-safety "主要的失败模式有哪些？" --mode
 - Agent 用法（中文）：[docs/skills/agent-usage.md](./docs/skills/agent-usage.md)
 - 典型工作流（中文）：[docs/skills/workflows.md](./docs/skills/workflows.md)
 - 快速开始（中文）：[docs/guide/getting-started.md](./docs/guide/getting-started.md)
+- 从 ref\zotero-cli 迁移（中文）：[docs/guide/migrating-from-ref-zotero-cli.md](./docs/guide/migrating-from-ref-zotero-cli.md)
 - CLI 参考（中文）：[docs/cli/overview.md](./docs/cli/overview.md)
 - Skills overview (EN): [docs/en/skills/overview.md](./docs/en/skills/overview.md)
 - Agent Usage (EN): [docs/en/skills/agent-usage.md](./docs/en/skills/agent-usage.md)
 - Skill workflows (EN): [docs/en/skills/workflows.md](./docs/en/skills/workflows.md)
 - Getting started (EN): [docs/en/guide/getting-started.md](./docs/en/guide/getting-started.md)
+- Migrating from ref\zotero-cli (EN): [docs/en/guide/migrating-from-ref-zotero-cli.md](./docs/en/guide/migrating-from-ref-zotero-cli.md)
 - CLI reference (EN): [docs/en/cli/overview.md](./docs/en/cli/overview.md)
 
 本地预览：

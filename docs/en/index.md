@@ -34,6 +34,7 @@ features:
 - Want to know how to ask in Claude Code or Codex: read [Agent Usage](/en/skills/agent-usage)
 - Want to know what the skill can surface from Zotero: read [Skills Overview](/en/skills/overview)
 - Want one end-to-end flow: read [Workflows](/en/skills/workflows)
+- If you used one of the reference CLIs before: read [Migrating from ref\zotero-cli](/en/guide/migrating-from-ref-zotero-cli) and [Migrating from ref\zotagent](/en/guide/migrating-from-ref-zotagent)
 - Want the manual command reference: read [CLI Overview](/en/cli/overview)
 
 ## Scope

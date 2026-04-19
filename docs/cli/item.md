@@ -89,6 +89,22 @@ zot --json item download ATCH005 --output downloads/
 - `item attach` 是上传新附件
 - `item download` 是下载已有附件
 
+## merge
+
+```bash
+zot --json item merge KEEP001 DUPE001
+zot --json item merge KEEP001 DUPE001 --confirm
+zot --json item merge KEEP001 DUPE001 --keep DUPE001 --confirm
+```
+
+说明：
+
+- 默认先 preview，不加 `--confirm` 不落库
+- `--keep` 用来指定哪一条留下；不传时默认保留第一个 key
+- 只支持 top-level bibliographic item
+- preview 会列出 metadata 补齐、tags / collections 新增、child re-parent 数、重复 attachment 跳过数
+- 如果你是先从重复检测结果里合并，也可以继续走 `library duplicates-merge`
+
 ## note / tag / annotation / scite
 
 ### notes

@@ -23,7 +23,8 @@
 2. [路由策略](/skills/routing)
 3. [安全边界](/skills/safety)
 4. [典型工作流](/skills/workflows)
-5. 真要看底层命令，再去 [CLI 总览](/cli/overview)
+5. 如果你以前在用参考 CLI，先看 [从 ref\zotero-cli 迁移](/guide/migrating-from-ref-zotero-cli) 或 [从 ref\zotagent 迁移](/guide/migrating-from-ref-zotagent)
+6. 真要看底层命令，再去 [CLI 总览](/cli/overview)
 
 ## 这个 skill 把哪些内容当作一等公民
 

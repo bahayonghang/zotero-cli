@@ -131,6 +131,43 @@ The reply should focus on:
 - missing values
 - whether the next step is config init, config set, or the actual Zotero task
 
+## H: List the most recently added items first
+
+User says:
+
+> Show me the last 10 items added to the library.
+
+The agent should:
+
+1. recognize that this is not keyword search
+2. route to the recent-N path instead of `library search`
+3. use the returned items as the handoff point for later item or workspace work
+
+The reply should focus on:
+
+- which items were added most recently
+- titles, authors, years
+- whether the next step should be detail, workspace, or further filtering
+
+## I: Preview a merge before applying it
+
+User says:
+
+> Preview what would change if KEEP001 and DUPE001 were merged. Only apply it after I confirm.
+
+The agent should:
+
+1. recognize this as manual merge, not just duplicate inspection
+2. return the preview first
+3. perform the write only after explicit confirmation
+
+The reply should focus on:
+
+- which metadata fields would be filled
+- which tags and collections would be added
+- how many child items would be re-parented
+- how many duplicate attachments would be skipped
+
 ## Regression coverage
 
 The repo already includes:
@@ -138,4 +175,4 @@ The repo already includes:
 - `skills/zot-skills/test-prompts.json`
 - `skills/zot-skills/evals/evals.json`
 
-They cover search, evidence extraction, workspace setup, saved searches, attachment download, and config inspection.
+They cover search, evidence extraction, workspace setup, saved searches, recent-N routing, manual merge preview, attachment download, and config inspection.

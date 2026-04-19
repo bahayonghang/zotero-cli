@@ -131,6 +131,43 @@ agent 应该做的事：
 - 缺失项
 - 下一步是 `config init`、`config set` 还是直接继续任务
 
+## H：先看最近入库的条目
+
+用户会说：
+
+> 给我看最近 10 条刚进 Zotero 库的文献
+
+agent 应该做的事：
+
+1. 识别这不是关键词搜索
+2. 走 recent-N 路由，而不是 library search
+3. 如果用户后面还要深读，再从返回结果里继续转 item / workspace
+
+回答重点：
+
+- 最近入库的是哪些条目
+- 它们的标题、作者、年份
+- 下一步是看详情、建 workspace，还是继续过滤
+
+## I：先 preview 再 merge
+
+用户会说：
+
+> 先帮我预览合并 KEEP001 和 DUPE001 会改什么；我确认后再真的合并
+
+agent 应该做的事：
+
+1. 识别这是手工 merge，不是单纯 duplicate 检查
+2. 先返回 preview
+3. 只有用户明确确认，才执行 `--confirm`
+
+回答重点：
+
+- 会补哪些 metadata
+- 会新增哪些 tags / collections
+- 会 re-parent 多少 children
+- 会跳过多少重复 attachment
+
 ## 回归验证
 
 仓库里已有这些回归资产：
@@ -138,4 +175,4 @@ agent 应该做的事：
 - `skills/zot-skills/test-prompts.json`
 - `skills/zot-skills/evals/evals.json`
 
-它们覆盖查条目、取证据、workspace、saved search、附件下载、配置排障等场景。
+它们覆盖查条目、取证据、workspace、saved search、recent-N、手工 merge、附件下载、配置排障等场景。

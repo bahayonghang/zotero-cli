@@ -34,6 +34,7 @@ features:
 - 想知道在 Claude Code / Codex 里怎么自然开口：看 [Agent 用法](/skills/agent-usage)
 - 想知道这个 skill 能从 Zotero 里拿什么：看 [Skills 总览](/skills/overview)
 - 想看一条完整主线怎么跑：看 [典型工作流](/skills/workflows)
+- 如果你以前在用参考 CLI：看 [从 ref\zotero-cli 迁移](/guide/migrating-from-ref-zotero-cli) 和 [从 ref\zotagent 迁移](/guide/migrating-from-ref-zotagent)
 - 想直接查命令参考：看 [CLI 总览](/cli/overview)
 
 ## 文档范围

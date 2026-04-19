@@ -23,7 +23,8 @@ Recommended order:
 2. [Routing](/en/skills/routing)
 3. [Safety](/en/skills/safety)
 4. [Workflows](/en/skills/workflows)
-5. Only then, if needed, [CLI Overview](/en/cli/overview)
+5. If you used one of the reference CLIs before, read [Migrating from ref\zotero-cli](/en/guide/migrating-from-ref-zotero-cli) or [Migrating from ref\zotagent](/en/guide/migrating-from-ref-zotagent)
+6. Only then, if needed, [CLI Overview](/en/cli/overview)
 
 ## What the skill treats as first-class
 

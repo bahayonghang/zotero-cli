@@ -4,6 +4,13 @@
 
 `sync update-status` checks whether a preprint has a published version.
 
+If you are coming from `ref/zotagent`, separate the meanings first:
+
+- `zotagent sync`: attachment extraction and indexing
+- `zot sync update-status`: publication-status checks
+
+This repo does not currently expose an equivalent of the zotagent `sync` command.
+
 Examples:
 
 ```bash

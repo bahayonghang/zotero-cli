@@ -10,6 +10,9 @@
 
 如果你是让 Agent 去“找文献、读 PDF、提取批注、整理主题 workspace、更新条目”，就按 skill-first 的方式启动。
 
+如果你是从 `ref/zotero-cli` 迁过来的，先看：[从 ref\\zotero-cli 迁移](/guide/migrating-from-ref-zotero-cli)。
+如果你是从 `ref/zotagent` 迁过来的，再看：[从 ref\\zotagent 迁移](/guide/migrating-from-ref-zotagent)。
+
 ## 这个 skill 能从 Zotero 里拿到什么
 
 - 条目元数据：title、creator、year、item type、citation、children
@@ -186,4 +189,6 @@ npm run build
 - [Skills 总览](/skills/overview)
 - [典型工作流](/skills/workflows)
 - [路由策略](/skills/routing)
+- [从 ref\zotero-cli 迁移](/guide/migrating-from-ref-zotero-cli)
+- [从 ref\zotagent 迁移](/guide/migrating-from-ref-zotagent)
 - [CLI 总览](/cli/overview)

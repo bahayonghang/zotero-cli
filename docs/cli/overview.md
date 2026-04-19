@@ -22,6 +22,7 @@
 - `workspace`
 - `sync`
 - `mcp`
+- `completions`
 
 ## JSON 输出格式
 
@@ -51,13 +52,16 @@
 zot --json doctor
 zot --json config show
 zot --json library search "attention" --tag transformer --creator Vaswani --year 2017
+zot --json library recent --count 10
 zot --json library citekey Smith2024
 zot --json library semantic-status
 zot --json item get ATTN001
+zot --json item merge KEEP001 DUPE001
 zot --json item download ATCH005
 zot --json item children ATTN001
 zot --json collection search Transform
 zot --json workspace query llm-safety "What are the main failure modes?" --mode hybrid --limit 5
+zot completions powershell
 ```
 
 ## 命令分工
@@ -69,6 +73,28 @@ zot --json workspace query llm-safety "What are the main failure modes?" --mode 
 - `workspace`：维护本地 reading workspace
 - `sync`：检查 preprint 是否已正式发表
 - `mcp`：当前只有占位命令，不是可用工作流
+- `completions`：生成 bash / zsh / fish / powershell 补全脚本
+
+## 从 ref\zotero-cli 迁移
+
+如果你以前在用 `ref/zotero-cli`：
+
+- `recent 10` 现在对应 `library recent --count 10`
+- 通用两项 merge 现在对应 `item merge KEY1 KEY2`
+- 旧的 flat top-level alias 和 `--api-base` 不会迁回
+
+完整迁移说明见：[从 ref\zotero-cli 迁移](/guide/migrating-from-ref-zotero-cli)
+
+## 从 ref\zotagent 迁移
+
+如果你以前在用 `ref/zotagent`：
+
+- `sync` 在这里不是附件索引，而是 preprint publication-status sync
+- `status` 没有等价单命令，当前要用 `doctor` + `library semantic-status`
+- `search-in` / `metadata` / `read` / `expand` 还没补齐
+- `s2` 和按 `paperId` 导入也还没补齐
+
+完整对照和补全计划见：[从 ref\zotagent 迁移](/guide/migrating-from-ref-zotagent)
 
 ## 子命令导航
 

@@ -6,7 +6,7 @@
 
 - `library search <query>`
 - `library list`
-- `library recent <YYYY-MM-DD>`
+- `library recent`
 - `library stats`
 - `library citekey <citekey>`
 - `library tags`
@@ -46,6 +46,21 @@ Available options:
 - `--direction <asc|desc>`
 - `--limit`
 - `--offset`
+
+## recent
+
+`library recent` now supports two modes:
+
+```bash
+zot --json library recent --count 10
+zot --json library recent 2026-04-01 --limit 20
+```
+
+Notes:
+
+- `--count <n>` means the latest N library items, returned by `dateAdded desc`
+- `<YYYY-MM-DD> --limit <n>` means items since a date boundary
+- without arguments, it defaults to `library recent --count 10`
 
 ## citation key, tags, libraries, and feeds
 
@@ -99,11 +114,14 @@ zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --dupli
 
 `duplicates-merge` is dry-run by default. Only `--confirm` performs the actual merge:
 
+- fill keeper metadata fields that are currently empty
 - merge tags
 - preserve or add collections
 - re-parent child items
 - skip obviously duplicate attachments when possible
 - move duplicate items to Trash
+
+If you already have two explicit item keys rather than a duplicate-candidate set, switch to `item merge` on the [item](/en/cli/item) page.
 
 ## saved search
 

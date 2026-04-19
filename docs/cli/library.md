@@ -6,7 +6,7 @@
 
 - `library search <query>`
 - `library list`
-- `library recent <YYYY-MM-DD>`
+- `library recent`
 - `library stats`
 - `library citekey <citekey>`
 - `library tags`
@@ -46,6 +46,21 @@ zot --json library search "alignment" --sort date-added --direction desc
 - `--direction <asc|desc>`
 - `--limit`
 - `--offset`
+
+## recent
+
+`library recent` 现在有两种模式：
+
+```bash
+zot --json library recent --count 10
+zot --json library recent 2026-04-01 --limit 20
+```
+
+说明：
+
+- `--count <n>` 表示最近 N 条刚入库的条目，按 `dateAdded desc` 返回
+- `<YYYY-MM-DD> --limit <n>` 表示取某个时间边界之后的条目
+- 不带参数时，默认等价于 `library recent --count 10`
 
 ## citation key、tags、libraries、feeds
 
@@ -99,11 +114,14 @@ zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --dupli
 
 `duplicates-merge` 默认是 dry-run。只有加 `--confirm` 才会真正：
 
+- 补 keeper 缺失的 metadata 字段
 - 合并 tags
 - 保留 / 补齐 collections
 - re-parent child items
 - 尝试跳过重复 attachment
 - 把 duplicate 送入 Trash
+
+如果你不是从重复候选里合并，而是手里已经有两条明确的 key，改走 [item](/cli/item) 里的 `item merge`。
 
 ## saved search
 

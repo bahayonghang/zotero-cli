@@ -15,7 +15,11 @@ const enNav = [
 const zhSidebar = [
   {
     text: '指南',
-    items: [{ text: '快速开始', link: '/guide/getting-started' }],
+    items: [
+      { text: '快速开始', link: '/guide/getting-started' },
+      { text: '从 ref\\zotero-cli 迁移', link: '/guide/migrating-from-ref-zotero-cli' },
+      { text: '从 ref\\zotagent 迁移', link: '/guide/migrating-from-ref-zotagent' },
+    ],
   },
   {
     text: 'CLI',
@@ -47,7 +51,17 @@ const zhSidebar = [
 const enSidebar = [
   {
     text: 'Guide',
-    items: [{ text: 'Getting Started', link: '/en/guide/getting-started' }],
+    items: [
+      { text: 'Getting Started', link: '/en/guide/getting-started' },
+      {
+        text: 'Migrating from ref\\zotero-cli',
+        link: '/en/guide/migrating-from-ref-zotero-cli',
+      },
+      {
+        text: 'Migrating from ref\\zotagent',
+        link: '/en/guide/migrating-from-ref-zotagent',
+      },
+    ],
   },
   {
     text: 'CLI',

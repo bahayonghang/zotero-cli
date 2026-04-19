@@ -10,19 +10,23 @@ It is not a command catalog.
 | --- | --- | --- |
 | “Find papers in my Zotero library about reward hacking” | surface candidate items first | which items match and why |
 | “Look up Smith2024” | direct citation-key lookup | metadata, citation, fallback state |
+| “Show me the last 10 items added to the library” | recent-N enumeration | what was added recently, not keyword matches |
 | “Pull the PDF annotations and notes for this paper” | evidence extraction for one item | metadata, children, annotations, missing capability |
 | “Create an llm-safety workspace” | build a long-lived topic workspace | naming, import scope, index prerequisites |
 | “Save this as a Zotero saved search” | store reusable search conditions | what conditions were saved |
 | “Download attachment ATCH005” | local attachment download | which attachment, where it was saved |
 | “Add a note to this item” | controlled mutation | what will change and whether write access exists |
+| “Preview a merge for KEEP001 and DUPE001 first” | manual merge preview | what will be filled or moved, and when the write happens |
 | “Show me the current config and default profile” | configuration inspection | effective config, default profile, missing pieces |
 
 ## Quick rule of thumb
 
 - one item or a few items: treat it as lookup or evidence extraction
 - a long-lived topic set: treat it as a workspace request
+- explicit “last 10” / “recent N” phrasing: treat it as `library recent --count`
 - “save this filter” or “reuse this later”: treat it as a saved-search request
 - “download the attachment”: treat it as an attachment task, not upload
+- “preview this merge first”: treat it as `item merge`, not immediate duplicate merge
 - any mutation: go through the safety gate first
 - any “why is this broken?” question: start with doctor or config
 
