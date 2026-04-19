@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible bug in the zot CLI, workspace, or skill
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please run `zot --json doctor`
+        first and paste the relevant output — it saves a lot of round trips.
+
+  - type: input
+    id: zot-version
+    attributes:
+      label: zot version
+      description: Output of `zot --version` (or the commit SHA if built from source)
+      placeholder: "zot 0.1.0 (abc1234)"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 14.5 / Ubuntu 24.04 / Windows 11"
+    validations:
+      required: true
+
+  - type: input
+    id: zotero-version
+    attributes:
+      label: Zotero version
+      placeholder: "Zotero 7.0.x"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The exact `zot ...` command you ran, plus any relevant config/env.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / error envelope
+      description: Paste the JSON envelope or error output.
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: "Output of `zot --json doctor`"
+      render: json
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I ran `zot --json doctor` and included the output when relevant.
+          required: false

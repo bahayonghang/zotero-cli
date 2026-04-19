@@ -1,0 +1,54 @@
+name: Feature request
+description: Suggest a new command, flag, workflow, or integration for zot
+title: "[feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the user need, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed CLI surface or workflow
+      description: |
+        If you already have a shape in mind (for example, a new `zot item ...`
+        subcommand or a new `--flag`), sketch it here.
+      render: shell
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds, existing commands, external tools, or previous attempts.
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - library (read / search / browse)
+        - item (metadata / PDF / annotations)
+        - collection
+        - workspace (BM25 / semantic / hybrid)
+        - sync (Zotero Web API writes)
+        - semantic-index / semantic-search
+        - mcp / skills / AI-agent integration
+        - docs / DX
+        - other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: This is not already covered by an existing command in the README or docs.
+          required: true
+        - label: I am willing to help test or iterate on this proposal.
+          required: false

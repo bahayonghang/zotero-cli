@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Zotero Web API docs
+    url: https://www.zotero.org/support/dev/web_api/v3/start
+    about: Upstream API behavior that zot-remote wraps.
+  - name: Better BibTeX docs
+    url: https://retorque.re/zotero-better-bibtex/
+    about: Citation keys and JSON-RPC used by `library citekey`.
+  - name: Zotero community forum
+    url: https://forums.zotero.org
+    about: Questions about Zotero itself (not the zot CLI).
