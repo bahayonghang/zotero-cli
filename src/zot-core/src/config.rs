@@ -277,11 +277,6 @@ fn windows_registry_data_dir() -> Option<PathBuf> {
     candidate.exists().then_some(candidate)
 }
 
-#[cfg(not(target_os = "windows"))]
-fn windows_registry_data_dir() -> Option<PathBuf> {
-    None
-}
-
 pub fn redact_secret(value: &str) -> String {
     if value.len() <= 4 {
         return "(set)".to_string();
