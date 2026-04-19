@@ -14,6 +14,31 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                 print_collections(&collections, 0);
             }
         }
+        CollectionCommand::Get(args) => {
+            let collection = ctx
+                .local_library()?
+                .get_collection(&args.key)?
+                .ok_or_else(|| zot_core::ZotError::InvalidInput {
+                    code: "collection-not-found".to_string(),
+                    message: format!("Collection '{}' not found", args.key),
+                    hint: Some("Use 'zot collection list' to inspect collection keys".to_string()),
+                })?;
+            if ctx.json {
+                print_enveloped(&collection, None)?;
+            } else {
+                print_collections(std::slice::from_ref(&collection), 0);
+            }
+        }
+        CollectionCommand::Subcollections(args) => {
+            let collections = ctx.local_library()?.get_subcollections(&args.key)?;
+            if ctx.json {
+                print_enveloped(&collections, None)?;
+            } else if collections.is_empty() {
+                println!("No subcollections found.");
+            } else {
+                print_collections(&collections, 0);
+            }
+        }
         CollectionCommand::Items(args) => {
             let items = ctx.local_library()?.get_collection_items(&args.key)?;
             if ctx.json {
@@ -30,6 +55,29 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                 print_enveloped(&collections, None)?;
             } else {
                 print_collections(&collections, 0);
+            }
+        }
+        CollectionCommand::ItemCount(args) => {
+            let count = ctx.local_library()?.get_collection_item_count(&args.key)?;
+            if ctx.json {
+                print_enveloped(
+                    serde_json::json!({ "collection_key": args.key, "item_count": count }),
+                    None,
+                )?;
+            } else {
+                println!("{count}");
+            }
+        }
+        CollectionCommand::Tags(args) => {
+            let tags = ctx.local_library()?.get_collection_tags(&args.key)?;
+            if ctx.json {
+                print_enveloped(&tags, None)?;
+            } else if tags.is_empty() {
+                println!("No tags found.");
+            } else {
+                for tag in tags {
+                    println!("{} ({})", tag.name, tag.count);
+                }
             }
         }
         CollectionCommand::Create(args) => {

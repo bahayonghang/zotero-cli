@@ -6,7 +6,7 @@ use reqwest::{Method, StatusCode};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use uuid::Uuid;
-use zot_core::{LibraryScope, ZotError, ZotResult};
+use zot_core::{LibraryScope, SavedSearch, SavedSearchCondition, ZotError, ZotResult};
 
 const API_BASE: &str = "https://api.zotero.org";
 
@@ -419,6 +419,63 @@ impl ZoteroRemote {
         .await
     }
 
+    pub async fn list_saved_searches(&self) -> ZotResult<Vec<SavedSearch>> {
+        let response = self
+            .client
+            .request(Method::GET, self.endpoint("searches"))
+            .send()
+            .await
+            .map_err(remote_err("list-saved-searches"))?;
+        let body: Vec<RawSavedSearch> = self.ensure_json(response, "list-saved-searches").await?;
+        Ok(body.into_iter().map(Into::into).collect())
+    }
+
+    pub async fn create_saved_search(
+        &self,
+        name: &str,
+        conditions: &[SavedSearchCondition],
+    ) -> ZotResult<String> {
+        let payload = json!([{
+            "name": name,
+            "conditions": conditions,
+        }]);
+        self.create_searches(&payload, "create-saved-search")
+            .await
+            .and_then(first_created_key)
+    }
+
+    pub async fn delete_saved_searches(&self, keys: &[String]) -> ZotResult<()> {
+        if keys.is_empty() {
+            return Ok(());
+        }
+        let response = self
+            .client
+            .delete(self.endpoint(&format!("searches?searchKey={}", keys.join(","))))
+            .header(
+                "If-Unmodified-Since-Version",
+                self.library_version().await?.to_string(),
+            )
+            .send()
+            .await
+            .map_err(remote_err("delete-saved-searches"))?;
+        self.ensure_empty(response, "delete-saved-searches").await
+    }
+
+    pub async fn list_item_versions(&self, since: Option<i64>) -> ZotResult<BTreeMap<String, i64>> {
+        let endpoint = if let Some(since) = since {
+            self.endpoint(&format!("items?format=versions&since={since}"))
+        } else {
+            self.endpoint("items?format=versions")
+        };
+        let response = self
+            .client
+            .request(Method::GET, endpoint)
+            .send()
+            .await
+            .map_err(remote_err("list-item-versions"))?;
+        self.ensure_json(response, "list-item-versions").await
+    }
+
     pub async fn delete_note(&self, note_key: &str) -> ZotResult<()> {
         self.delete_item(note_key).await
     }
@@ -497,12 +554,61 @@ impl ZoteroRemote {
             .collect())
     }
 
+    async fn create_searches(&self, payload: &Value, code: &str) -> ZotResult<Vec<String>> {
+        let response = self
+            .client
+            .post(self.endpoint("searches"))
+            .header("Zotero-Write-Token", Uuid::new_v4().to_string())
+            .json(payload)
+            .send()
+            .await
+            .map_err(remote_err("create-searches"))?;
+        let body: MultiWriteResponse = self.ensure_json(response, code).await?;
+        Ok(body
+            .successful
+            .unwrap_or_default()
+            .into_values()
+            .filter_map(|entry| entry.key)
+            .collect())
+    }
+
     fn endpoint(&self, path: &str) -> String {
         let scope = match self.scope {
             LibraryScope::User => format!("users/{}", self.library_id),
             LibraryScope::Group { .. } => format!("groups/{}", self.library_id),
         };
         format!("{API_BASE}/{scope}/{path}")
+    }
+
+    async fn library_version(&self) -> ZotResult<i64> {
+        let response = self
+            .client
+            .request(Method::GET, self.endpoint("items?limit=1&format=keys"))
+            .send()
+            .await
+            .map_err(remote_err("library-version"))?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ZotError::Remote {
+                code: "library-version".to_string(),
+                message: format!("Request failed with status {}: {body}", status.as_u16()),
+                hint: http_hint(Some(status)),
+                status: Some(status.as_u16()),
+            });
+        }
+        let version = response
+            .headers()
+            .get("Last-Modified-Version")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.parse::<i64>().ok())
+            .ok_or_else(|| ZotError::Remote {
+                code: "library-version".to_string(),
+                message: "Response missing Last-Modified-Version header".to_string(),
+                hint: None,
+                status: None,
+            })?;
+        Ok(version)
     }
 
     async fn create_attachment_item(
@@ -682,6 +788,44 @@ struct FileUploadAuthorization {
     suffix: Option<String>,
     #[serde(rename = "uploadKey")]
     upload_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawSavedSearch {
+    key: String,
+    version: i64,
+    library: Option<RawSearchLibrary>,
+    data: RawSavedSearchData,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawSearchLibrary {
+    #[serde(rename = "type")]
+    library_type: Option<String>,
+    id: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawSavedSearchData {
+    name: String,
+    #[serde(default)]
+    conditions: Vec<SavedSearchCondition>,
+}
+
+impl From<RawSavedSearch> for SavedSearch {
+    fn from(value: RawSavedSearch) -> Self {
+        Self {
+            key: value.key,
+            version: value.version,
+            name: value.data.name,
+            conditions: value.data.conditions,
+            library_type: value
+                .library
+                .as_ref()
+                .and_then(|library| library.library_type.clone()),
+            library_id: value.library.and_then(|library| library.id),
+        }
+    }
 }
 
 fn first_created_key(keys: Vec<String>) -> ZotResult<String> {

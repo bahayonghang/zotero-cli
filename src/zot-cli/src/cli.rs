@@ -19,6 +19,10 @@ pub(crate) struct Cli {
 #[derive(Subcommand)]
 pub(crate) enum Commands {
     Doctor,
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
     Library {
         #[command(subcommand)]
         command: LibraryCommand,
@@ -61,6 +65,10 @@ pub(crate) enum LibraryCommand {
     SemanticStatus,
     Duplicates(LibraryDuplicatesArgs),
     DuplicatesMerge(LibraryDuplicatesMergeArgs),
+    SavedSearch {
+        #[command(subcommand)]
+        command: LibrarySavedSearchCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -71,6 +79,9 @@ pub(crate) enum ItemCommand {
     Pdf(ItemPdfArgs),
     Fulltext(ItemPdfArgs),
     Children(ItemChildrenArgs),
+    Download(ItemDownloadArgs),
+    Deleted(ItemDeletedArgs),
+    Versions(ItemVersionsArgs),
     Outline(ItemKeyArgs),
     Export(ItemExportArgs),
     Cite(ItemCiteArgs),
@@ -135,8 +146,12 @@ pub(crate) enum ItemSciteCommand {
 #[derive(Subcommand)]
 pub(crate) enum CollectionCommand {
     List,
+    Get(CollectionKeyArgs),
+    Subcollections(CollectionKeyArgs),
     Items(CollectionItemsArgs),
     Search(CollectionSearchArgs),
+    ItemCount(CollectionKeyArgs),
+    Tags(CollectionKeyArgs),
     Create(CollectionCreateArgs),
     Rename(CollectionRenameArgs),
     Delete(CollectionKeyArgs),
@@ -167,6 +182,65 @@ pub(crate) enum SyncCommand {
 #[derive(Subcommand)]
 pub(crate) enum McpCommand {
     Serve,
+}
+
+#[derive(Subcommand)]
+pub(crate) enum ConfigCommand {
+    Init(ConfigInitArgs),
+    Show,
+    Set(ConfigSetArgs),
+    Profiles {
+        #[command(subcommand)]
+        command: ConfigProfilesCommand,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum ConfigProfilesCommand {
+    List,
+    Use(ConfigProfilesUseArgs),
+}
+
+#[derive(Subcommand)]
+pub(crate) enum LibrarySavedSearchCommand {
+    List,
+    Create(LibrarySavedSearchCreateArgs),
+    Delete(LibrarySavedSearchDeleteArgs),
+}
+
+#[derive(Args)]
+pub(crate) struct ConfigInitArgs {
+    #[arg(long = "target-profile")]
+    pub(crate) target_profile: Option<String>,
+    #[arg(long)]
+    pub(crate) make_default: bool,
+    #[arg(long)]
+    pub(crate) data_dir: Option<String>,
+    #[arg(long)]
+    pub(crate) library_id: Option<String>,
+    #[arg(long)]
+    pub(crate) api_key: Option<String>,
+    #[arg(long)]
+    pub(crate) semantic_scholar_api_key: Option<String>,
+    #[arg(long)]
+    pub(crate) embedding_url: Option<String>,
+    #[arg(long)]
+    pub(crate) embedding_key: Option<String>,
+    #[arg(long)]
+    pub(crate) embedding_model: Option<String>,
+}
+
+#[derive(Args)]
+pub(crate) struct ConfigSetArgs {
+    pub(crate) key: ConfigKeyArg,
+    pub(crate) value: String,
+    #[arg(long = "target-profile")]
+    pub(crate) target_profile: Option<String>,
+}
+
+#[derive(Args)]
+pub(crate) struct ConfigProfilesUseArgs {
+    pub(crate) name: String,
 }
 
 #[derive(Args)]
@@ -267,6 +341,19 @@ pub(crate) struct LibraryDuplicatesMergeArgs {
 }
 
 #[derive(Args)]
+pub(crate) struct LibrarySavedSearchCreateArgs {
+    #[arg(long)]
+    pub(crate) name: String,
+    #[arg(long)]
+    pub(crate) conditions: String,
+}
+
+#[derive(Args)]
+pub(crate) struct LibrarySavedSearchDeleteArgs {
+    pub(crate) keys: Vec<String>,
+}
+
+#[derive(Args)]
 pub(crate) struct ItemKeyArgs {
     pub(crate) key: String,
 }
@@ -297,6 +384,25 @@ pub(crate) struct ItemPdfArgs {
 #[derive(Args)]
 pub(crate) struct ItemChildrenArgs {
     pub(crate) keys: Vec<String>,
+}
+
+#[derive(Args)]
+pub(crate) struct ItemDownloadArgs {
+    pub(crate) key: String,
+    #[arg(long)]
+    pub(crate) output: Option<PathBuf>,
+}
+
+#[derive(Args)]
+pub(crate) struct ItemDeletedArgs {
+    #[arg(long, default_value_t = 50)]
+    pub(crate) limit: usize,
+}
+
+#[derive(Args)]
+pub(crate) struct ItemVersionsArgs {
+    #[arg(long)]
+    pub(crate) since: Option<i64>,
 }
 
 #[derive(Args)]
@@ -652,6 +758,20 @@ pub(crate) enum DuplicateMethodArg {
     Both,
 }
 
+#[derive(Clone, Debug, Copy, ValueEnum)]
+pub(crate) enum ConfigKeyArg {
+    DataDir,
+    LibraryId,
+    ApiKey,
+    SemanticScholarApiKey,
+    EmbeddingUrl,
+    EmbeddingKey,
+    EmbeddingModel,
+    OutputFormat,
+    OutputLimit,
+    ExportStyle,
+}
+
 impl From<SortFieldArg> for SortField {
     fn from(value: SortFieldArg) -> Self {
         match value {
@@ -711,10 +831,47 @@ mod tests {
     #[test]
     fn parses_new_library_and_item_command_surfaces() {
         for argv in [
+            ["zot", "config", "show"].as_slice(),
+            [
+                "zot",
+                "config",
+                "init",
+                "--target-profile",
+                "work",
+                "--library-id",
+                "42",
+            ]
+            .as_slice(),
+            [
+                "zot",
+                "config",
+                "set",
+                "library-id",
+                "42",
+                "--target-profile",
+                "work",
+            ]
+            .as_slice(),
+            ["zot", "config", "profiles", "use", "work"].as_slice(),
             ["zot", "library", "semantic-status"].as_slice(),
             ["zot", "library", "citekey", "Smith2024"].as_slice(),
             ["zot", "library", "duplicates", "--method", "both"].as_slice(),
+            ["zot", "library", "saved-search", "list"].as_slice(),
+            [
+                "zot",
+                "library",
+                "saved-search",
+                "create",
+                "--name",
+                "Recent",
+                "--conditions",
+                "[]",
+            ]
+            .as_slice(),
             ["zot", "item", "children", "ATTN001"].as_slice(),
+            ["zot", "item", "download", "ATCH005"].as_slice(),
+            ["zot", "item", "versions", "--since", "12"].as_slice(),
+            ["zot", "item", "deleted", "--limit", "10"].as_slice(),
             ["zot", "item", "annotation", "search", "core"].as_slice(),
             ["zot", "item", "scite", "search", "attention"].as_slice(),
             [
@@ -727,6 +884,10 @@ mod tests {
             ]
             .as_slice(),
             ["zot", "collection", "search", "Transform"].as_slice(),
+            ["zot", "collection", "get", "COLTR02"].as_slice(),
+            ["zot", "collection", "subcollections", "COLTR02"].as_slice(),
+            ["zot", "collection", "item-count", "COLTR02"].as_slice(),
+            ["zot", "collection", "tags", "COLTR02"].as_slice(),
         ] {
             if let Err(err) = Cli::try_parse_from(argv) {
                 panic!("cli parse failed for {:?}: {err}", argv);

@@ -75,6 +75,20 @@ pub(crate) fn update_status_to_json(key: String, status: PublicationStatus) -> s
     })
 }
 
+pub(crate) fn parse_json_input(input: &str, label: &str) -> ZotResult<serde_json::Value> {
+    let path = std::path::PathBuf::from(input);
+    let raw = if path.exists() {
+        std::fs::read_to_string(&path).map_err(|source| ZotError::Io { path, source })?
+    } else {
+        input.to_string()
+    };
+    serde_json::from_str(&raw).map_err(|err| ZotError::InvalidInput {
+        code: "json-input".to_string(),
+        message: format!("Invalid JSON for {label}: {err}"),
+        hint: Some("Pass a JSON string or a path to a JSON file".to_string()),
+    })
+}
+
 fn parse_page_bound(value: &str, raw: &str) -> ZotResult<usize> {
     value.parse::<usize>().map_err(|_| invalid_page_range(raw))
 }

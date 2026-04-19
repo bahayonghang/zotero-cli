@@ -1,14 +1,9 @@
 [workspace]
-members = [
-    "src/zot-core",
-    "src/zot-local",
-    "src/zot-remote",
-    "src/zot-cli",
-]
+members = ["src/zot-core", "src/zot-local", "src/zot-remote", "src/zot-cli"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 authors = ["bahayonghang"]
@@ -28,7 +23,12 @@ opener = "0.8.4"
 pdfium-render = "0.9.0"
 rand = "0.10.1"
 regex = "1.12.2"
-reqwest = { version = "0.13.2", default-features = false, features = ["json", "multipart", "rustls", "stream"] }
+reqwest = { version = "0.13.2", default-features = false, features = [
+    "json",
+    "multipart",
+    "rustls",
+    "stream",
+] }
 rmcp = { version = "1.5.0", features = ["macros", "server", "transport-io"] }
 rusqlite = { version = "0.39.0", features = ["bundled", "chrono"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -40,6 +40,9 @@ tokio = { version = "1.52.1", features = ["full"] }
 toml = "1.1.2"
 urlencoding = "2.1.3"
 uuid = { version = "1.23.1", features = ["v4", "serde"] }
+zot-core = { path = "src/zot-core" }
+zot-local = { path = "src/zot-local" }
+zot-remote = { path = "src/zot-remote" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

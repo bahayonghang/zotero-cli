@@ -52,6 +52,24 @@ pub struct Attachment {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SavedSearchCondition {
+    pub condition: String,
+    pub operator: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SavedSearch {
+    pub key: String,
+    pub version: i64,
+    pub name: String,
+    pub conditions: Vec<SavedSearchCondition>,
+    pub library_type: Option<String>,
+    pub library_id: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Collection {
     pub key: String,
     pub name: String,

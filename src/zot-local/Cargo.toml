@@ -20,4 +20,4 @@ strsim.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 toml.workspace = true
-zot-core = { version = "0.1.0", path = "../zot-core" }
+zot-core.workspace = true

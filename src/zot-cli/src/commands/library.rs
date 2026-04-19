@@ -2,17 +2,20 @@ use std::collections::{BTreeMap, HashSet};
 
 use anyhow::Result;
 use chrono::Utc;
-use zot_core::{EnvelopeMeta, Item, SemanticHit, SemanticIndexStatus};
+use zot_core::{EnvelopeMeta, Item, SavedSearchCondition, SemanticHit, SemanticIndexStatus};
 use zot_local::{
     HybridMode, LocalLibrary, PdfBackend, PdfCache, PdfiumBackend, RagIndex, SearchOptions,
     build_metadata_chunk, chunk_text, compute_term_frequencies, tokenize,
 };
 use zot_remote::{BetterBibTexClient, EmbeddingClient};
 
-use crate::cli::{LibraryCommand, LibrarySemanticIndexArgs, LibrarySemanticSearchArgs};
+use crate::cli::{
+    LibraryCommand, LibrarySavedSearchCommand, LibrarySavedSearchCreateArgs,
+    LibrarySavedSearchDeleteArgs, LibrarySemanticIndexArgs, LibrarySemanticSearchArgs,
+};
 use crate::context::AppContext;
 use crate::format::{print_enveloped, print_items, print_stats};
-use crate::util::maybe_embed_query;
+use crate::util::{maybe_embed_query, parse_json_input};
 
 pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<()> {
     let library = ctx.local_library()?;
@@ -221,8 +224,96 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             }
         }
+        LibraryCommand::SavedSearch { command } => handle_saved_search(ctx, command).await?,
     }
     Ok(())
+}
+
+async fn handle_saved_search(ctx: &AppContext, command: LibrarySavedSearchCommand) -> Result<()> {
+    match command {
+        LibrarySavedSearchCommand::List => {
+            let searches = ctx.remote()?.list_saved_searches().await?;
+            if ctx.json {
+                print_enveloped(
+                    &searches,
+                    Some(EnvelopeMeta {
+                        count: Some(searches.len()),
+                        total: Some(searches.len()),
+                        profile: ctx.profile.clone(),
+                    }),
+                )?;
+            } else if searches.is_empty() {
+                println!("No saved searches found.");
+            } else {
+                for search in searches {
+                    println!("{} {}", search.key, search.name);
+                }
+            }
+        }
+        LibrarySavedSearchCommand::Create(args) => {
+            let payload = create_saved_search(ctx, args).await?;
+            if ctx.json {
+                print_enveloped(payload, None)?;
+            } else {
+                println!("Saved search created.");
+            }
+        }
+        LibrarySavedSearchCommand::Delete(args) => {
+            let payload = delete_saved_searches(ctx, args).await?;
+            if ctx.json {
+                print_enveloped(payload, None)?;
+            } else {
+                println!("Saved search deleted.");
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn create_saved_search(
+    ctx: &AppContext,
+    args: LibrarySavedSearchCreateArgs,
+) -> Result<serde_json::Value> {
+    let value = parse_json_input(&args.conditions, "saved search conditions")?;
+    let conditions: Vec<SavedSearchCondition> =
+        serde_json::from_value(value).map_err(|err| zot_core::ZotError::InvalidInput {
+            code: "saved-search-conditions".to_string(),
+            message: format!("Invalid saved search conditions: {err}"),
+            hint: Some("Pass a JSON array of {condition, operator, value?} objects".to_string()),
+        })?;
+    if conditions.is_empty() {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "saved-search-conditions".to_string(),
+            message: "Saved search conditions cannot be empty".to_string(),
+            hint: Some("Add at least one condition".to_string()),
+        }
+        .into());
+    }
+    let key = ctx
+        .remote()?
+        .create_saved_search(&args.name, &conditions)
+        .await?;
+    Ok(serde_json::json!({
+        "search_key": key,
+        "name": args.name,
+        "conditions": conditions,
+    }))
+}
+
+async fn delete_saved_searches(
+    ctx: &AppContext,
+    args: LibrarySavedSearchDeleteArgs,
+) -> Result<serde_json::Value> {
+    if args.keys.is_empty() {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "saved-search-delete".to_string(),
+            message: "At least one saved search key is required".to_string(),
+            hint: None,
+        }
+        .into());
+    }
+    ctx.remote()?.delete_saved_searches(&args.keys).await?;
+    Ok(serde_json::json!({ "deleted": args.keys }))
 }
 
 pub(crate) async fn semantic_status(ctx: &AppContext) -> Result<SemanticIndexStatus> {
@@ -594,8 +685,12 @@ fn attachment_signature(value: &serde_json::Value) -> Option<(String, String, St
 #[cfg(test)]
 mod tests {
     use super::{
-        effective_semantic_index_limit, select_stale_item_keys, truncate_semantic_index_items,
+        create_saved_search, effective_semantic_index_limit, select_stale_item_keys,
+        truncate_semantic_index_items,
     };
+    use crate::cli::LibrarySavedSearchCreateArgs;
+    use crate::context::AppContext;
+    use zot_core::{AppConfig, LibraryScope};
 
     #[test]
     fn semantic_index_limit_defaults_to_ten_thousand() {
@@ -618,5 +713,31 @@ mod tests {
     fn truncate_semantic_index_items_applies_collection_limit() {
         let limited = truncate_semantic_index_items(vec![1, 2, 3], 2);
         assert_eq!(limited, vec![1, 2]);
+    }
+
+    #[tokio::test]
+    async fn rejects_empty_saved_search_conditions_before_remote_calls() {
+        let ctx = AppContext {
+            json: true,
+            profile: None,
+            scope: LibraryScope::User,
+            config: AppConfig::default(),
+        };
+        let err = create_saved_search(
+            &ctx,
+            LibrarySavedSearchCreateArgs {
+                name: "Recent".to_string(),
+                conditions: "[]".to_string(),
+            },
+        )
+        .await
+        .expect_err("empty conditions should fail");
+        let err = err.downcast_ref::<zot_core::ZotError>().expect("zot error");
+        match err {
+            zot_core::ZotError::InvalidInput { code, .. } => {
+                assert_eq!(code, "saved-search-conditions")
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 }

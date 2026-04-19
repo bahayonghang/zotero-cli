@@ -23,9 +23,10 @@ reqwest.workspace = true
 rmcp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tempfile.workspace = true
 tokio.workspace = true
 toml.workspace = true
 uuid.workspace = true
-zot-core = { version = "0.1.0", path = "../zot-core" }
-zot-local = { version = "0.1.0", path = "../zot-local" }
-zot-remote = { version = "0.1.0", path = "../zot-remote" }
+zot-core.workspace = true
+zot-local.workspace = true
+zot-remote.workspace = true

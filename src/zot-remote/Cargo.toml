@@ -20,4 +20,4 @@ thiserror.workspace = true
 tokio.workspace = true
 urlencoding.workspace = true
 uuid.workspace = true
-zot-core = { version = "0.1.0", path = "../zot-core" }
+zot-core.workspace = true

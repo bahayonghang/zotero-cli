@@ -138,7 +138,7 @@ impl AppConfig {
         Self::config_dir().join(CONFIG_FILE_NAME)
     }
 
-    pub fn load(profile: Option<&str>) -> ZotResult<Self> {
+    pub fn load_raw() -> ZotResult<Self> {
         let path = Self::config_file();
         if !path.exists() {
             return Ok(Self::default());
@@ -151,7 +151,25 @@ impl AppConfig {
             path: path.clone(),
             detail: source.to_string(),
         })?;
-        Ok(parsed.materialize_profile(profile))
+        Ok(parsed)
+    }
+
+    pub fn load(profile: Option<&str>) -> ZotResult<Self> {
+        Ok(Self::load_raw()?.materialize_profile(profile))
+    }
+
+    pub fn save(&self) -> ZotResult<PathBuf> {
+        let path = Self::config_file();
+        ensure_config_dir()?;
+        let encoded = toml::to_string_pretty(self).map_err(|source| ZotError::ConfigParse {
+            path: path.clone(),
+            detail: source.to_string(),
+        })?;
+        std::fs::write(&path, encoded).map_err(|source| ZotError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        Ok(path)
     }
 
     fn materialize_profile(mut self, profile_name: Option<&str>) -> Self {
@@ -200,6 +218,19 @@ impl AppConfig {
     pub fn semantic_scholar_key(&self) -> Option<&str> {
         (!self.zotero.semantic_scholar_api_key.is_empty())
             .then_some(self.zotero.semantic_scholar_api_key.as_str())
+    }
+
+    pub fn default_profile_name(&self) -> Option<&str> {
+        self.default.get("profile").map(String::as_str)
+    }
+
+    pub fn set_default_profile(&mut self, profile_name: Option<&str>) {
+        if let Some(profile_name) = profile_name {
+            self.default
+                .insert("profile".to_string(), profile_name.to_string());
+        } else {
+            self.default.remove("profile");
+        }
     }
 }
 
@@ -329,5 +360,17 @@ mod tests {
             LibraryScope::Group { group_id: 42 }
         );
         assert!(parse_library_scope("group:abc").is_err());
+    }
+
+    #[test]
+    fn manages_default_profile_name() {
+        let mut config = AppConfig::default();
+        assert_eq!(config.default_profile_name(), None);
+
+        config.set_default_profile(Some("work"));
+        assert_eq!(config.default_profile_name(), Some("work"));
+
+        config.set_default_profile(None);
+        assert_eq!(config.default_profile_name(), None);
     }
 }

@@ -1,7 +1,10 @@
 default:
   @just --list
 
-check:
+version-check:
+  cargo test -p zot-cli --test workspace_version_guard
+
+check: version-check
   cargo check --workspace
 
 fmt:

@@ -1,9 +1,11 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use zot_local::{PdfBackend, PdfCache, PdfiumBackend};
 
 use crate::cli::{
-    ItemChildrenArgs, ItemCiteArgs, ItemExportArgs, ItemKeyArgs, ItemOpenArgs, ItemPdfArgs,
-    ItemRelatedArgs,
+    ItemChildrenArgs, ItemCiteArgs, ItemDeletedArgs, ItemDownloadArgs, ItemExportArgs, ItemKeyArgs,
+    ItemOpenArgs, ItemPdfArgs, ItemRelatedArgs, ItemVersionsArgs,
 };
 use crate::context::AppContext;
 use crate::format::{print_enveloped, print_item, print_items};
@@ -147,6 +149,75 @@ pub(crate) async fn handle_children(ctx: &AppContext, args: ItemChildrenArgs) ->
     Ok(())
 }
 
+pub(crate) async fn handle_download(ctx: &AppContext, args: ItemDownloadArgs) -> Result<()> {
+    let library = ctx.local_library()?;
+    let attachment = library.get_attachment_by_key(&args.key)?.ok_or_else(|| {
+        zot_core::ZotError::InvalidInput {
+            code: "attachment-not-found".to_string(),
+            message: format!("Attachment '{}' not found", args.key),
+            hint: Some("Pass an attachment item key such as ATCH005".to_string()),
+        }
+    })?;
+    let source = library.attachment_path(&attachment);
+    if !source.exists() {
+        return Err(zot_core::ZotError::Io {
+            path: source,
+            source: std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Attachment file is missing from local Zotero storage",
+            ),
+        }
+        .into());
+    }
+    let destination = resolve_download_path(args.output, &attachment.filename)?;
+    if let Some(parent) = destination.parent() {
+        std::fs::create_dir_all(parent).map_err(|source| zot_core::ZotError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    std::fs::copy(&source, &destination).map_err(|source| zot_core::ZotError::Io {
+        path: destination.clone(),
+        source,
+    })?;
+    if ctx.json {
+        print_enveloped(
+            serde_json::json!({
+                "attachment_key": args.key,
+                "path": zot_core::canonicalize_or_original(&destination),
+            }),
+            None,
+        )?;
+    } else {
+        println!("{}", destination.display());
+    }
+    Ok(())
+}
+
+pub(crate) async fn handle_deleted(ctx: &AppContext, args: ItemDeletedArgs) -> Result<()> {
+    let items = ctx.local_library()?.get_trash_items(args.limit)?;
+    if ctx.json {
+        print_enveloped(&items, None)?;
+    } else {
+        print_items(&items);
+    }
+    Ok(())
+}
+
+pub(crate) async fn handle_versions(ctx: &AppContext, args: ItemVersionsArgs) -> Result<()> {
+    let versions = ctx.remote()?.list_item_versions(args.since).await?;
+    if ctx.json {
+        print_enveloped(&versions, None)?;
+    } else if versions.is_empty() {
+        println!("No item versions found.");
+    } else {
+        for (key, version) in versions {
+            println!("{key} {version}");
+        }
+    }
+    Ok(())
+}
+
 pub(crate) async fn handle_outline(ctx: &AppContext, key: &str) -> Result<()> {
     let library = ctx.local_library()?;
     let attachment =
@@ -205,4 +276,44 @@ pub(crate) async fn handle_cite(ctx: &AppContext, args: ItemCiteArgs) -> Result<
         println!("{citation}");
     }
     Ok(())
+}
+
+fn resolve_download_path(output: Option<PathBuf>, filename: &str) -> zot_core::ZotResult<PathBuf> {
+    let destination = match output {
+        Some(path) if path.is_dir() => path.join(filename),
+        Some(path) => path,
+        None => std::env::current_dir()
+            .map_err(|source| zot_core::ZotError::Io {
+                path: PathBuf::from("."),
+                source,
+            })?
+            .join(filename),
+    };
+    Ok(destination)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_download_path;
+
+    #[test]
+    fn resolves_download_path_inside_directory() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let path = resolve_download_path(Some(tempdir.path().to_path_buf()), "paper.pdf")
+            .expect("download path");
+        assert_eq!(
+            path.file_name().and_then(|value| value.to_str()),
+            Some("paper.pdf")
+        );
+    }
+
+    #[test]
+    fn keeps_explicit_download_filename() {
+        let path =
+            resolve_download_path(Some("custom.pdf".into()), "paper.pdf").expect("download path");
+        assert_eq!(
+            path.file_name().and_then(|value| value.to_str()),
+            Some("custom.pdf")
+        );
+    }
 }

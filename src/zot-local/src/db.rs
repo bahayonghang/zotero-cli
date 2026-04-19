@@ -642,6 +642,41 @@ impl LocalLibrary {
             .collect())
     }
 
+    pub fn get_collection(&self, collection_key: &str) -> ZotResult<Option<Collection>> {
+        let mut flattened = Vec::new();
+        for collection in self.get_collections()? {
+            flatten_collection_tree(&collection, &mut flattened);
+        }
+        Ok(flattened
+            .into_iter()
+            .find(|collection| collection.key == collection_key))
+    }
+
+    pub fn get_subcollections(&self, collection_key: &str) -> ZotResult<Vec<Collection>> {
+        fn find_children(collection: &Collection, key: &str) -> Option<Vec<Collection>> {
+            if collection.key == key {
+                return Some(collection.children.clone());
+            }
+            for child in &collection.children {
+                if let Some(found) = find_children(child, key) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        for collection in self.get_collections()? {
+            if let Some(found) = find_children(&collection, collection_key) {
+                return Ok(found);
+            }
+        }
+        Err(ZotError::InvalidInput {
+            code: "collection-not-found".to_string(),
+            message: format!("Collection '{collection_key}' not found"),
+            hint: Some("Use 'zot collection list' to inspect collection keys".to_string()),
+        })
+    }
+
     pub fn get_collection_items(&self, collection_key: &str) -> ZotResult<Vec<Item>> {
         let collection_id = self.resolve_collection_id(collection_key)?;
         let mut stmt = self
@@ -655,6 +690,44 @@ impl LocalLibrary {
             .collect::<Result<Vec<_>, _>>()
             .map_err(sql_err("get-collection-items"))?;
         self.get_items_batch(&item_ids)
+    }
+
+    pub fn get_collection_item_count(&self, collection_key: &str) -> ZotResult<usize> {
+        let collection_id = self.resolve_collection_id(collection_key)?;
+        self.conn
+            .query_row(
+                "SELECT COUNT(*) FROM collectionItems WHERE collectionID = ?1",
+                params![collection_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count as usize)
+            .map_err(sql_err("get-collection-item-count"))
+    }
+
+    pub fn get_collection_tags(&self, collection_key: &str) -> ZotResult<Vec<TagSummary>> {
+        let collection_id = self.resolve_collection_id(collection_key)?;
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT t.name, COUNT(*) as cnt
+                 FROM collectionItems ci
+                 JOIN itemTags it ON ci.itemID = it.itemID
+                 JOIN tags t ON it.tagID = t.tagID
+                 WHERE ci.collectionID = ?1
+                 GROUP BY t.tagID, t.name
+                 ORDER BY cnt DESC, t.name ASC",
+            )
+            .map_err(sql_err("get-collection-tags"))?;
+        let rows = stmt
+            .query_map(params![collection_id], |row| {
+                Ok(TagSummary {
+                    name: row.get::<_, String>(0)?,
+                    count: row.get::<_, i64>(1)? as usize,
+                })
+            })
+            .map_err(sql_err("get-collection-tags"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("get-collection-tags"))
     }
 
     pub fn get_libraries(&self) -> ZotResult<Vec<LibraryInfo>> {
@@ -889,11 +962,15 @@ impl LocalLibrary {
             .find(|attachment| attachment.content_type == "application/pdf"))
     }
 
-    pub fn pdf_path(&self, attachment: &Attachment) -> PathBuf {
+    pub fn attachment_path(&self, attachment: &Attachment) -> PathBuf {
         self.data_dir
             .join("storage")
             .join(&attachment.key)
             .join(&attachment.filename)
+    }
+
+    pub fn pdf_path(&self, attachment: &Attachment) -> PathBuf {
+        self.attachment_path(attachment)
     }
 
     pub fn get_recent_items(
@@ -2327,12 +2404,14 @@ Original Date: 2017');
 
             INSERT INTO collections VALUES (1, 'Machine Learning', NULL, 1, 'COLML01');
             INSERT INTO collections VALUES (2, 'Transformers', 1, 1, 'COLTR02');
+            INSERT INTO collections VALUES (4, 'Attention Variants', 2, 1, 'COLSUB03');
             INSERT INTO collections VALUES (3, 'Group Papers', NULL, 2, 'GRPCOL03');
             INSERT INTO collectionItems VALUES (1, 1, 0);
             INSERT INTO collectionItems VALUES (1, 2, 0);
             INSERT INTO collectionItems VALUES (1, 3, 0);
             INSERT INTO collectionItems VALUES (1, 6, 0);
             INSERT INTO collectionItems VALUES (2, 1, 0);
+            INSERT INTO collectionItems VALUES (4, 8, 0);
             INSERT INTO collectionItems VALUES (3, 9, 0);
 
             INSERT INTO itemRelations VALUES (1, 1, 'http://zotero.org/users/local/BERT002');
@@ -2533,6 +2612,36 @@ Original Date: 2017');
             collections
                 .iter()
                 .any(|collection| collection.key == "COLTR02")
+        );
+
+        let collection = match lib.get_collection("COLTR02") {
+            Ok(Some(collection)) => collection,
+            Ok(None) => panic!("expected collection details"),
+            Err(err) => panic!("get collection failed: {err}"),
+        };
+        assert_eq!(collection.name, "Transformers");
+
+        let subcollections = match lib.get_subcollections("COLTR02") {
+            Ok(subcollections) => subcollections,
+            Err(err) => panic!("get subcollections failed: {err}"),
+        };
+        assert_eq!(subcollections.len(), 1);
+        assert_eq!(subcollections[0].key, "COLSUB03");
+
+        let item_count = match lib.get_collection_item_count("COLTR02") {
+            Ok(count) => count,
+            Err(err) => panic!("get collection item count failed: {err}"),
+        };
+        assert_eq!(item_count, 1);
+
+        let collection_tags = match lib.get_collection_tags("COLTR02") {
+            Ok(tags) => tags,
+            Err(err) => panic!("get collection tags failed: {err}"),
+        };
+        assert!(
+            collection_tags
+                .iter()
+                .any(|tag| tag.name == "attention" && tag.count == 1)
         );
     }
 
