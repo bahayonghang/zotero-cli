@@ -2107,20 +2107,6 @@ mod tests {
         _dir: TempDir,
     }
 
-    fn fixture_library() -> LocalLibrary {
-        let data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("ref")
-            .join("zotero-cli-cc")
-            .join("tests")
-            .join("fixtures");
-        match LocalLibrary::open(data_dir, LibraryScope::User) {
-            Ok(lib) => lib,
-            Err(err) => panic!("fixture db: {err}"),
-        }
-    }
-
     fn rich_fixture_library() -> TestFixture {
         let dir = match tempfile::tempdir() {
             Ok(dir) => dir,
@@ -2371,8 +2357,8 @@ Original Date: 2017');
 
     #[test]
     fn searches_titles_and_fulltext() {
-        let lib = fixture_library();
-        let result = match lib.search(SearchOptions {
+        let fixture = rich_fixture_library();
+        let result = match fixture.lib.search(SearchOptions {
             query: "attention".to_string(),
             ..SearchOptions::default()
         }) {
@@ -2384,14 +2370,11 @@ Original Date: 2017');
 
     #[test]
     fn resolves_group_library() {
-        let data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("..")
-            .join("ref")
-            .join("zotero-cli-cc")
-            .join("tests")
-            .join("fixtures");
-        let lib = match LocalLibrary::open(data_dir, LibraryScope::Group { group_id: 99999 }) {
+        let fixture = rich_fixture_library();
+        let lib = match LocalLibrary::open(
+            fixture._dir.path(),
+            LibraryScope::Group { group_id: 99999 },
+        ) {
             Ok(lib) => lib,
             Err(err) => panic!("group db failed: {err}"),
         };
