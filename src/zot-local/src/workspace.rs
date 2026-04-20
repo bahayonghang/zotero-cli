@@ -789,13 +789,11 @@ fn repeat_placeholders(count: usize) -> String {
 }
 
 fn ensure_workspace_name(name: &str) -> ZotResult<()> {
-    let valid =
-        regex::Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").map_err(|err| ZotError::InvalidInput {
-            code: "workspace-regex".to_string(),
-            message: err.to_string(),
-            hint: None,
-        })?;
-    if valid.is_match(name) {
+    static WORKSPACE_NAME_RE: std::sync::LazyLock<regex::Regex> =
+        std::sync::LazyLock::new(|| {
+            regex::Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").expect("valid workspace-name regex")
+        });
+    if WORKSPACE_NAME_RE.is_match(name) {
         Ok(())
     } else {
         Err(ZotError::InvalidInput {

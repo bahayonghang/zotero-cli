@@ -149,17 +149,17 @@ impl ZoteroRemote {
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
-        let mut merged = existing
-            .into_iter()
-            .filter_map(|entry| {
-                entry
-                    .get("tag")
-                    .and_then(Value::as_str)
-                    .map(ToOwned::to_owned)
-            })
-            .collect::<Vec<_>>();
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut merged: Vec<String> = Vec::new();
+        for entry in existing {
+            if let Some(tag) = entry.get("tag").and_then(Value::as_str)
+                && seen.insert(tag.to_string())
+            {
+                merged.push(tag.to_string());
+            }
+        }
         for tag in tags {
-            if !merged.contains(tag) {
+            if seen.insert(tag.clone()) {
                 merged.push(tag.clone());
             }
         }
@@ -182,6 +182,7 @@ impl ZoteroRemote {
 
     pub async fn remove_tags(&self, key: &str, tags: &[String]) -> ZotResult<()> {
         let mut item = self.get_item_data(key).await?;
+        let drop: std::collections::HashSet<&str> = tags.iter().map(String::as_str).collect();
         let filtered = item
             .data
             .get("tags")
@@ -193,7 +194,7 @@ impl ZoteroRemote {
                 entry
                     .get("tag")
                     .and_then(Value::as_str)
-                    .map(|tag| !tags.iter().any(|candidate| candidate == tag))
+                    .map(|tag| !drop.contains(tag))
                     .unwrap_or(true)
             })
             .collect::<Vec<_>>();

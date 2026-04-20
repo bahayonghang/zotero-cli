@@ -1,5 +1,6 @@
 use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -239,8 +240,9 @@ pub fn parse_library_scope(value: &str) -> ZotResult<LibraryScope> {
         return Ok(LibraryScope::User);
     }
 
-    let re = Regex::new(r"^group:(\d+)$").expect("valid regex");
-    if let Some(captures) = re.captures(value) {
+    static GROUP_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^group:(\d+)$").expect("valid regex"));
+    if let Some(captures) = GROUP_RE.captures(value) {
         let group_id = captures
             .get(1)
             .and_then(|m| m.as_str().parse::<i64>().ok())
