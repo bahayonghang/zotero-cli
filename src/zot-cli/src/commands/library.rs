@@ -1,11 +1,8 @@
-use std::collections::{BTreeMap, HashSet};
-
 use anyhow::Result;
 use chrono::Utc;
 use zot_core::{EnvelopeMeta, Item, SavedSearchCondition, SemanticHit, SemanticIndexStatus};
 use zot_local::{
-    HybridMode, LocalLibrary, PdfBackend, PdfCache, PdfiumBackend, RagIndex, SearchOptions,
-    build_metadata_chunk, chunk_text, compute_term_frequencies, tokenize,
+    HybridMode, LocalLibrary, PdfiumBackend, ReindexOpts, SearchOptions, SemanticStore,
 };
 use zot_remote::{BetterBibTexClient, EmbeddingClient};
 
@@ -330,26 +327,7 @@ async fn delete_saved_searches(
 }
 
 pub(crate) async fn semantic_status(ctx: &AppContext) -> Result<SemanticIndexStatus> {
-    let path = ctx.library_index_path();
-    if !path.exists() {
-        return Ok(SemanticIndexStatus {
-            exists: false,
-            path: path.display().to_string(),
-            indexed_items: 0,
-            indexed_chunks: 0,
-            chunks_with_embeddings: 0,
-            last_indexed_at: None,
-        });
-    }
-    let index = RagIndex::open(&path)?;
-    Ok(SemanticIndexStatus {
-        exists: true,
-        path: path.display().to_string(),
-        indexed_items: index.indexed_keys()?.len(),
-        indexed_chunks: index.chunk_count()?,
-        chunks_with_embeddings: index.embedding_count()?,
-        last_indexed_at: index.get_meta("indexed_at")?,
-    })
+    SemanticStore::status_at(ctx.library_index_path()).map_err(Into::into)
 }
 
 async fn semantic_index(
@@ -357,75 +335,44 @@ async fn semantic_index(
     library: &LocalLibrary,
     args: LibrarySemanticIndexArgs,
 ) -> Result<serde_json::Value> {
-    let path = ctx.library_index_path();
-    let index = RagIndex::open(&path)?;
+    let store = SemanticStore::open(
+        ctx.library_index_path(),
+        Some(
+            zot_core::AppConfig::config_dir()
+                .join("cache")
+                .join("library_md_cache.sqlite"),
+        ),
+    )?;
     if args.force_rebuild {
-        index.clear()?;
+        store.clear()?;
     }
     let backend = PdfiumBackend;
-    let cache = PdfCache::new(Some(
-        zot_core::AppConfig::config_dir()
-            .join("cache")
-            .join("library_md_cache.sqlite"),
-    ))?;
     let embedding_client = EmbeddingClient::new(ctx.config.embedding.clone());
     let limit = effective_semantic_index_limit(args.limit);
     let items = load_semantic_index_items(library, args.collection.as_deref(), limit)?;
-    if !args.force_rebuild {
-        for item in &items {
-            index.remove_item_chunks(&item.key)?;
-        }
-        let stale_keys = collect_deleted_indexed_keys(library, &index)?;
-        for item_key in stale_keys {
-            index.remove_item_chunks(&item_key)?;
-        }
+    let (stats, pending) = store.reindex_chunks(
+        library,
+        &backend,
+        ReindexOpts {
+            items: &items,
+            fulltext: args.fulltext,
+            force_rebuild: args.force_rebuild,
+        },
+    )?;
+
+    if embedding_client.configured() && !pending.is_empty() {
+        let texts: Vec<String> = pending.iter().map(|p| p.text.clone()).collect();
+        let embeddings = embedding_client.embed(&texts).await?;
+        store.apply_pending_embeddings(pending, embeddings)?;
     }
 
-    let mut all_texts = Vec::new();
-    let mut chunk_ids = Vec::new();
-    for item in &items {
-        let metadata_chunk = build_metadata_chunk(item);
-        let chunk_id = index.insert_chunk(&item.key, "metadata", &metadata_chunk)?;
-        index.insert_terms(
-            chunk_id,
-            &compute_term_frequencies(&tokenize(&metadata_chunk)),
-        )?;
-        all_texts.push(metadata_chunk);
-        chunk_ids.push(chunk_id);
-
-        if args.fulltext
-            && let Some(attachment) = library.get_pdf_attachment(&item.key)?
-        {
-            let pdf_path = library.pdf_path(&attachment);
-            let text = if let Some(cached) = cache.get(&pdf_path)? {
-                cached
-            } else {
-                let extracted = backend.extract_text(&pdf_path, None)?;
-                cache.put(&pdf_path, &extracted)?;
-                extracted
-            };
-            for chunk in chunk_text(&text, &item.title, 500, 50) {
-                let chunk_id = index.insert_chunk(&item.key, "pdf", &chunk)?;
-                index.insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&chunk)))?;
-                all_texts.push(chunk);
-                chunk_ids.push(chunk_id);
-            }
-        }
-    }
-
-    if embedding_client.configured() && !all_texts.is_empty() {
-        let embeddings = embedding_client.embed(&all_texts).await?;
-        for (chunk_id, embedding) in chunk_ids.into_iter().zip(embeddings) {
-            index.set_embedding(chunk_id, &embedding)?;
-        }
-    }
-
-    index.set_meta("indexed_at", &Utc::now().to_rfc3339())?;
-    let status = semantic_status(ctx).await?;
+    store.mark_indexed_at(&Utc::now().to_rfc3339())?;
+    let status = store.status()?;
     Ok(serde_json::json!({
         "indexed": true,
-        "items": items.len(),
-        "fulltext": args.fulltext,
+        "items": stats.items,
+        "fulltext": stats.fulltext,
+        "chunks": stats.chunks,
         "status": status,
     }))
 }
@@ -452,37 +399,12 @@ fn truncate_semantic_index_items<T>(mut items: Vec<T>, limit: usize) -> Vec<T> {
     items
 }
 
-fn collect_deleted_indexed_keys(
-    library: &LocalLibrary,
-    index: &RagIndex,
-) -> zot_core::ZotResult<Vec<String>> {
-    select_stale_item_keys(index.indexed_keys()?, |item_key| {
-        Ok(library.get_item(item_key)?.is_some())
-    })
-}
-
-fn select_stale_item_keys<F>(
-    indexed_keys: Vec<String>,
-    mut item_exists: F,
-) -> zot_core::ZotResult<Vec<String>>
-where
-    F: FnMut(&str) -> zot_core::ZotResult<bool>,
-{
-    let mut stale_keys = Vec::new();
-    for item_key in indexed_keys {
-        if !item_exists(&item_key)? {
-            stale_keys.push(item_key);
-        }
-    }
-    Ok(stale_keys)
-}
-
 async fn semantic_search(
     ctx: &AppContext,
     library: &LocalLibrary,
     args: LibrarySemanticSearchArgs,
 ) -> Result<Vec<SemanticHit>> {
-    let index = RagIndex::open(ctx.library_index_path())?;
+    let store = SemanticStore::open(ctx.library_index_path(), None)?;
     let mut mode: HybridMode = args.mode.into();
     let embedding = if matches!(mode, HybridMode::Semantic | HybridMode::Hybrid) {
         match maybe_embed_query(&ctx.config.embedding, &args.query).await? {
@@ -496,47 +418,16 @@ async fn semantic_search(
         None
     };
 
-    let allowed = if let Some(collection) = args.collection.as_deref() {
-        library
-            .get_collection_items(collection)?
-            .into_iter()
-            .map(|item| item.key)
-            .collect::<HashSet<_>>()
-    } else {
-        HashSet::new()
-    };
-
-    let chunks = index.query(
-        &args.query,
-        mode,
-        embedding.as_deref(),
-        args.limit.saturating_mul(5),
-    )?;
-    let mut deduped = BTreeMap::<String, SemanticHit>::new();
-    for chunk in chunks {
-        if !allowed.is_empty() && !allowed.contains(&chunk.item_key) {
-            continue;
-        }
-        if let Some(item) = library.get_item(&chunk.item_key)? {
-            let entry = deduped
-                .entry(item.key.clone())
-                .or_insert_with(|| SemanticHit {
-                    item: item.clone(),
-                    score: chunk.score,
-                    source: chunk.source.clone(),
-                    matched_chunk: Some(chunk.content.clone()),
-                });
-            if chunk.score > entry.score {
-                entry.score = chunk.score;
-                entry.source = chunk.source.clone();
-                entry.matched_chunk = Some(chunk.content.clone());
-            }
-        }
-        if deduped.len() >= args.limit {
-            break;
-        }
-    }
-    Ok(deduped.into_values().collect())
+    store
+        .search(
+            library,
+            &args.query,
+            mode,
+            embedding.as_deref(),
+            args.collection.as_deref(),
+            args.limit,
+        )
+        .map_err(Into::into)
 }
 
 async fn merge_duplicates(
@@ -563,10 +454,7 @@ async fn merge_duplicates(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        create_saved_search, effective_semantic_index_limit, select_stale_item_keys,
-        truncate_semantic_index_items,
-    };
+    use super::{create_saved_search, effective_semantic_index_limit, truncate_semantic_index_items};
     use crate::cli::LibrarySavedSearchCreateArgs;
     use crate::context::AppContext;
     use zot_core::{AppConfig, LibraryScope};
@@ -575,17 +463,6 @@ mod tests {
     fn semantic_index_limit_defaults_to_ten_thousand() {
         assert_eq!(effective_semantic_index_limit(0), 10_000);
         assert_eq!(effective_semantic_index_limit(25), 25);
-    }
-
-    #[test]
-    fn select_stale_item_keys_returns_missing_entries_only() {
-        let stale = select_stale_item_keys(
-            vec!["ATTN001".to_string(), "DEAD999".to_string()],
-            |item_key| Ok(item_key == "ATTN001"),
-        )
-        .expect("select stale keys");
-
-        assert_eq!(stale, vec!["DEAD999"]);
     }
 
     #[test]
