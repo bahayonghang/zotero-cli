@@ -168,11 +168,12 @@ async fn export_workspace(
 ) -> Result<()> {
     let workspace = store.load(&args.name)?;
     let library = ctx.local_library()?;
-    let items = workspace
-        .items
-        .iter()
-        .filter_map(|entry| library.get_item(&entry.key).ok().flatten())
-        .collect::<Vec<_>>();
+    let mut items = Vec::with_capacity(workspace.items.len());
+    for entry in &workspace.items {
+        if let Some(item) = library.get_item(&entry.key)? {
+            items.push(item);
+        }
+    }
     match args.format.as_str() {
         "json" => {
             if ctx.json {

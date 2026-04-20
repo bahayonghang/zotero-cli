@@ -359,7 +359,7 @@ impl RagIndex {
     pub fn indexed_keys(&self) -> ZotResult<Vec<String>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT DISTINCT item_key FROM chunks")
+            .prepare_cached("SELECT DISTINCT item_key FROM chunks")
             .map_err(db_err("rag-indexed-keys"))?;
         let rows = stmt
             .query_map([], |row| row.get::<_, String>(0))
@@ -506,7 +506,7 @@ impl RagIndex {
     fn load_all_chunks(&self) -> ZotResult<Vec<ChunkRow>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, item_key, source, content, embedding FROM chunks")
+            .prepare_cached("SELECT id, item_key, source, content, embedding FROM chunks")
             .map_err(db_err("rag-load-chunks"))?;
         let rows = stmt
             .query_map([], |row| {
@@ -529,7 +529,7 @@ impl RagIndex {
     fn average_doc_len(&self) -> ZotResult<f32> {
         let mut stmt = self
             .conn
-            .prepare("SELECT content FROM chunks")
+            .prepare_cached("SELECT content FROM chunks")
             .map_err(db_err("rag-avg-doc-len"))?;
         let rows = stmt
             .query_map([], |row| row.get::<_, String>(0))
@@ -554,7 +554,7 @@ impl RagIndex {
             format!("SELECT DISTINCT chunk_id FROM bm25_terms WHERE term IN ({placeholders})");
         let mut stmt = self
             .conn
-            .prepare(&sql)
+            .prepare_cached(&sql)
             .map_err(db_err("rag-bm25-candidates"))?;
         let rows = stmt
             .query_map(params_from_iter(query_terms.iter()), |row| {
@@ -573,7 +573,7 @@ impl RagIndex {
         let sql = format!(
             "SELECT id, item_key, source, content, embedding FROM chunks WHERE id IN ({placeholders})"
         );
-        let mut stmt = self.conn.prepare(&sql).map_err(db_err("rag-load-chunks"))?;
+        let mut stmt = self.conn.prepare_cached(&sql).map_err(db_err("rag-load-chunks"))?;
         let rows = stmt
             .query_map(params_from_iter(chunk_ids.iter()), |row| {
                 let embedding_raw = row.get::<_, Option<String>>(4)?;
@@ -602,7 +602,7 @@ impl RagIndex {
         let placeholders = repeat_placeholders(chunk_ids.len());
         let sql =
             format!("SELECT chunk_id, term, tf FROM bm25_terms WHERE chunk_id IN ({placeholders})");
-        let mut stmt = self.conn.prepare(&sql).map_err(db_err("rag-load-terms"))?;
+        let mut stmt = self.conn.prepare_cached(&sql).map_err(db_err("rag-load-terms"))?;
         let rows = stmt
             .query_map(params_from_iter(chunk_ids.iter()), |row| {
                 Ok((

@@ -85,26 +85,32 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             }
         }
         LibraryCommand::Citekey(args) => {
-            let item = if let Some(result) = library.search_by_citation_key(&args.citekey)? {
-                Some(result)
-            } else {
-                let bbt = BetterBibTexClient::new();
-                if bbt.probe().await {
-                    bbt.search(&args.citekey)
-                        .await?
-                        .into_iter()
-                        .find(|candidate| candidate.citekey == args.citekey)
-                        .and_then(|candidate| library.get_item(&candidate.item_key).ok().flatten())
-                        .map(|item| zot_core::CitationKeyMatch {
-                            citekey: args.citekey.clone(),
-                            source: "better-bibtex".to_string(),
-                            item,
-                        })
-                } else {
-                    None
+            let match_opt = match library.search_by_citation_key(&args.citekey)? {
+                Some(result) => Some(result),
+                None => {
+                    let bbt = BetterBibTexClient::new();
+                    if bbt.probe().await {
+                        let candidate = bbt
+                            .search(&args.citekey)
+                            .await?
+                            .into_iter()
+                            .find(|candidate| candidate.citekey == args.citekey);
+                        match candidate {
+                            Some(candidate) => library.get_item(&candidate.item_key)?.map(|item| {
+                                zot_core::CitationKeyMatch {
+                                    citekey: args.citekey.clone(),
+                                    source: "better-bibtex".to_string(),
+                                    item,
+                                }
+                            }),
+                            None => None,
+                        }
+                    } else {
+                        None
+                    }
                 }
-            }
-            .ok_or_else(|| zot_core::ZotError::InvalidInput {
+            };
+            let item = match_opt.ok_or_else(|| zot_core::ZotError::InvalidInput {
                 code: "citation-key-not-found".to_string(),
                 message: format!("Citation key '{}' not found", args.citekey),
                 hint: None,
