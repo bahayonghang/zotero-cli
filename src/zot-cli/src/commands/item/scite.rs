@@ -77,7 +77,7 @@ async fn report(
         }
         .into());
     };
-    SciteClient::new()
+    SciteClient::new(ctx.http())
         .get_report(&resolved_doi)
         .await?
         .ok_or_else(|| {
@@ -104,7 +104,7 @@ async fn search(ctx: &AppContext, query: &str, limit: usize) -> Result<Vec<serde
         .iter()
         .filter_map(|item| item.doi.clone())
         .collect::<Vec<_>>();
-    let reports = SciteClient::new().get_reports_batch(&dois).await?;
+    let reports = SciteClient::new(ctx.http()).get_reports_batch(&dois).await?;
     Ok(items
         .into_iter()
         .map(|item| {
@@ -136,7 +136,7 @@ async fn retractions(
         .iter()
         .filter_map(|item| item.doi.clone())
         .collect::<Vec<_>>();
-    let reports = SciteClient::new().get_reports_batch(&dois).await?;
+    let reports = SciteClient::new(ctx.http()).get_reports_batch(&dois).await?;
     Ok(items
         .into_iter()
         .filter_map(|item| {

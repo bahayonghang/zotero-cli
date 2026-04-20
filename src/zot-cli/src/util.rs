@@ -1,12 +1,13 @@
 use anyhow::Result;
 use zot_core::{EmbeddingConfig, PdfOutlineEntry, ZotError, ZotResult};
-use zot_remote::{EmbeddingClient, PublicationStatus};
+use zot_remote::{EmbeddingClient, HttpRuntime, PublicationStatus};
 
 pub(crate) async fn maybe_embed_query(
+    runtime: &HttpRuntime,
     config: &EmbeddingConfig,
     query: &str,
 ) -> ZotResult<Option<Vec<f32>>> {
-    let client = EmbeddingClient::new(config.clone());
+    let client = EmbeddingClient::new(runtime, config.clone());
     if !client.configured() {
         return Ok(None);
     }

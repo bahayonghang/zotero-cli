@@ -3,6 +3,8 @@ use regex::Regex;
 use serde::Deserialize;
 use zot_core::{ZotError, ZotResult};
 
+use crate::http::HttpRuntime;
+
 const API_BASE: &str = "https://api.semanticscholar.org/graph/v1";
 static ARXIV_VERSION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"v\d+$").expect("valid regex"));
 static BIORXIV_RE: Lazy<Regex> =
@@ -78,33 +80,27 @@ pub fn extract_preprint_info(
 #[derive(Clone)]
 pub struct SemanticScholarClient {
     client: reqwest::Client,
+    api_key: Option<String>,
 }
 
 impl SemanticScholarClient {
-    pub fn new(api_key: Option<&str>) -> ZotResult<Self> {
-        let mut headers = reqwest::header::HeaderMap::new();
-        if let Some(api_key) = api_key
-            && !api_key.is_empty()
-        {
-            let header_value = reqwest::header::HeaderValue::from_str(api_key).map_err(|err| {
+    pub fn new(runtime: &HttpRuntime, api_key: Option<&str>) -> ZotResult<Self> {
+        let api_key = api_key
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_string());
+        if let Some(value) = api_key.as_deref() {
+            reqwest::header::HeaderValue::from_str(value).map_err(|err| {
                 ZotError::InvalidInput {
                     code: "ss-api-key".to_string(),
                     message: err.to_string(),
                     hint: None,
                 }
             })?;
-            headers.insert("x-api-key", header_value);
         }
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .build()
-            .map_err(|err| ZotError::Remote {
-                code: "ss-client".to_string(),
-                message: err.to_string(),
-                hint: None,
-                status: None,
-            })?;
-        Ok(Self { client })
+        Ok(Self {
+            client: runtime.client_clone(),
+            api_key,
+        })
     }
 
     pub async fn check_publication(
@@ -115,9 +111,11 @@ impl SemanticScholarClient {
             "{API_BASE}/paper/{}?fields=externalIds,journal,venue,publicationDate,title,publicationVenue",
             info.api_id
         );
-        let response = self
-            .client
-            .get(url)
+        let mut request = self.client.get(url);
+        if let Some(api_key) = self.api_key.as_deref() {
+            request = request.header("x-api-key", api_key);
+        }
+        let response = request
             .send()
             .await
             .map_err(remote_err("ss-request"))?;

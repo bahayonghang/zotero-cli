@@ -1,5 +1,6 @@
 pub mod better_bibtex;
 pub mod embedding;
+pub mod http;
 pub mod oa;
 pub mod scite;
 pub mod semantic_scholar;
@@ -7,6 +8,7 @@ pub mod zotero;
 
 pub use better_bibtex::{BetterBibTexClient, BetterBibTexSearchItem};
 pub use embedding::EmbeddingClient;
+pub use http::HttpRuntime;
 pub use oa::{
     ArxivWork, CrossRefWork, OaClient, ResolvedPdfUrl, normalize_arxiv_id, normalize_doi,
 };

@@ -3,6 +3,8 @@ use regex::Regex;
 use serde::Deserialize;
 use zot_core::{ZotError, ZotResult};
 
+use crate::http::HttpRuntime;
+
 static DOI_URL_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"doi\.org/(10\.\d{4,9}/[^\s?#]+)").expect("valid DOI regex"));
 static DOI_RE: Lazy<Regex> =
@@ -87,16 +89,10 @@ pub struct OaClient {
     ss_base: String,
 }
 
-impl Default for OaClient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl OaClient {
-    pub fn new() -> Self {
+    pub fn new(runtime: &HttpRuntime) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: runtime.client_clone(),
             crossref_base: std::env::var("ZOT_CROSSREF_API_BASE")
                 .unwrap_or_else(|_| "https://api.crossref.org".to_string()),
             unpaywall_base: std::env::var("ZOT_UNPAYWALL_API_BASE")

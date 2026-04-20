@@ -2,6 +2,8 @@ use serde::Deserialize;
 use serde_json::json;
 use zot_core::{EmbeddingConfig, ZotError, ZotResult};
 
+use crate::http::HttpRuntime;
+
 #[derive(Clone)]
 pub struct EmbeddingClient {
     client: reqwest::Client,
@@ -9,9 +11,9 @@ pub struct EmbeddingClient {
 }
 
 impl EmbeddingClient {
-    pub fn new(config: EmbeddingConfig) -> Self {
+    pub fn new(runtime: &HttpRuntime, config: EmbeddingConfig) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: runtime.client_clone(),
             config,
         }
     }

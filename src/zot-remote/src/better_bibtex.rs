@@ -2,6 +2,8 @@ use serde::Deserialize;
 use serde_json::json;
 use zot_core::{ZotError, ZotResult};
 
+use crate::http::HttpRuntime;
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct BetterBibTexSearchItem {
     #[serde(default)]
@@ -20,19 +22,13 @@ pub struct BetterBibTexClient {
     base_url: String,
 }
 
-impl Default for BetterBibTexClient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl BetterBibTexClient {
-    pub fn new() -> Self {
+    pub fn new(runtime: &HttpRuntime) -> Self {
         let port = std::env::var("ZOT_BBT_PORT").unwrap_or_else(|_| "23119".to_string());
         let base_url = std::env::var("ZOT_BBT_URL")
             .unwrap_or_else(|_| format!("http://127.0.0.1:{port}/better-bibtex"));
         Self {
-            client: reqwest::Client::new(),
+            client: runtime.client_clone(),
             base_url,
         }
     }

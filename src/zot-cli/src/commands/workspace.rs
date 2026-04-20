@@ -214,7 +214,7 @@ async fn index_workspace(ctx: &AppContext, store: &WorkspaceStore, name: &str) -
     index.clear()?;
     let backend = PdfiumBackend;
     let cache = PdfCache::new(Some(store.root().join(".md_cache.sqlite")))?;
-    let embedding_client = EmbeddingClient::new(ctx.config.embedding.clone());
+    let embedding_client = EmbeddingClient::new(ctx.http(), ctx.config.embedding.clone());
     let mut all_texts = Vec::new();
     let mut chunk_ids = Vec::new();
     for entry in workspace.items {
@@ -267,7 +267,7 @@ async fn query_workspace(
     let index = RagIndex::open(store.root().join(format!("{}.idx.sqlite", args.name)))?;
     let mode: HybridMode = args.mode.into();
     let embedding = if matches!(mode, HybridMode::Semantic | HybridMode::Hybrid) {
-        maybe_embed_query(&ctx.config.embedding, &args.question).await?
+        maybe_embed_query(ctx.http(), &ctx.config.embedding, &args.question).await?
     } else {
         None
     };

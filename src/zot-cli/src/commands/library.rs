@@ -85,7 +85,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             let match_opt = match library.search_by_citation_key(&args.citekey)? {
                 Some(result) => Some(result),
                 None => {
-                    let bbt = BetterBibTexClient::new();
+                    let bbt = BetterBibTexClient::new(ctx.http());
                     if bbt.probe().await {
                         let candidate = bbt
                             .search(&args.citekey)
@@ -347,7 +347,7 @@ async fn semantic_index(
         store.clear()?;
     }
     let backend = PdfiumBackend;
-    let embedding_client = EmbeddingClient::new(ctx.config.embedding.clone());
+    let embedding_client = EmbeddingClient::new(ctx.http(), ctx.config.embedding.clone());
     let limit = effective_semantic_index_limit(args.limit);
     let items = load_semantic_index_items(library, args.collection.as_deref(), limit)?;
     let (stats, pending) = store.reindex_chunks(
@@ -407,7 +407,7 @@ async fn semantic_search(
     let store = SemanticStore::open(ctx.library_index_path(), None)?;
     let mut mode: HybridMode = args.mode.into();
     let embedding = if matches!(mode, HybridMode::Semantic | HybridMode::Hybrid) {
-        match maybe_embed_query(&ctx.config.embedding, &args.query).await? {
+        match maybe_embed_query(ctx.http(), &ctx.config.embedding, &args.query).await? {
             Some(embedding) => Some(embedding),
             None => {
                 mode = HybridMode::Bm25;
@@ -454,10 +454,13 @@ async fn merge_duplicates(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::{create_saved_search, effective_semantic_index_limit, truncate_semantic_index_items};
     use crate::cli::LibrarySavedSearchCreateArgs;
     use crate::context::AppContext;
     use zot_core::{AppConfig, LibraryScope};
+    use zot_remote::HttpRuntime;
 
     #[test]
     fn semantic_index_limit_defaults_to_ten_thousand() {
@@ -478,6 +481,7 @@ mod tests {
             profile: None,
             scope: LibraryScope::User,
             config: AppConfig::default(),
+            http: Arc::new(HttpRuntime::default()),
         };
         let err = create_saved_search(
             &ctx,

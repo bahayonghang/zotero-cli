@@ -3,22 +3,18 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use zot_core::{EditorialNotice, SciteItemReport, SciteTally, ZotError, ZotResult};
 
+use crate::http::HttpRuntime;
+
 #[derive(Clone)]
 pub struct SciteClient {
     client: reqwest::Client,
     base_url: String,
 }
 
-impl Default for SciteClient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl SciteClient {
-    pub fn new() -> Self {
+    pub fn new(runtime: &HttpRuntime) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: runtime.client_clone(),
             base_url: std::env::var("ZOT_SCITE_API_BASE")
                 .unwrap_or_else(|_| "https://api.scite.ai".to_string()),
         }
@@ -282,7 +278,8 @@ mod tests {
 
     #[test]
     fn merges_scite_report_title_tally_and_notices() {
-        let client = SciteClient::new();
+        let runtime = crate::http::HttpRuntime::default();
+        let client = SciteClient::new(&runtime);
         let report = client.merge_report(
             "10.1038/nature12373",
             Some(zot_core::SciteTally {

@@ -17,7 +17,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: SyncCommand) -> Result<()>
             } else {
                 library.get_arxiv_preprints(args.collection.as_deref(), args.limit)?
             };
-            let client = SemanticScholarClient::new(ctx.config.semantic_scholar_key())?;
+            let client = SemanticScholarClient::new(ctx.http(), ctx.config.semantic_scholar_key())?;
             let mut matches = Vec::new();
             for item in items {
                 if let Some(info) = extract_preprint_info(

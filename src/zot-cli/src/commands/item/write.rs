@@ -5,7 +5,7 @@ use std::path::Path;
 use anyhow::Result;
 use zot_local::{PdfBackend, PdfiumBackend};
 use zot_remote::oa::CreatorName;
-use zot_remote::{OaClient, ZoteroRemote, normalize_arxiv_id, normalize_doi};
+use zot_remote::{HttpRuntime, OaClient, ZoteroRemote, normalize_arxiv_id, normalize_doi};
 
 use super::merge::merge_item_set;
 use crate::cli::{
@@ -201,14 +201,15 @@ async fn add_item_by_doi(
         message: format!("'{}' does not appear to be a valid DOI", doi),
         hint: None,
     })?;
-    let oa = OaClient::new();
+    let oa = OaClient::new(ctx.http());
     let work = oa.fetch_crossref_work(&doi).await?;
     let remote = ctx.remote()?;
     let key = remote
         .create_item_from_value(build_crossref_item_payload(&work, collections, tags))
         .await?;
     if !matches!(attach_mode, AttachModeArg::None) {
-        maybe_attach_open_access_pdf(&remote, &key, &doi, Some(&work), attach_mode).await?;
+        maybe_attach_open_access_pdf(ctx.http(), &remote, &key, &doi, Some(&work), attach_mode)
+            .await?;
     }
     Ok(key)
 }
@@ -225,12 +226,13 @@ async fn add_item_by_url(
     }
     let remote = ctx.remote()?;
     if let Some(arxiv_id) = normalize_arxiv_id(url) {
-        let work = OaClient::new().fetch_arxiv_work(&arxiv_id).await?;
+        let work = OaClient::new(ctx.http()).fetch_arxiv_work(&arxiv_id).await?;
         let key = remote
             .create_item_from_value(build_arxiv_item_payload(&work, collections, tags))
             .await?;
         if !matches!(attach_mode, AttachModeArg::None) {
             maybe_attach_pdf_url(
+                ctx.http(),
                 &remote,
                 &key,
                 &work.pdf_url,
@@ -302,6 +304,7 @@ async fn add_item_from_file(
 }
 
 async fn maybe_attach_open_access_pdf(
+    runtime: &HttpRuntime,
     remote: &ZoteroRemote,
     item_key: &str,
     doi: &str,
@@ -311,11 +314,12 @@ async fn maybe_attach_open_access_pdf(
     if matches!(attach_mode, AttachModeArg::None) {
         return Ok(());
     }
-    if let Some(resolved) = OaClient::new()
+    if let Some(resolved) = OaClient::new(runtime)
         .resolve_open_access_pdf(doi, crossref)
         .await?
     {
         maybe_attach_pdf_url(
+            runtime,
             remote,
             item_key,
             &resolved.url,
@@ -328,6 +332,7 @@ async fn maybe_attach_open_access_pdf(
 }
 
 async fn maybe_attach_pdf_url(
+    runtime: &HttpRuntime,
     remote: &ZoteroRemote,
     item_key: &str,
     url: &str,
@@ -342,7 +347,8 @@ async fn maybe_attach_pdf_url(
                 .await?;
         }
         AttachModeArg::Auto => {
-            let response = reqwest::Client::new()
+            let response = runtime
+                .client()
                 .get(url)
                 .send()
                 .await

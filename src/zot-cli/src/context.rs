@@ -1,9 +1,10 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Result;
 use zot_core::{AppConfig, LibraryScope};
 use zot_local::LocalLibrary;
-use zot_remote::ZoteroRemote;
+use zot_remote::{HttpRuntime, ZoteroRemote};
 
 use crate::cli::Cli;
 
@@ -13,18 +14,25 @@ pub(crate) struct AppContext {
     pub(crate) profile: Option<String>,
     pub(crate) scope: LibraryScope,
     pub(crate) config: AppConfig,
+    pub(crate) http: Arc<HttpRuntime>,
 }
 
 impl AppContext {
     pub(crate) fn from_cli(cli: &Cli) -> Result<Self> {
         let scope = zot_core::parse_library_scope(&cli.library)?;
         let config = AppConfig::load(cli.profile.as_deref())?;
+        let http = Arc::new(HttpRuntime::new()?);
         Ok(Self {
             json: cli.json,
             profile: cli.profile.clone(),
             scope,
             config,
+            http,
         })
+    }
+
+    pub(crate) fn http(&self) -> &HttpRuntime {
+        &self.http
     }
 
     pub(crate) fn local_library(&self) -> zot_core::ZotResult<LocalLibrary> {
