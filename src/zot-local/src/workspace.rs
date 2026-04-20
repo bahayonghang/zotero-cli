@@ -205,7 +205,7 @@ impl RagIndex {
                 item_key TEXT NOT NULL,
                 source TEXT NOT NULL,
                 content TEXT NOT NULL,
-                embedding TEXT
+                embedding BLOB
             );
             CREATE TABLE IF NOT EXISTS bm25_terms (
                 term TEXT NOT NULL,
@@ -224,7 +224,104 @@ impl RagIndex {
             message: err.to_string(),
             hint: None,
         })?;
-        Ok(Self { conn })
+        let instance = Self { conn };
+        instance.migrate_embedding_to_blob()?;
+        Ok(instance)
+    }
+
+    /// Migrate legacy v1 indexes where `embedding` was stored as JSON-text.
+    /// New indexes are created with BLOB directly; this is a no-op on them.
+    fn migrate_embedding_to_blob(&self) -> ZotResult<()> {
+        let mut stmt = self
+            .conn
+            .prepare_cached("PRAGMA table_info(chunks)")
+            .map_err(db_err("rag-migrate-info"))?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+            })
+            .map_err(db_err("rag-migrate-info"))?;
+        let mut declared = None;
+        for row in rows {
+            let (name, decl) = row.map_err(db_err("rag-migrate-info"))?;
+            if name == "embedding" {
+                declared = Some(decl);
+                break;
+            }
+        }
+        drop(stmt);
+        let Some(decl) = declared else {
+            return Ok(());
+        };
+        if decl.eq_ignore_ascii_case("BLOB") || decl.is_empty() {
+            return Ok(());
+        }
+        let legacy_rows: Vec<(i64, Option<String>)> = {
+            let mut stmt = self
+                .conn
+                .prepare_cached(
+                    "SELECT id, embedding FROM chunks
+                     WHERE embedding IS NOT NULL AND embedding != ''",
+                )
+                .map_err(db_err("rag-migrate-select"))?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?))
+                })
+                .map_err(db_err("rag-migrate-select"))?;
+            rows.collect::<Result<Vec<_>, _>>()
+                .map_err(db_err("rag-migrate-select"))?
+        };
+        let tx = self
+            .conn
+            .unchecked_transaction()
+            .map_err(db_err("rag-migrate-tx"))?;
+        tx.execute_batch(
+            "ALTER TABLE chunks RENAME COLUMN embedding TO embedding_legacy_json;
+             ALTER TABLE chunks ADD COLUMN embedding BLOB;",
+        )
+        .map_err(db_err("rag-migrate-alter"))?;
+        for (id, json) in legacy_rows {
+            let Some(json) = json else { continue };
+            let Ok(values) = serde_json::from_str::<Vec<f32>>(&json) else {
+                continue;
+            };
+            let bytes = encode_embedding(&values);
+            tx.execute(
+                "UPDATE chunks SET embedding = ?1 WHERE id = ?2",
+                params![bytes, id],
+            )
+            .map_err(db_err("rag-migrate-update"))?;
+        }
+        tx.execute_batch("ALTER TABLE chunks DROP COLUMN embedding_legacy_json;")
+            .map_err(db_err("rag-migrate-drop"))?;
+        tx.commit().map_err(db_err("rag-migrate-commit"))?;
+        Ok(())
+    }
+
+    /// Run a closure under a single write transaction; commits on success.
+    /// Used for bulk reindex to amortize fsync cost.
+    pub fn with_write_tx<R, F>(&self, f: F) -> ZotResult<R>
+    where
+        F: FnOnce() -> ZotResult<R>,
+    {
+        let tx = self
+            .conn
+            .unchecked_transaction()
+            .map_err(db_err("rag-write-tx"))?;
+        let result = f()?;
+        tx.commit().map_err(db_err("rag-write-tx-commit"))?;
+        Ok(result)
+    }
+
+    fn invalidate_bm25_stats(&self) -> ZotResult<()> {
+        self.conn
+            .execute(
+                "DELETE FROM index_meta WHERE key = 'bm25.avg_doc_len'",
+                [],
+            )
+            .map_err(db_err("rag-bm25-invalidate"))?;
+        Ok(())
     }
 
     pub fn clear(&self) -> ZotResult<()> {
@@ -249,79 +346,52 @@ impl RagIndex {
                 message: err.to_string(),
                 hint: None,
             })?;
+        self.invalidate_bm25_stats()?;
         Ok(self.conn.last_insert_rowid())
     }
 
     pub fn remove_item_chunks(&self, item_key: &str) -> ZotResult<()> {
-        let tx = self
-            .conn
-            .unchecked_transaction()
+        self.conn
+            .execute(
+                "DELETE FROM bm25_terms WHERE chunk_id IN (SELECT id FROM chunks WHERE item_key = ?1)",
+                params![item_key],
+            )
             .map_err(|err| ZotError::Database {
-                code: "rag-delete-chunks-tx".to_string(),
+                code: "rag-delete-terms".to_string(),
                 message: err.to_string(),
                 hint: None,
             })?;
-        tx.execute(
-            "DELETE FROM bm25_terms WHERE chunk_id IN (SELECT id FROM chunks WHERE item_key = ?1)",
-            params![item_key],
-        )
-        .map_err(|err| ZotError::Database {
-            code: "rag-delete-terms".to_string(),
-            message: err.to_string(),
-            hint: None,
-        })?;
-        tx.execute("DELETE FROM chunks WHERE item_key = ?1", params![item_key])
+        self.conn
+            .execute("DELETE FROM chunks WHERE item_key = ?1", params![item_key])
             .map_err(|err| ZotError::Database {
                 code: "rag-delete-chunks".to_string(),
                 message: err.to_string(),
                 hint: None,
             })?;
-        tx.commit().map_err(|err| ZotError::Database {
-            code: "rag-delete-chunks-commit".to_string(),
-            message: err.to_string(),
-            hint: None,
-        })?;
+        self.invalidate_bm25_stats()?;
         Ok(())
     }
 
     pub fn insert_terms(&self, chunk_id: i64, terms: &HashMap<String, f32>) -> ZotResult<()> {
-        let tx = self
+        let mut stmt = self
             .conn
-            .unchecked_transaction()
-            .map_err(|err| ZotError::Database {
-                code: "rag-terms-tx".to_string(),
-                message: err.to_string(),
-                hint: None,
-            })?;
-        for (term, tf) in terms {
-            tx.execute(
+            .prepare_cached(
                 "INSERT INTO bm25_terms (term, chunk_id, tf) VALUES (?1, ?2, ?3)",
-                params![term, chunk_id, tf],
             )
-            .map_err(|err| ZotError::Database {
-                code: "rag-insert-term".to_string(),
-                message: err.to_string(),
-                hint: None,
-            })?;
+            .map_err(db_err("rag-insert-term-prepare"))?;
+        for (term, tf) in terms {
+            stmt.execute(params![term, chunk_id, tf])
+                .map_err(db_err("rag-insert-term"))?;
         }
-        tx.commit().map_err(|err| ZotError::Database {
-            code: "rag-terms-commit".to_string(),
-            message: err.to_string(),
-            hint: None,
-        })?;
         Ok(())
     }
 
     pub fn set_embedding(&self, chunk_id: i64, embedding: &[f32]) -> ZotResult<()> {
-        let raw = serde_json::to_string(embedding).map_err(|err| ZotError::Database {
-            code: "rag-embedding-serialize".to_string(),
-            message: err.to_string(),
-            hint: None,
-        })?;
+        let bytes = encode_embedding(embedding);
         self.conn
             .execute(
                 "UPDATE chunks SET embedding = ?1 WHERE id = ?2",
-                params![raw, chunk_id],
+                params![bytes, chunk_id],
             )
             .map_err(|err| ZotError::Database {
                 code: "rag-set-embedding".to_string(),
@@ -380,7 +450,7 @@ impl RagIndex {
     pub fn embedding_count(&self) -> ZotResult<usize> {
         self.conn
             .query_row(
-                "SELECT COUNT(*) FROM chunks WHERE embedding IS NOT NULL AND embedding != ''",
+                "SELECT COUNT(*) FROM chunks WHERE embedding IS NOT NULL AND length(embedding) > 0",
                 [],
                 |row| row.get::<_, i64>(0),
             )
@@ -510,9 +580,10 @@ impl RagIndex {
             .map_err(db_err("rag-load-chunks"))?;
         let rows = stmt
             .query_map([], |row| {
-                let embedding_raw = row.get::<_, Option<String>>(4)?;
-                let embedding =
-                    embedding_raw.and_then(|raw| serde_json::from_str::<Vec<f32>>(&raw).ok());
+                let embedding_raw = row.get::<_, Option<Vec<u8>>>(4)?;
+                let embedding = embedding_raw
+                    .filter(|bytes| !bytes.is_empty())
+                    .and_then(|bytes| decode_embedding(&bytes));
                 Ok(ChunkRow {
                     id: row.get::<_, i64>(0)?,
                     item_key: row.get::<_, String>(1)?,
@@ -527,6 +598,18 @@ impl RagIndex {
     }
 
     fn average_doc_len(&self) -> ZotResult<f32> {
+        if let Some(cached) = self
+            .get_meta("bm25.avg_doc_len")?
+            .and_then(|raw| raw.parse::<f32>().ok())
+        {
+            return Ok(cached);
+        }
+        let fresh = self.compute_average_doc_len()?;
+        let _ = self.set_meta("bm25.avg_doc_len", &fresh.to_string());
+        Ok(fresh)
+    }
+
+    fn compute_average_doc_len(&self) -> ZotResult<f32> {
         let mut stmt = self
             .conn
             .prepare_cached("SELECT content FROM chunks")
@@ -576,9 +659,10 @@ impl RagIndex {
         let mut stmt = self.conn.prepare_cached(&sql).map_err(db_err("rag-load-chunks"))?;
         let rows = stmt
             .query_map(params_from_iter(chunk_ids.iter()), |row| {
-                let embedding_raw = row.get::<_, Option<String>>(4)?;
-                let embedding =
-                    embedding_raw.and_then(|raw| serde_json::from_str::<Vec<f32>>(&raw).ok());
+                let embedding_raw = row.get::<_, Option<Vec<u8>>>(4)?;
+                let embedding = embedding_raw
+                    .filter(|bytes| !bytes.is_empty())
+                    .and_then(|bytes| decode_embedding(&bytes));
                 Ok(ChunkRow {
                     id: row.get::<_, i64>(0)?,
                     item_key: row.get::<_, String>(1)?,
@@ -777,6 +861,28 @@ fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
     } else {
         dot / (left_norm * right_norm)
     }
+}
+
+/// Encode an embedding as little-endian f32 bytes for BLOB storage.
+fn encode_embedding(values: &[f32]) -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(values.len() * 4);
+    for value in values {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    bytes
+}
+
+/// Decode little-endian f32 bytes stored in a chunk's BLOB column.
+fn decode_embedding(bytes: &[u8]) -> Option<Vec<f32>> {
+    if bytes.len() % 4 != 0 {
+        return None;
+    }
+    Some(
+        bytes
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect(),
+    )
 }
 
 fn db_err(code: &'static str) -> impl Fn(rusqlite::Error) -> ZotError {

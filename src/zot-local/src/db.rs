@@ -76,6 +76,7 @@ pub struct LocalLibrary {
     library_id: i64,
     conn: Connection,
     _temp_dir: Option<TempDir>,
+    collections_cache: std::cell::OnceCell<Vec<Collection>>,
 }
 
 impl LocalLibrary {
@@ -98,6 +99,7 @@ impl LocalLibrary {
             library_id: 1,
             conn,
             _temp_dir: temp_dir,
+            collections_cache: std::cell::OnceCell::new(),
         };
         instance.library_id = instance.resolve_library_id()?;
         Ok(instance)
@@ -527,6 +529,15 @@ impl LocalLibrary {
     }
 
     pub fn get_collections(&self) -> ZotResult<Vec<Collection>> {
+        if let Some(cached) = self.collections_cache.get() {
+            return Ok(cached.clone());
+        }
+        let fresh = self.load_collections_tree()?;
+        let _ = self.collections_cache.set(fresh.clone());
+        Ok(fresh)
+    }
+
+    fn load_collections_tree(&self) -> ZotResult<Vec<Collection>> {
         let mut stmt = self
             .conn
             .prepare_cached("SELECT collectionID, collectionName, parentCollectionID, key FROM collections WHERE libraryID = ?1")
