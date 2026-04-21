@@ -21,8 +21,7 @@ impl SciteClient {
     }
 
     pub async fn get_report(&self, doi: &str) -> ZotResult<Option<SciteItemReport>> {
-        let tally = self.get_tally(doi).await?;
-        let paper = self.get_paper(doi).await?;
+        let (tally, paper) = tokio::try_join!(self.get_tally(doi), self.get_paper(doi))?;
         if tally.is_none() && paper.is_none() {
             return Ok(None);
         }
@@ -58,8 +57,10 @@ impl SciteClient {
         &self,
         dois: &[String],
     ) -> ZotResult<BTreeMap<String, SciteItemReport>> {
-        let tally_map = self.get_tallies_batch(dois).await?;
-        let paper_map = self.get_papers_batch(dois).await?;
+        let (tally_map, paper_map) = tokio::try_join!(
+            self.get_tallies_batch(dois),
+            self.get_papers_batch(dois)
+        )?;
         let mut results = BTreeMap::new();
         for doi in dois {
             if let Some(report) = self.merge_report(
