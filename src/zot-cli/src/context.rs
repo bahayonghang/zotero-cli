@@ -55,7 +55,12 @@ impl AppContext {
                 hint: Some("Run `zot config init` or set ZOT_API_KEY".to_string()),
             });
         }
-        ZoteroRemote::new(library_id, &self.config.zotero.api_key, self.scope.clone())
+        ZoteroRemote::new(
+            &self.http,
+            library_id,
+            &self.config.zotero.api_key,
+            self.scope.clone(),
+        )
     }
 
     pub(crate) fn library_index_path(&self) -> PathBuf {

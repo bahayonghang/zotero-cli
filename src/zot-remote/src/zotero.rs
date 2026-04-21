@@ -1,46 +1,77 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
+use reqwest::header::{CONTENT_TYPE, HeaderValue};
 use reqwest::{Method, StatusCode};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use uuid::Uuid;
 use zot_core::{LibraryScope, SavedSearch, SavedSearchCondition, ZotError, ZotResult};
 
+use crate::http::HttpRuntime;
+
 const API_BASE: &str = "https://api.zotero.org";
+const ZOTERO_API_KEY_HEADER: &str = "zotero-api-key";
 
 #[derive(Clone)]
 pub struct ZoteroRemote {
     client: reqwest::Client,
     library_id: String,
+    api_key: String,
     scope: LibraryScope,
 }
 
 impl ZoteroRemote {
     pub fn new(
+        runtime: &HttpRuntime,
         library_id: impl Into<String>,
         api_key: &str,
         scope: LibraryScope,
     ) -> ZotResult<Self> {
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            HeaderName::from_static("zotero-api-key"),
-            HeaderValue::from_str(api_key).map_err(|err| ZotError::InvalidInput {
-                code: "api-key".to_string(),
-                message: err.to_string(),
-                hint: None,
-            })?,
-        );
-        let client = reqwest::Client::builder()
-            .default_headers(headers)
-            .build()
-            .map_err(remote_err("client-build"))?;
+        // Validate the API key parses as a header value up front; actual
+        // attachment happens per-request via `http_*` helpers so we can share
+        // the underlying connection pool across remote clients.
+        HeaderValue::from_str(api_key).map_err(|err| ZotError::InvalidInput {
+            code: "api-key".to_string(),
+            message: err.to_string(),
+            hint: None,
+        })?;
         Ok(Self {
-            client,
+            client: runtime.client_clone(),
             library_id: library_id.into(),
+            api_key: api_key.to_string(),
             scope,
         })
+    }
+
+    fn http_request(
+        &self,
+        method: Method,
+        url: impl reqwest::IntoUrl,
+    ) -> reqwest::RequestBuilder {
+        self.client
+            .request(method, url)
+            .header(ZOTERO_API_KEY_HEADER, &self.api_key)
+    }
+
+    fn http_get(&self, url: impl reqwest::IntoUrl) -> reqwest::RequestBuilder {
+        self.http_request(Method::GET, url)
+    }
+
+    fn http_post(&self, url: impl reqwest::IntoUrl) -> reqwest::RequestBuilder {
+        self.http_request(Method::POST, url)
+    }
+
+    fn http_put(&self, url: impl reqwest::IntoUrl) -> reqwest::RequestBuilder {
+        self.http_request(Method::PUT, url)
+    }
+
+    fn http_patch(&self, url: impl reqwest::IntoUrl) -> reqwest::RequestBuilder {
+        self.http_request(Method::PATCH, url)
+    }
+
+    fn http_delete(&self, url: impl reqwest::IntoUrl) -> reqwest::RequestBuilder {
+        self.http_request(Method::DELETE, url)
     }
 
     pub async fn create_item(&self, doi: Option<&str>, url: Option<&str>) -> ZotResult<String> {
@@ -78,8 +109,7 @@ impl ZoteroRemote {
         }
         let version = item.version();
         let response = self
-            .client
-            .put(self.endpoint(&format!("items/{key}")))
+            .http_put(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", version.to_string())
             .json(&item.data)
             .send()
@@ -92,8 +122,7 @@ impl ZoteroRemote {
         let item = self.get_item_data(key).await?;
         let payload = json!({ "deleted": 1 });
         let response = self
-            .client
-            .patch(self.endpoint(&format!("items/{key}")))
+            .http_patch(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
             .json(&payload)
             .send()
@@ -106,8 +135,7 @@ impl ZoteroRemote {
         let mut item = self.get_item_data(key).await?;
         item.data["deleted"] = Value::Number(0.into());
         let response = self
-            .client
-            .patch(self.endpoint(&format!("items/{key}")))
+            .http_patch(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
             .json(&item.data)
             .send()
@@ -131,8 +159,7 @@ impl ZoteroRemote {
         let mut item = self.get_item_data(note_key).await?;
         item.data["note"] = Value::String(content.to_string());
         let response = self
-            .client
-            .put(self.endpoint(&format!("items/{note_key}")))
+            .http_put(self.endpoint(&format!("items/{note_key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
             .json(&item.data)
             .send()
@@ -170,8 +197,7 @@ impl ZoteroRemote {
                 .collect(),
         );
         let response = self
-            .client
-            .put(self.endpoint(&format!("items/{key}")))
+            .http_put(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
             .json(&item.data)
             .send()
@@ -200,8 +226,7 @@ impl ZoteroRemote {
             .collect::<Vec<_>>();
         item.data["tags"] = Value::Array(filtered);
         let response = self
-            .client
-            .put(self.endpoint(&format!("items/{key}")))
+            .http_put(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
             .json(&item.data)
             .send()
@@ -220,8 +245,7 @@ impl ZoteroRemote {
             "parentCollection": parent_key.unwrap_or(""),
         }]);
         let response = self
-            .client
-            .post(self.endpoint("collections"))
+            .http_post(self.endpoint("collections"))
             .header("Zotero-Write-Token", Uuid::new_v4().to_string())
             .json(&payload)
             .send()
@@ -242,8 +266,7 @@ impl ZoteroRemote {
         let mut collection = self.get_collection_data(key).await?;
         collection.data["name"] = Value::String(new_name.to_string());
         let response = self
-            .client
-            .put(self.endpoint(&format!("collections/{key}")))
+            .http_put(self.endpoint(&format!("collections/{key}")))
             .header(
                 "If-Unmodified-Since-Version",
                 collection.version().to_string(),
@@ -258,8 +281,7 @@ impl ZoteroRemote {
     pub async fn delete_collection(&self, key: &str) -> ZotResult<()> {
         let collection = self.get_collection_data(key).await?;
         let response = self
-            .client
-            .delete(self.endpoint(&format!("collections/{key}")))
+            .http_delete(self.endpoint(&format!("collections/{key}")))
             .header(
                 "If-Unmodified-Since-Version",
                 collection.version().to_string(),
@@ -291,8 +313,7 @@ impl ZoteroRemote {
             item.data["collections"] = Value::Array(next.into_iter().map(Value::String).collect());
         }
         let response = self
-            .client
-            .patch(self.endpoint(&format!("items/{item_key}")))
+            .http_patch(self.endpoint(&format!("items/{item_key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
             .json(&item.data)
             .send()
@@ -323,8 +344,7 @@ impl ZoteroRemote {
             .collect::<Vec<_>>();
         item.data["collections"] = Value::Array(next);
         let response = self
-            .client
-            .patch(self.endpoint(&format!("items/{item_key}")))
+            .http_patch(self.endpoint(&format!("items/{item_key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
             .json(&item.data)
             .send()
@@ -370,8 +390,7 @@ impl ZoteroRemote {
         payload.extend_from_slice(&bytes);
         payload.extend_from_slice(suffix.as_bytes());
         let upload_response = self
-            .client
-            .post(upload_url)
+            .http_post(upload_url)
             .header(CONTENT_TYPE, content_type)
             .body(payload)
             .send()
@@ -390,8 +409,7 @@ impl ZoteroRemote {
         }
 
         let register_response = self
-            .client
-            .post(self.endpoint(&format!("items/{attachment_key}/file")))
+            .http_post(self.endpoint(&format!("items/{attachment_key}/file")))
             .header("If-None-Match", "*")
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(format!("upload={upload_key}"))
@@ -422,8 +440,7 @@ impl ZoteroRemote {
 
     pub async fn list_saved_searches(&self) -> ZotResult<Vec<SavedSearch>> {
         let response = self
-            .client
-            .request(Method::GET, self.endpoint("searches"))
+            .http_get(self.endpoint("searches"))
             .send()
             .await
             .map_err(remote_err("list-saved-searches"))?;
@@ -450,8 +467,7 @@ impl ZoteroRemote {
             return Ok(());
         }
         let response = self
-            .client
-            .delete(self.endpoint(&format!("searches?searchKey={}", keys.join(","))))
+            .http_delete(self.endpoint(&format!("searches?searchKey={}", keys.join(","))))
             .header(
                 "If-Unmodified-Since-Version",
                 self.library_version().await?.to_string(),
@@ -469,8 +485,7 @@ impl ZoteroRemote {
             self.endpoint("items?format=versions")
         };
         let response = self
-            .client
-            .request(Method::GET, endpoint)
+            .http_get(endpoint)
             .send()
             .await
             .map_err(remote_err("list-item-versions"))?;
@@ -492,8 +507,7 @@ impl ZoteroRemote {
 
     pub async fn list_children(&self, key: &str) -> ZotResult<Vec<Value>> {
         let response = self
-            .client
-            .request(Method::GET, self.endpoint(&format!("items/{key}/children")))
+            .http_get(self.endpoint(&format!("items/{key}/children")))
             .send()
             .await
             .map_err(remote_err("list-children"))?;
@@ -502,8 +516,7 @@ impl ZoteroRemote {
 
     pub async fn list_children_flat(&self, key: &str) -> ZotResult<Vec<Value>> {
         let response = self
-            .client
-            .request(Method::GET, self.endpoint(&format!("items/{key}/children")))
+            .http_get(self.endpoint(&format!("items/{key}/children")))
             .send()
             .await
             .map_err(remote_err("list-children"))?;
@@ -536,8 +549,7 @@ impl ZoteroRemote {
                     hint: None,
                 })?;
         let response = self
-            .client
-            .put(self.endpoint(&format!("items/{key}")))
+            .http_put(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", version.to_string())
             .json(&sanitize_flat_item_value(item))
             .send()
@@ -549,8 +561,7 @@ impl ZoteroRemote {
     pub async fn set_deleted(&self, key: &str, deleted: bool) -> ZotResult<()> {
         let item = self.get_item_data(key).await?;
         let response = self
-            .client
-            .patch(self.endpoint(&format!("items/{key}")))
+            .http_patch(self.endpoint(&format!("items/{key}")))
             .header("If-Unmodified-Since-Version", item.version().to_string())
             .json(&json!({ "deleted": if deleted { 1 } else { 0 } }))
             .send()
@@ -561,8 +572,7 @@ impl ZoteroRemote {
 
     async fn create_items(&self, payload: &Value, code: &str) -> ZotResult<Vec<String>> {
         let response = self
-            .client
-            .post(self.endpoint("items"))
+            .http_post(self.endpoint("items"))
             .header("Zotero-Write-Token", Uuid::new_v4().to_string())
             .json(payload)
             .send()
@@ -579,8 +589,7 @@ impl ZoteroRemote {
 
     async fn create_searches(&self, payload: &Value, code: &str) -> ZotResult<Vec<String>> {
         let response = self
-            .client
-            .post(self.endpoint("searches"))
+            .http_post(self.endpoint("searches"))
             .header("Zotero-Write-Token", Uuid::new_v4().to_string())
             .json(payload)
             .send()
@@ -605,8 +614,7 @@ impl ZoteroRemote {
 
     async fn library_version(&self) -> ZotResult<i64> {
         let response = self
-            .client
-            .request(Method::GET, self.endpoint("items?limit=1&format=keys"))
+            .http_get(self.endpoint("items?limit=1&format=keys"))
             .send()
             .await
             .map_err(remote_err("library-version"))?;
@@ -653,8 +661,7 @@ impl ZoteroRemote {
             "contentType": content_type,
         }]);
         let response = self
-            .client
-            .post(self.endpoint("items"))
+            .http_post(self.endpoint("items"))
             .header("Zotero-Write-Token", Uuid::new_v4().to_string())
             .json(&payload)
             .send()
@@ -707,8 +714,7 @@ impl ZoteroRemote {
             modified
         );
         let response = self
-            .client
-            .post(self.endpoint(&format!("items/{attachment_key}/file")))
+            .http_post(self.endpoint(&format!("items/{attachment_key}/file")))
             .header("If-None-Match", "*")
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(body)
@@ -720,8 +726,7 @@ impl ZoteroRemote {
 
     async fn get_item_data(&self, key: &str) -> ZotResult<EditableObject> {
         let response = self
-            .client
-            .request(Method::GET, self.endpoint(&format!("items/{key}")))
+            .http_get(self.endpoint(&format!("items/{key}")))
             .send()
             .await
             .map_err(remote_err("get-item"))?;
@@ -730,8 +735,7 @@ impl ZoteroRemote {
 
     async fn get_collection_data(&self, key: &str) -> ZotResult<EditableObject> {
         let response = self
-            .client
-            .request(Method::GET, self.endpoint(&format!("collections/{key}")))
+            .http_get(self.endpoint(&format!("collections/{key}")))
             .send()
             .await
             .map_err(remote_err("get-collection"))?;
