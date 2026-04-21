@@ -44,11 +44,7 @@ impl ZoteroRemote {
         })
     }
 
-    fn http_request(
-        &self,
-        method: Method,
-        url: impl reqwest::IntoUrl,
-    ) -> reqwest::RequestBuilder {
+    fn http_request(&self, method: Method, url: impl reqwest::IntoUrl) -> reqwest::RequestBuilder {
         self.client
             .request(method, url)
             .header(ZOTERO_API_KEY_HEADER, &self.api_key)

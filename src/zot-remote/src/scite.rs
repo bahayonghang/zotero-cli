@@ -57,10 +57,8 @@ impl SciteClient {
         &self,
         dois: &[String],
     ) -> ZotResult<BTreeMap<String, SciteItemReport>> {
-        let (tally_map, paper_map) = tokio::try_join!(
-            self.get_tallies_batch(dois),
-            self.get_papers_batch(dois)
-        )?;
+        let (tally_map, paper_map) =
+            tokio::try_join!(self.get_tallies_batch(dois), self.get_papers_batch(dois))?;
         let mut results = BTreeMap::new();
         for doi in dois {
             if let Some(report) = self.merge_report(

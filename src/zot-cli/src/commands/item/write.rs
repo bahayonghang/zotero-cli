@@ -226,7 +226,9 @@ async fn add_item_by_url(
     }
     let remote = ctx.remote()?;
     if let Some(arxiv_id) = normalize_arxiv_id(url) {
-        let work = OaClient::new(ctx.http()).fetch_arxiv_work(&arxiv_id).await?;
+        let work = OaClient::new(ctx.http())
+            .fetch_arxiv_work(&arxiv_id)
+            .await?;
         let key = remote
             .create_item_from_value(build_arxiv_item_payload(&work, collections, tags))
             .await?;
@@ -347,17 +349,14 @@ async fn maybe_attach_pdf_url(
                 .await?;
         }
         AttachModeArg::Auto => {
-            let response = runtime
-                .client()
-                .get(url)
-                .send()
-                .await
-                .map_err(|err| zot_core::ZotError::Remote {
+            let response = runtime.client().get(url).send().await.map_err(|err| {
+                zot_core::ZotError::Remote {
                     code: "pdf-download".to_string(),
                     message: err.to_string(),
                     hint: None,
                     status: err.status().map(|status| status.as_u16()),
-                })?;
+                }
+            })?;
             if !response.status().is_success() {
                 return Ok(());
             }

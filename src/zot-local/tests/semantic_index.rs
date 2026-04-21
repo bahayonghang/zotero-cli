@@ -13,9 +13,7 @@ fn insert_chunk_with_embedding(
         .insert_chunk(item_key, source, content)
         .expect("insert chunk");
     let terms = compute_term_frequencies(&tokenize(content));
-    index
-        .insert_terms(chunk_id, &terms)
-        .expect("insert terms");
+    index.insert_terms(chunk_id, &terms).expect("insert terms");
     index
         .set_embedding(chunk_id, embedding)
         .expect("set embedding");
@@ -114,9 +112,7 @@ fn legacy_text_embedding_migrates_to_blob_on_open() {
 
     // Column declaration must now be BLOB so writes round-trip binary bytes.
     let conn = Connection::open(&path).expect("reopen post-migration");
-    let mut stmt = conn
-        .prepare("PRAGMA table_info(chunks)")
-        .expect("pragma");
+    let mut stmt = conn.prepare("PRAGMA table_info(chunks)").expect("pragma");
     let rows = stmt
         .query_map([], |row| {
             Ok((row.get::<_, String>(1)?, row.get::<_, String>(2)?))
@@ -133,7 +129,10 @@ fn legacy_text_embedding_migrates_to_blob_on_open() {
             saw_blob = true;
         }
     }
-    assert!(saw_blob, "migrated schema must still expose embedding column");
+    assert!(
+        saw_blob,
+        "migrated schema must still expose embedding column"
+    );
 }
 
 #[test]
@@ -151,10 +150,7 @@ fn with_write_tx_wraps_bulk_inserts_in_single_commit() {
             for (i, emb) in embeddings.iter().enumerate() {
                 let content = format!("chunk-{i} body text");
                 let chunk_id = index.insert_chunk("BULK001", "metadata", &content)?;
-                index.insert_terms(
-                    chunk_id,
-                    &compute_term_frequencies(&tokenize(&content)),
-                )?;
+                index.insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&content)))?;
                 index.set_embedding(chunk_id, emb)?;
             }
             Ok(())

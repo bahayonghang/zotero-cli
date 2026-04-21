@@ -456,7 +456,9 @@ async fn merge_duplicates(
 mod tests {
     use std::sync::Arc;
 
-    use super::{create_saved_search, effective_semantic_index_limit, truncate_semantic_index_items};
+    use super::{
+        create_saved_search, effective_semantic_index_limit, truncate_semantic_index_items,
+    };
     use crate::cli::LibrarySavedSearchCreateArgs;
     use crate::context::AppContext;
     use zot_core::{AppConfig, LibraryScope};

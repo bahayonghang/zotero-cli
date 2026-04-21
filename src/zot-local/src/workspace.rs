@@ -316,10 +316,7 @@ impl RagIndex {
 
     fn invalidate_bm25_stats(&self) -> ZotResult<()> {
         self.conn
-            .execute(
-                "DELETE FROM index_meta WHERE key = 'bm25.avg_doc_len'",
-                [],
-            )
+            .execute("DELETE FROM index_meta WHERE key = 'bm25.avg_doc_len'", [])
             .map_err(db_err("rag-bm25-invalidate"))?;
         Ok(())
     }
@@ -375,9 +372,7 @@ impl RagIndex {
     pub fn insert_terms(&self, chunk_id: i64, terms: &HashMap<String, f32>) -> ZotResult<()> {
         let mut stmt = self
             .conn
-            .prepare_cached(
-                "INSERT INTO bm25_terms (term, chunk_id, tf) VALUES (?1, ?2, ?3)",
-            )
+            .prepare_cached("INSERT INTO bm25_terms (term, chunk_id, tf) VALUES (?1, ?2, ?3)")
             .map_err(db_err("rag-insert-term-prepare"))?;
         for (term, tf) in terms {
             stmt.execute(params![term, chunk_id, tf])
@@ -656,7 +651,10 @@ impl RagIndex {
         let sql = format!(
             "SELECT id, item_key, source, content, embedding FROM chunks WHERE id IN ({placeholders})"
         );
-        let mut stmt = self.conn.prepare_cached(&sql).map_err(db_err("rag-load-chunks"))?;
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
+            .map_err(db_err("rag-load-chunks"))?;
         let rows = stmt
             .query_map(params_from_iter(chunk_ids.iter()), |row| {
                 let embedding_raw = row.get::<_, Option<Vec<u8>>>(4)?;
@@ -686,7 +684,10 @@ impl RagIndex {
         let placeholders = repeat_placeholders(chunk_ids.len());
         let sql =
             format!("SELECT chunk_id, term, tf FROM bm25_terms WHERE chunk_id IN ({placeholders})");
-        let mut stmt = self.conn.prepare_cached(&sql).map_err(db_err("rag-load-terms"))?;
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
+            .map_err(db_err("rag-load-terms"))?;
         let rows = stmt
             .query_map(params_from_iter(chunk_ids.iter()), |row| {
                 Ok((
@@ -789,10 +790,9 @@ fn repeat_placeholders(count: usize) -> String {
 }
 
 fn ensure_workspace_name(name: &str) -> ZotResult<()> {
-    static WORKSPACE_NAME_RE: std::sync::LazyLock<regex::Regex> =
-        std::sync::LazyLock::new(|| {
-            regex::Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").expect("valid workspace-name regex")
-        });
+    static WORKSPACE_NAME_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").expect("valid workspace-name regex")
+    });
     if WORKSPACE_NAME_RE.is_match(name) {
         Ok(())
     } else {

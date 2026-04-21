@@ -296,7 +296,10 @@ impl LocalLibrary {
              AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
              LIMIT ?3"
         );
-        let mut stmt = self.conn.prepare_cached(&sql).map_err(sql_err("search-notes"))?;
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
+            .map_err(sql_err("search-notes"))?;
         let rows = stmt
             .query_map(params![pattern, self.library_id, limit as i64], |row| {
                 Ok((
@@ -404,7 +407,11 @@ impl LocalLibrary {
 
     pub fn get_item_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
         let mut children = Vec::new();
-        children.extend(self.get_note_children(key)?.into_iter().map(ChildItem::Note));
+        children.extend(
+            self.get_note_children(key)?
+                .into_iter()
+                .map(ChildItem::Note),
+        );
         children.extend(
             self.get_attachment_children(key)?
                 .into_iter()
@@ -1000,7 +1007,10 @@ impl LocalLibrary {
             "SELECT itemID FROM items WHERE libraryID = ?1 AND {} >= ?2 ORDER BY {} DESC LIMIT ?3",
             column, column
         );
-        let mut stmt = self.conn.prepare_cached(&sql).map_err(sql_err("recent-items"))?;
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
+            .map_err(sql_err("recent-items"))?;
         let rows = stmt
             .query_map(params![self.library_id, since, limit as i64], |row| {
                 row.get::<_, i64>(0)
@@ -1134,7 +1144,9 @@ impl LocalLibrary {
 
         let mut stmt = self
             .conn
-            .prepare_cached("SELECT object FROM itemRelations WHERE itemID = ?1 AND predicateID = 1")
+            .prepare_cached(
+                "SELECT object FROM itemRelations WHERE itemID = ?1 AND predicateID = 1",
+            )
             .map_err(sql_err("related-explicit"))?;
         let rows = stmt
             .query_map(params![parent_id], |row| row.get::<_, String>(0))
@@ -1187,7 +1199,10 @@ impl LocalLibrary {
             );
             let mut params_vec = vec![rusqlite::types::Value::from(parent_id)];
             params_vec.extend(my_tag_ids.iter().copied().map(rusqlite::types::Value::from));
-            let mut stmt = self.conn.prepare_cached(&sql).map_err(sql_err("related-tags"))?;
+            let mut stmt = self
+                .conn
+                .prepare_cached(&sql)
+                .map_err(sql_err("related-tags"))?;
             let rows = stmt
                 .query_map(params_from_iter(params_vec), |row| {
                     Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
@@ -1444,15 +1459,17 @@ impl LocalLibrary {
         like: &str,
         item_ids: &mut HashSet<i64>,
     ) -> ZotResult<()> {
-        let mut stmt = self.conn.prepare_cached(
-            "SELECT DISTINCT i.itemID FROM items i
+        let mut stmt = self
+            .conn
+            .prepare_cached(
+                "SELECT DISTINCT i.itemID FROM items i
              JOIN itemData id ON i.itemID = id.itemID
              JOIN itemDataValues iv ON id.valueID = iv.valueID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE iv.value LIKE ?1 AND i.libraryID = ?2
              AND it.typeName NOT IN ('attachment','note','annotation')",
-        )
-        .map_err(sql_err("search-fields"))?;
+            )
+            .map_err(sql_err("search-fields"))?;
         let rows = stmt
             .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
             .map_err(sql_err("search-fields"))?;
@@ -1467,15 +1484,17 @@ impl LocalLibrary {
         like: &str,
         item_ids: &mut HashSet<i64>,
     ) -> ZotResult<()> {
-        let mut stmt = self.conn.prepare_cached(
-            "SELECT DISTINCT ic.itemID FROM itemCreators ic
+        let mut stmt = self
+            .conn
+            .prepare_cached(
+                "SELECT DISTINCT ic.itemID FROM itemCreators ic
              JOIN creators c ON ic.creatorID = c.creatorID
              JOIN items i ON ic.itemID = i.itemID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE (c.firstName LIKE ?1 OR c.lastName LIKE ?1) AND i.libraryID = ?2
              AND it.typeName NOT IN ('attachment','note','annotation')",
-        )
-        .map_err(sql_err("search-creators"))?;
+            )
+            .map_err(sql_err("search-creators"))?;
         let rows = stmt
             .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
             .map_err(sql_err("search-creators"))?;
@@ -1490,15 +1509,17 @@ impl LocalLibrary {
         like: &str,
         item_ids: &mut HashSet<i64>,
     ) -> ZotResult<()> {
-        let mut stmt = self.conn.prepare_cached(
-            "SELECT DISTINCT it.itemID FROM itemTags it
+        let mut stmt = self
+            .conn
+            .prepare_cached(
+                "SELECT DISTINCT it.itemID FROM itemTags it
              JOIN tags t ON it.tagID = t.tagID
              JOIN items i ON it.itemID = i.itemID
              JOIN itemTypes ity ON i.itemTypeID = ity.itemTypeID
              WHERE t.name LIKE ?1 AND i.libraryID = ?2
              AND ity.typeName NOT IN ('attachment','note','annotation')",
-        )
-        .map_err(sql_err("search-tags"))?;
+            )
+            .map_err(sql_err("search-tags"))?;
         let rows = stmt
             .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
             .map_err(sql_err("search-tags"))?;
@@ -1513,16 +1534,18 @@ impl LocalLibrary {
         like: &str,
         item_ids: &mut HashSet<i64>,
     ) -> ZotResult<()> {
-        let mut stmt = self.conn.prepare_cached(
-            "SELECT DISTINCT ia.parentItemID FROM fulltextItemWords fw
+        let mut stmt = self
+            .conn
+            .prepare_cached(
+                "SELECT DISTINCT ia.parentItemID FROM fulltextItemWords fw
              JOIN fulltextWords w ON fw.wordID = w.wordID
              JOIN itemAttachments ia ON fw.itemID = ia.itemID
              JOIN items i ON ia.parentItemID = i.itemID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE w.word LIKE ?1 AND ia.parentItemID IS NOT NULL AND i.libraryID = ?2
              AND it.typeName NOT IN ('attachment','note','annotation')",
-        )
-        .map_err(sql_err("search-fulltext"))?;
+            )
+            .map_err(sql_err("search-fulltext"))?;
         let rows = stmt
             .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
             .map_err(sql_err("search-fulltext"))?;

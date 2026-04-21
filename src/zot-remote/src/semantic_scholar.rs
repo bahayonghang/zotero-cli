@@ -115,10 +115,7 @@ impl SemanticScholarClient {
         if let Some(api_key) = self.api_key.as_deref() {
             request = request.header("x-api-key", api_key);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(remote_err("ss-request"))?;
+        let response = request.send().await.map_err(remote_err("ss-request"))?;
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(None);
         }

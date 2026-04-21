@@ -134,9 +134,9 @@ impl SemanticStore {
             }
             for item in opts.items {
                 let metadata_chunk = build_metadata_chunk(item);
-                let chunk_id =
-                    self.index
-                        .insert_chunk(&item.key, "metadata", &metadata_chunk)?;
+                let chunk_id = self
+                    .index
+                    .insert_chunk(&item.key, "metadata", &metadata_chunk)?;
                 self.index.insert_terms(
                     chunk_id,
                     &compute_term_frequencies(&tokenize(&metadata_chunk)),
@@ -152,17 +152,12 @@ impl SemanticStore {
                 {
                     let pdf_path = library.pdf_path(&attachment);
                     let text = self.pdf_text(backend, &pdf_path)?;
-                    for chunk in chunk_text(
-                        &text,
-                        &item.title,
-                        CHUNK_MAX_TOKENS,
-                        CHUNK_OVERLAP_TOKENS,
-                    ) {
+                    for chunk in
+                        chunk_text(&text, &item.title, CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS)
+                    {
                         let chunk_id = self.index.insert_chunk(&item.key, "pdf", &chunk)?;
-                        self.index.insert_terms(
-                            chunk_id,
-                            &compute_term_frequencies(&tokenize(&chunk)),
-                        )?;
+                        self.index
+                            .insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&chunk)))?;
                         pending.push(PendingEmbedding {
                             chunk_id,
                             text: chunk,
@@ -249,9 +244,9 @@ impl SemanticStore {
             None => HashSet::new(),
         };
 
-        let chunks =
-            self.index
-                .query(query, mode, query_embedding, limit.saturating_mul(5))?;
+        let chunks = self
+            .index
+            .query(query, mode, query_embedding, limit.saturating_mul(5))?;
         let mut deduped: BTreeMap<String, SemanticHit> = BTreeMap::new();
         for chunk in chunks {
             if !allowed_keys.is_empty() && !allowed_keys.contains(&chunk.item_key) {
