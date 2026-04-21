@@ -98,20 +98,83 @@ pub struct TagSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ChildItem {
+pub struct ChildNote {
     pub key: String,
     pub parent_key: Option<String>,
-    pub item_type: String,
-    pub title: Option<String>,
-    pub content_type: Option<String>,
-    pub filename: Option<String>,
-    pub note: Option<String>,
-    pub annotation_type: Option<String>,
-    pub text: Option<String>,
-    pub comment: Option<String>,
+    pub content: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ChildAttachment {
+    pub key: String,
+    pub parent_key: Option<String>,
+    pub filename: String,
+    pub content_type: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ChildAnnotation {
+    pub key: String,
+    pub parent_key: Option<String>,
+    pub annotation_type: String,
+    pub text: String,
+    pub comment: String,
     pub color: Option<String>,
     pub page_label: Option<String>,
     pub tags: Vec<String>,
+}
+
+/// One child of an item: note, attachment, or annotation.
+///
+/// Serialised with a `kind` discriminator + flattened payload, so consumers
+/// can match on `kind` instead of hunting through a dozen nullable fields:
+/// ```json
+/// { "kind": "note", "key": "...", "parent_key": "...", "content": "...", "tags": [] }
+/// { "kind": "attachment", "key": "...", "filename": "...", "content_type": "...", "tags": [] }
+/// { "kind": "annotation", "key": "...", "annotation_type": "highlight", "text": "...", ... }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum ChildItem {
+    Note(ChildNote),
+    Attachment(ChildAttachment),
+    Annotation(ChildAnnotation),
+}
+
+impl ChildItem {
+    pub fn key(&self) -> &str {
+        match self {
+            Self::Note(inner) => &inner.key,
+            Self::Attachment(inner) => &inner.key,
+            Self::Annotation(inner) => &inner.key,
+        }
+    }
+
+    pub fn parent_key(&self) -> Option<&str> {
+        match self {
+            Self::Note(inner) => inner.parent_key.as_deref(),
+            Self::Attachment(inner) => inner.parent_key.as_deref(),
+            Self::Annotation(inner) => inner.parent_key.as_deref(),
+        }
+    }
+
+    pub fn kind_label(&self) -> &'static str {
+        match self {
+            Self::Note(_) => "note",
+            Self::Attachment(_) => "attachment",
+            Self::Annotation(_) => "annotation",
+        }
+    }
+
+    pub fn tags(&self) -> &[String] {
+        match self {
+            Self::Note(inner) => &inner.tags,
+            Self::Attachment(inner) => &inner.tags,
+            Self::Annotation(inner) => &inner.tags,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

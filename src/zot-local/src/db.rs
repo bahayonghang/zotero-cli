@@ -8,9 +8,10 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use strsim::normalized_levenshtein;
 use tempfile::TempDir;
 use zot_core::{
-    AnnotationRecord, Attachment, ChildItem, CitationKeyMatch, Collection, Creator, DuplicateGroup,
-    FeedInfo, Item, LibraryInfo, LibraryScope, LibraryStats, Note, NoteSearchResult, SearchResult,
-    TagSummary, ZotError, ZotResult,
+    AnnotationRecord, Attachment, ChildAnnotation, ChildAttachment, ChildItem, ChildNote,
+    CitationKeyMatch, Collection, Creator, DuplicateGroup, FeedInfo, Item, LibraryInfo,
+    LibraryScope, LibraryStats, Note, NoteSearchResult, SearchResult, TagSummary, ZotError,
+    ZotResult,
 };
 
 use crate::citation::export_item;
@@ -403,9 +404,17 @@ impl LocalLibrary {
 
     pub fn get_item_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
         let mut children = Vec::new();
-        children.extend(self.get_note_children(key)?);
-        children.extend(self.get_attachment_children(key)?);
-        children.extend(self.get_annotation_children(key)?);
+        children.extend(self.get_note_children(key)?.into_iter().map(ChildItem::Note));
+        children.extend(
+            self.get_attachment_children(key)?
+                .into_iter()
+                .map(ChildItem::Attachment),
+        );
+        children.extend(
+            self.get_annotation_children(key)?
+                .into_iter()
+                .map(ChildItem::Annotation),
+        );
         Ok(children)
     }
 
@@ -431,7 +440,19 @@ impl LocalLibrary {
         let mut results = if let Some(item_key) = item_key {
             self.get_annotation_children(item_key)?
                 .into_iter()
-                .map(child_to_annotation_record)
+                .map(|child| AnnotationRecord {
+                    key: child.key,
+                    parent_key: None,
+                    parent_title: None,
+                    attachment_key: child.parent_key,
+                    attachment_title: None,
+                    annotation_type: child.annotation_type,
+                    text: child.text,
+                    comment: child.comment,
+                    color: child.color,
+                    page_label: child.page_label,
+                    tags: child.tags,
+                })
                 .collect::<Vec<_>>()
         } else {
             let title_field_id = self.field_id("title")?.unwrap_or(4);
@@ -1975,51 +1996,34 @@ impl LocalLibrary {
             .map_err(sql_err("field-id"))
     }
 
-    fn get_note_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
+    fn get_note_children(&self, key: &str) -> ZotResult<Vec<ChildNote>> {
         Ok(self
             .get_notes(key)?
             .into_iter()
-            .map(|note| ChildItem {
+            .map(|note| ChildNote {
                 key: note.key,
                 parent_key: Some(note.parent_key),
-                item_type: "note".to_string(),
-                title: None,
-                content_type: None,
-                filename: None,
-                note: Some(note.content),
-                annotation_type: None,
-                text: None,
-                comment: None,
-                color: None,
-                page_label: None,
+                content: note.content,
                 tags: note.tags,
             })
             .collect())
     }
 
-    fn get_attachment_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
+    fn get_attachment_children(&self, key: &str) -> ZotResult<Vec<ChildAttachment>> {
         Ok(self
             .get_attachments(key)?
             .into_iter()
-            .map(|attachment| ChildItem {
+            .map(|attachment| ChildAttachment {
                 key: attachment.key,
                 parent_key: Some(attachment.parent_key),
-                item_type: "attachment".to_string(),
-                title: Some(attachment.filename.clone()),
-                content_type: Some(attachment.content_type),
-                filename: Some(attachment.filename),
-                note: None,
-                annotation_type: None,
-                text: None,
-                comment: None,
-                color: None,
-                page_label: None,
+                filename: attachment.filename,
+                content_type: attachment.content_type,
                 tags: Vec::new(),
             })
             .collect())
     }
 
-    fn get_annotation_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
+    fn get_annotation_children(&self, key: &str) -> ZotResult<Vec<ChildAnnotation>> {
         if !self.table_exists("itemAnnotations")? {
             return Ok(Vec::new());
         }
@@ -2074,17 +2078,12 @@ impl LocalLibrary {
                 .map_err(sql_err("annotation-children"))?;
             let rows = stmt
                 .query_map(params![attachment_id, self.library_id], |row| {
-                    Ok(ChildItem {
+                    Ok(ChildAnnotation {
                         key: row.get::<_, String>(0)?,
                         parent_key: Some(attachment_key.clone()),
-                        item_type: "annotation".to_string(),
-                        title: None,
-                        content_type: None,
-                        filename: None,
-                        note: None,
-                        annotation_type: Some(annotation_type_name(row.get::<_, i64>(5)?)),
-                        text: Some(row.get::<_, Option<String>>(1)?.unwrap_or_default()),
-                        comment: Some(row.get::<_, Option<String>>(2)?.unwrap_or_default()),
+                        annotation_type: annotation_type_name(row.get::<_, i64>(5)?),
+                        text: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                        comment: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
                         color: row.get::<_, Option<String>>(3)?,
                         page_label: row.get::<_, Option<String>>(4)?,
                         tags: Vec::new(),
@@ -2167,24 +2166,6 @@ fn annotation_type_name(value: i64) -> String {
     .to_string()
 }
 
-fn child_to_annotation_record(child: ChildItem) -> AnnotationRecord {
-    AnnotationRecord {
-        key: child.key,
-        parent_key: None,
-        parent_title: None,
-        attachment_key: child.parent_key,
-        attachment_title: None,
-        annotation_type: child
-            .annotation_type
-            .unwrap_or_else(|| "unknown".to_string()),
-        text: child.text.unwrap_or_default(),
-        comment: child.comment.unwrap_or_default(),
-        color: child.color,
-        page_label: child.page_label,
-        tags: child.tags,
-    }
-}
-
 fn flatten_collection_tree(collection: &Collection, flattened: &mut Vec<Collection>) {
     flattened.push(Collection {
         key: collection.key.clone(),
@@ -2237,6 +2218,7 @@ mod tests {
     use zot_core::LibraryScope;
 
     use super::{DuplicateMatchMethod, LocalLibrary, SearchOptions};
+    use zot_core::ChildItem;
 
     struct TestFixture {
         lib: LocalLibrary,
@@ -2635,21 +2617,19 @@ Original Date: 2017');
             Ok(children) => children,
             Err(err) => panic!("get item children failed: {err}"),
         };
-        assert!(
-            children
-                .iter()
-                .any(|child| child.item_type == "note" && child.key == "NOTE004")
-        );
-        assert!(
-            children
-                .iter()
-                .any(|child| child.item_type == "attachment" && child.key == "ATCH005")
-        );
-        assert!(children.iter().any(|child| {
-            child.item_type == "annotation"
-                && child.key == "ANNO011"
-                && child.annotation_type.as_deref() == Some("highlight")
-        }));
+        assert!(children.iter().any(|child| matches!(
+            child,
+            ChildItem::Note(note) if note.key == "NOTE004"
+        )));
+        assert!(children.iter().any(|child| matches!(
+            child,
+            ChildItem::Attachment(attachment) if attachment.key == "ATCH005"
+        )));
+        assert!(children.iter().any(|child| matches!(
+            child,
+            ChildItem::Annotation(annotation)
+                if annotation.key == "ANNO011" && annotation.annotation_type == "highlight"
+        )));
 
         let note_hits = match lib.search_notes("transformer", 10) {
             Ok(results) => results,

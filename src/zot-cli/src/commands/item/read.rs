@@ -142,7 +142,7 @@ pub(crate) async fn handle_children(ctx: &AppContext, args: ItemChildrenArgs) ->
         for (key, values) in children {
             println!("{key}");
             for value in values {
-                println!("  - {} [{}]", value.key, value.item_type);
+                println!("  - {} [{}]", value.key(), value.kind_label());
             }
         }
     }
