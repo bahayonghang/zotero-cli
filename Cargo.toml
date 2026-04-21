@@ -3,7 +3,7 @@ members = ["src/zot-core", "src/zot-local", "src/zot-remote", "src/zot-cli"]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT"
 authors = ["bahayonghang"]
