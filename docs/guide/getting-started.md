@@ -49,6 +49,10 @@ cargo run -q -p zot-cli -- --json doctor
 
 同一轮任务固定一种调用路径，不要混用。
 
+如果 `doctor` 里 `write_credentials` 是缺失状态，而你当前只做本地检索、PDF 读取、outline、批注读取或本地索引，这一项可以忽略。它只影响 Zotero Web API 写操作。
+
+如果 `doctor` 里 `pdf_backend.available=false`，但平台受支持，`zot` 会在第一次真正需要 Pdfium 的本地 PDF 读取时自动下载受管 Pdfium；`doctor` 本身不会触发下载。
+
 ### 4. 需要远端写入或保存查询时，先配 config
 
 如果你后面要做这些事：
@@ -150,6 +154,8 @@ just ci
 - `ZOT_DATA_DIR`
 - `ZOT_LIBRARY_ID`
 - `ZOT_API_KEY`
+- `ZOT_PDFIUM_LIB_PATH`
+- `ZOT_PDFIUM_CACHE_DIR`
 - `ZOT_EMBEDDING_URL`
 - `ZOT_EMBEDDING_KEY`
 - `ZOT_EMBEDDING_MODEL`
@@ -160,6 +166,7 @@ just ci
 
 - `ZOT_BBT_PORT`
 - `ZOT_BBT_URL`
+- `PDFIUM_LIB_PATH`
 - `ZOT_SCITE_API_BASE`
 - `ZOT_CROSSREF_API_BASE`
 - `ZOT_UNPAYWALL_API_BASE`

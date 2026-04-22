@@ -21,7 +21,7 @@ Check `doctor` output under `write_credentials`. The usual missing pieces are:
 - `ZOT_API_KEY`
 - `ZOT_LIBRARY_ID`
 
-Without them, only local read-only analysis is available.
+Without them, local read-only analysis still works. They only gate Zotero Web API writes.
 
 ### 2. `library citekey` returns nothing
 
@@ -35,10 +35,16 @@ Check `doctor` for `better_bibtex.available`:
 Check these `doctor` fields:
 
 - `pdf_backend.available`
+- `pdf_backend.auto_download_supported`
+- `pdf_backend.cached`
 - `annotation_support.pdf_outline`
 - `annotation_support.annotation_creation`
 
 Without a working backend, do not assume PDF text, outlines, or annotation creation are available.
+
+- If `auto_download_supported=true`, the first real local PDF read will auto-download managed Pdfium.
+- If `auto_download_supported=false`, provide Pdfium manually with `ZOT_PDFIUM_LIB_PATH` or `PDFIUM_LIB_PATH`.
+- `doctor` probes only; it does not download Pdfium by itself.
 
 ### 4. semantic search is not very semantic
 

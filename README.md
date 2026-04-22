@@ -96,6 +96,10 @@ cargo run -q -p zot-cli -- --json doctor
 
 Keep one invocation path for the whole session. Do not switch back and forth.
 
+`doctor` reports `write_credentials` even in local-only setups. That field is optional for local reads and only matters for Zotero Web API writes.
+
+If local PDF reads need Pdfium and no compatible library is already present, `zot` will auto-download a managed Pdfium binary on the first local PDF read on supported Windows, macOS, and glibc Linux targets.
+
 ### 4. Initialize config when you need writes or saved searches
 
 If you plan to write notes, tags, collection membership, saved searches, or publication status:
@@ -190,9 +194,15 @@ Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.
 
 - `zot mcp serve` is scaffolded and currently returns `mcp-not-implemented`. For now, use the skill plus the runtime.
 - Local reads come from the Zotero data directory. Mutations go through the Zotero Web API only.
+- Missing write credentials do not block local reads. They only block Zotero Web API writes.
 - Annotation creation is PDF-first. It requires a local PDF, Pdfium support, and write credentials.
 - Citation-key lookup prefers Better BibTeX support and falls back to compatible local parsing when possible.
 - Legacy connector-style `search` / `fetch` ideas are intentionally mapped onto explicit `library`, `item`, `collection`, `workspace`, and `sync` workflows.
+
+If you need to override Pdfium resolution manually:
+
+- `ZOT_PDFIUM_LIB_PATH` or `PDFIUM_LIB_PATH` can point to a compatible Pdfium library file or directory.
+- `ZOT_PDFIUM_CACHE_DIR` can override the base directory used for Zot-managed Pdfium downloads.
 
 ---
 

@@ -21,7 +21,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `ZOT_API_KEY`
 - `ZOT_LIBRARY_ID`
 
-没有这两个配置时，只能做本地只读分析。
+没有这两个配置时，仍然可以做本地只读分析。它们只影响 Zotero Web API 写操作。
 
 ### 2. `library citekey` 找不到结果
 
@@ -35,10 +35,16 @@ cargo run -q -p zot-cli -- --json doctor
 看 `doctor` 里的：
 
 - `pdf_backend.available`
+- `pdf_backend.auto_download_supported`
+- `pdf_backend.cached`
 - `annotation_support.pdf_outline`
 - `annotation_support.annotation_creation`
 
-没有可用 backend 时，不要假设能抽取 PDF 文本、outline 或创建批注。
+没有可用 backend 时，不要先假设能抽取 PDF 文本、outline 或创建批注。
+
+- 如果 `auto_download_supported=true`，第一次真正读取本地 PDF 时会自动下载受管 Pdfium。
+- 如果 `auto_download_supported=false`，要手工提供 Pdfium，优先用 `ZOT_PDFIUM_LIB_PATH`，兼容 `PDFIUM_LIB_PATH`。
+- `doctor` 只探测，不会主动下载 Pdfium。
 
 ### 4. semantic search 不像语义检索
 

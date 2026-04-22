@@ -96,6 +96,10 @@ cargo run -q -p zot-cli -- --json doctor
 
 同一轮任务里固定一种调用方式，不要来回切。
 
+`doctor` 里会显示 `write_credentials`。如果你只做本地读取，这一项可以忽略；它只影响 Zotero Web API 写操作。
+
+如果本地 PDF 读取需要 Pdfium，而当前机器上还没有可用库，`zot` 会在受支持的 Windows、macOS、glibc Linux 平台上，在第一次本地 PDF 读取时自动下载受管 Pdfium。
+
 ### 4. 需要写入或 saved search 时，先初始化 config
 
 如果你后面要写 note、tag、collection 关系、saved search 或 publication status：
@@ -190,9 +194,15 @@ just docs
 
 - `zot mcp serve` 现在只是 scaffold，会返回 `mcp-not-implemented`。当前应走 skill + runtime。
 - 本地读取来自 Zotero 数据目录。写操作只走 Zotero Web API。
+- 缺少写凭据不会阻塞本地读取，只会阻塞 Zotero Web API 写入。
 - annotation 创建是 PDF-first，依赖本地 PDF、Pdfium 和写凭证。
 - citation key 查询优先走 Better BibTeX，可用时补强；否则退回兼容的本地解析。
 - 旧参考实现里的 `search` / `fetch` 这种 connector 心智模型，已经被显式映射到 `library`、`item`、`collection`、`workspace`、`sync` 这些工作流。
+
+如果你要手工覆盖 Pdfium 查找：
+
+- `ZOT_PDFIUM_LIB_PATH` 或 `PDFIUM_LIB_PATH` 可以指向兼容的 Pdfium 库文件或目录。
+- `ZOT_PDFIUM_CACHE_DIR` 可以覆盖 Zot 受管 Pdfium 下载使用的基础缓存目录。
 
 ---
 

@@ -49,6 +49,10 @@ cargo run -q -p zot-cli -- --json doctor
 
 Pick one invocation path and keep it consistent for the session.
 
+If `doctor` shows missing `write_credentials` and you only need local search, PDF reads, outlines, annotation reads, or local indexing, that is safe to ignore. Those credentials only matter for Zotero Web API writes.
+
+If `doctor` shows `pdf_backend.available=false` on a supported platform, `zot` will auto-download a managed Pdfium binary the first time a local PDF read actually needs it. `doctor` itself does not trigger the download.
+
 ### 4. Configure writes and saved-search support when needed
 
 If you plan to:
@@ -150,6 +154,8 @@ Common environment variables:
 - `ZOT_DATA_DIR`
 - `ZOT_LIBRARY_ID`
 - `ZOT_API_KEY`
+- `ZOT_PDFIUM_LIB_PATH`
+- `ZOT_PDFIUM_CACHE_DIR`
 - `ZOT_EMBEDDING_URL`
 - `ZOT_EMBEDDING_KEY`
 - `ZOT_EMBEDDING_MODEL`
@@ -160,6 +166,7 @@ Optional integration overrides:
 
 - `ZOT_BBT_PORT`
 - `ZOT_BBT_URL`
+- `PDFIUM_LIB_PATH`
 - `ZOT_SCITE_API_BASE`
 - `ZOT_CROSSREF_API_BASE`
 - `ZOT_UNPAYWALL_API_BASE`
