@@ -3,7 +3,7 @@ members = ["src/zot-core", "src/zot-local", "src/zot-remote", "src/zot-cli"]
 resolver = "2"
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 license = "MIT"
 authors = ["bahayonghang"]
@@ -17,6 +17,7 @@ chrono = { version = "0.4.42", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive", "env", "unicode"] }
 clap_complete = "4.6.1"
 dirs = "6.0.0"
+flate2 = "1.1.5"
 http = "1.3.1"
 md5 = "0.8.0"
 once_cell = "1.21.3"
@@ -35,6 +36,7 @@ rusqlite = { version = "0.39.0", features = ["bundled", "chrono"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 strsim = "0.11.1"
+tar = "0.4.44"
 tempfile = "3.23.0"
 thiserror = "2.0.18"
 tokio = { version = "1.52.1", features = ["full"] }
