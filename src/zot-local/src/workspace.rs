@@ -460,10 +460,35 @@ impl RagIndex {
         embedding: Option<&[f32]>,
         limit: usize,
     ) -> ZotResult<Vec<QueryChunk>> {
-        let bm25 = self.score_bm25(question)?;
+        self.query_scoped(question, mode, embedding, None, limit)
+    }
+
+    pub fn query_allowed(
+        &self,
+        question: &str,
+        mode: HybridMode,
+        embedding: Option<&[f32]>,
+        allowed_item_keys: &[&str],
+        limit: usize,
+    ) -> ZotResult<Vec<QueryChunk>> {
+        if allowed_item_keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        self.query_scoped(question, mode, embedding, Some(allowed_item_keys), limit)
+    }
+
+    fn query_scoped(
+        &self,
+        question: &str,
+        mode: HybridMode,
+        embedding: Option<&[f32]>,
+        allowed_item_keys: Option<&[&str]>,
+        limit: usize,
+    ) -> ZotResult<Vec<QueryChunk>> {
+        let bm25 = self.score_bm25(question, allowed_item_keys)?;
         let semantic = if matches!(mode, HybridMode::Semantic | HybridMode::Hybrid) {
             embedding
-                .map(|values| self.score_semantic(values))
+                .map(|values| self.score_semantic(values, allowed_item_keys))
                 .transpose()?
                 .unwrap_or_default()
         } else {
@@ -479,34 +504,29 @@ impl RagIndex {
         Ok(merged.into_iter().take(limit).collect())
     }
 
-    fn score_bm25(&self, question: &str) -> ZotResult<Vec<QueryChunk>> {
+    fn score_bm25(
+        &self,
+        question: &str,
+        allowed_item_keys: Option<&[&str]>,
+    ) -> ZotResult<Vec<QueryChunk>> {
         let query_terms = tokenize(question);
         if query_terms.is_empty() {
             return Ok(Vec::new());
         }
-        let candidate_ids = self.matching_chunk_ids(&query_terms)?;
+        let candidate_ids = self.matching_chunk_ids(&query_terms, allowed_item_keys)?;
         if candidate_ids.is_empty() {
             return Ok(Vec::new());
         }
         let chunks = self.load_chunks_by_ids(&candidate_ids)?;
-        let avg_doc_len = self.average_doc_len()?;
+        let avg_doc_len = self.average_doc_len(allowed_item_keys)?;
         let terms_by_chunk = self.load_terms_for_chunks(&candidate_ids)?;
         let mut df = HashMap::new();
         for term in &query_terms {
-            let count = self
-                .conn
-                .query_row(
-                    "SELECT COUNT(DISTINCT chunk_id) FROM bm25_terms WHERE term = ?1",
-                    params![term],
-                    |row| row.get::<_, i64>(0),
-                )
-                .optional()
-                .map_err(db_err("rag-bm25-df"))?
-                .unwrap_or(0);
+            let count = self.document_frequency(term, allowed_item_keys)?;
             df.insert(term.clone(), count as f32);
         }
 
-        let total_docs = self.chunk_count()?.max(1) as f32;
+        let total_docs = self.chunk_count_scoped(allowed_item_keys)?.max(1) as f32;
         let mut scored = Vec::new();
         for chunk in chunks {
             let doc_len = tokenize(&chunk.content).len() as f32;
@@ -545,8 +565,12 @@ impl RagIndex {
         Ok(scored)
     }
 
-    fn score_semantic(&self, embedding: &[f32]) -> ZotResult<Vec<QueryChunk>> {
-        let chunks = self.load_all_chunks()?;
+    fn score_semantic(
+        &self,
+        embedding: &[f32],
+        allowed_item_keys: Option<&[&str]>,
+    ) -> ZotResult<Vec<QueryChunk>> {
+        let chunks = self.load_all_chunks(allowed_item_keys)?;
         let mut scored = Vec::new();
         for chunk in chunks {
             if let Some(chunk_embedding) = chunk.embedding.as_deref() {
@@ -568,7 +592,10 @@ impl RagIndex {
         Ok(scored)
     }
 
-    fn load_all_chunks(&self) -> ZotResult<Vec<ChunkRow>> {
+    fn load_all_chunks(&self, allowed_item_keys: Option<&[&str]>) -> ZotResult<Vec<ChunkRow>> {
+        if let Some(keys) = allowed_item_keys {
+            return self.load_all_chunks_for_items(keys);
+        }
         let mut stmt = self
             .conn
             .prepare_cached("SELECT id, item_key, source, content, embedding FROM chunks")
@@ -592,7 +619,41 @@ impl RagIndex {
             .map_err(db_err("rag-load-chunks"))
     }
 
-    fn average_doc_len(&self) -> ZotResult<f32> {
+    fn load_all_chunks_for_items(&self, allowed_item_keys: &[&str]) -> ZotResult<Vec<ChunkRow>> {
+        if allowed_item_keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        let placeholders = repeat_placeholders(allowed_item_keys.len());
+        let sql = format!(
+            "SELECT id, item_key, source, content, embedding FROM chunks WHERE item_key IN ({placeholders})"
+        );
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
+            .map_err(db_err("rag-load-chunks"))?;
+        let rows = stmt
+            .query_map(params_from_iter(allowed_item_keys.iter().copied()), |row| {
+                let embedding_raw = row.get::<_, Option<Vec<u8>>>(4)?;
+                let embedding = embedding_raw
+                    .filter(|bytes| !bytes.is_empty())
+                    .and_then(|bytes| decode_embedding(&bytes));
+                Ok(ChunkRow {
+                    id: row.get::<_, i64>(0)?,
+                    item_key: row.get::<_, String>(1)?,
+                    source: row.get::<_, String>(2)?,
+                    content: row.get::<_, String>(3)?,
+                    embedding,
+                })
+            })
+            .map_err(db_err("rag-load-chunks"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(db_err("rag-load-chunks"))
+    }
+
+    fn average_doc_len(&self, allowed_item_keys: Option<&[&str]>) -> ZotResult<f32> {
+        if let Some(keys) = allowed_item_keys {
+            return self.compute_average_doc_len_for_items(keys);
+        }
         if let Some(cached) = self
             .get_meta("bm25.avg_doc_len")?
             .and_then(|raw| raw.parse::<f32>().ok())
@@ -626,7 +687,43 @@ impl RagIndex {
         }
     }
 
-    fn matching_chunk_ids(&self, query_terms: &[String]) -> ZotResult<Vec<i64>> {
+    fn compute_average_doc_len_for_items(&self, allowed_item_keys: &[&str]) -> ZotResult<f32> {
+        if allowed_item_keys.is_empty() {
+            return Ok(1.0);
+        }
+        let placeholders = repeat_placeholders(allowed_item_keys.len());
+        let sql = format!("SELECT content FROM chunks WHERE item_key IN ({placeholders})");
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
+            .map_err(db_err("rag-avg-doc-len"))?;
+        let rows = stmt
+            .query_map(params_from_iter(allowed_item_keys.iter().copied()), |row| {
+                row.get::<_, String>(0)
+            })
+            .map_err(db_err("rag-avg-doc-len"))?;
+        let mut total_docs = 0usize;
+        let mut total_tokens = 0usize;
+        for row in rows {
+            let content = row.map_err(db_err("rag-avg-doc-len"))?;
+            total_docs += 1;
+            total_tokens += tokenize(&content).len();
+        }
+        if total_docs == 0 {
+            Ok(1.0)
+        } else {
+            Ok(total_tokens as f32 / total_docs as f32)
+        }
+    }
+
+    fn matching_chunk_ids(
+        &self,
+        query_terms: &[String],
+        allowed_item_keys: Option<&[&str]>,
+    ) -> ZotResult<Vec<i64>> {
+        if let Some(keys) = allowed_item_keys {
+            return self.matching_chunk_ids_for_items(query_terms, keys);
+        }
         let placeholders = repeat_placeholders(query_terms.len());
         let sql =
             format!("SELECT DISTINCT chunk_id FROM bm25_terms WHERE term IN ({placeholders})");
@@ -641,6 +738,87 @@ impl RagIndex {
             .map_err(db_err("rag-bm25-candidates"))?;
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(db_err("rag-bm25-candidates"))
+    }
+
+    fn matching_chunk_ids_for_items(
+        &self,
+        query_terms: &[String],
+        allowed_item_keys: &[&str],
+    ) -> ZotResult<Vec<i64>> {
+        if allowed_item_keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        let term_placeholders = repeat_placeholders(query_terms.len());
+        let key_placeholders = repeat_placeholders(allowed_item_keys.len());
+        let sql = format!(
+            "SELECT DISTINCT t.chunk_id
+             FROM bm25_terms t
+             JOIN chunks c ON c.id = t.chunk_id
+             WHERE t.term IN ({term_placeholders})
+             AND c.item_key IN ({key_placeholders})"
+        );
+        let params = query_terms
+            .iter()
+            .map(String::as_str)
+            .chain(allowed_item_keys.iter().copied());
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
+            .map_err(db_err("rag-bm25-candidates"))?;
+        let rows = stmt
+            .query_map(params_from_iter(params), |row| row.get::<_, i64>(0))
+            .map_err(db_err("rag-bm25-candidates"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(db_err("rag-bm25-candidates"))
+    }
+
+    fn document_frequency(&self, term: &str, allowed_item_keys: Option<&[&str]>) -> ZotResult<i64> {
+        let Some(keys) = allowed_item_keys else {
+            return self
+                .conn
+                .query_row(
+                    "SELECT COUNT(DISTINCT chunk_id) FROM bm25_terms WHERE term = ?1",
+                    params![term],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()
+                .map(|count| count.unwrap_or(0))
+                .map_err(db_err("rag-bm25-df"));
+        };
+        if keys.is_empty() {
+            return Ok(0);
+        }
+        let placeholders = repeat_placeholders(keys.len());
+        let sql = format!(
+            "SELECT COUNT(DISTINCT t.chunk_id)
+             FROM bm25_terms t
+             JOIN chunks c ON c.id = t.chunk_id
+             WHERE t.term = ?
+             AND c.item_key IN ({placeholders})"
+        );
+        let params = std::iter::once(term).chain(keys.iter().copied());
+        self.conn
+            .query_row(&sql, params_from_iter(params), |row| row.get::<_, i64>(0))
+            .optional()
+            .map(|count| count.unwrap_or(0))
+            .map_err(db_err("rag-bm25-df"))
+    }
+
+    fn chunk_count_scoped(&self, allowed_item_keys: Option<&[&str]>) -> ZotResult<usize> {
+        let Some(keys) = allowed_item_keys else {
+            return self.chunk_count();
+        };
+        if keys.is_empty() {
+            return Ok(0);
+        }
+        let placeholders = repeat_placeholders(keys.len());
+        let sql = format!("SELECT COUNT(*) FROM chunks WHERE item_key IN ({placeholders})");
+        self.conn
+            .query_row(&sql, params_from_iter(keys.iter().copied()), |row| {
+                row.get::<_, i64>(0)
+            })
+            .map(|count| count as usize)
+            .map_err(db_err("rag-chunk-count"))
     }
 
     fn load_chunks_by_ids(&self, chunk_ids: &[i64]) -> ZotResult<Vec<ChunkRow>> {
@@ -1067,6 +1245,9 @@ mod tests {
             )
             .expect("insert non-matching terms");
 
-        assert_eq!(index.average_doc_len().expect("average doc length"), 5.0);
+        assert_eq!(
+            index.average_doc_len(None).expect("average doc length"),
+            5.0
+        );
     }
 }

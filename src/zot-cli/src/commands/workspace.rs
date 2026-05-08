@@ -1,10 +1,7 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use zot_local::{
-    HybridMode, PdfBackend, PdfCache, PdfiumBackend, RagIndex, SearchOptions, WorkspaceStore,
-    build_metadata_chunk, chunk_text, compute_term_frequencies, tokenize,
-};
+use zot_local::{HybridMode, PdfiumBackend, SearchOptions, WorkspaceRagStore, WorkspaceStore};
 use zot_remote::EmbeddingClient;
 
 use crate::cli::{
@@ -210,49 +207,23 @@ async fn export_workspace(
 async fn index_workspace(ctx: &AppContext, store: &WorkspaceStore, name: &str) -> Result<()> {
     let workspace = store.load(name)?;
     let library = ctx.local_library()?;
-    let index = RagIndex::open(store.root().join(format!("{name}.idx.sqlite")))?;
-    index.clear()?;
+    let rag = WorkspaceRagStore::open(store, name)?;
     let backend = PdfiumBackend;
-    let cache = PdfCache::new(Some(store.root().join(".md_cache.sqlite")))?;
     let embedding_client = EmbeddingClient::new(ctx.http(), ctx.config.embedding.clone());
-    let mut all_texts = Vec::new();
-    let mut chunk_ids = Vec::new();
-    for entry in workspace.items {
-        if let Some(item) = library.get_item(&entry.key)? {
-            let metadata_chunk = build_metadata_chunk(&item);
-            let chunk_id = index.insert_chunk(&item.key, "metadata", &metadata_chunk)?;
-            index.insert_terms(
-                chunk_id,
-                &compute_term_frequencies(&tokenize(&metadata_chunk)),
-            )?;
-            all_texts.push(metadata_chunk);
-            chunk_ids.push(chunk_id);
-            if let Some(attachment) = library.get_pdf_attachment(&item.key)? {
-                let pdf_path = library.pdf_path(&attachment);
-                let text = if let Some(cached) = cache.get(&pdf_path)? {
-                    cached
-                } else {
-                    let extracted = backend.extract_text(&pdf_path, None)?;
-                    cache.put(&pdf_path, &extracted)?;
-                    extracted
-                };
-                for chunk in chunk_text(&text, &item.title, 500, 50) {
-                    let chunk_id = index.insert_chunk(&item.key, "pdf", &chunk)?;
-                    index.insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&chunk)))?;
-                    all_texts.push(chunk);
-                    chunk_ids.push(chunk_id);
-                }
-            }
-        }
-    }
-    if embedding_client.configured() && !all_texts.is_empty() {
-        let embeddings = embedding_client.embed(&all_texts).await?;
-        for (chunk_id, embedding) in chunk_ids.into_iter().zip(embeddings) {
-            index.set_embedding(chunk_id, &embedding)?;
-        }
+    let (stats, pending) = rag.reindex_workspace(&library, &workspace, &backend, true)?;
+    if embedding_client.configured() && !pending.is_empty() {
+        let texts = pending
+            .iter()
+            .map(|chunk| chunk.text.clone())
+            .collect::<Vec<_>>();
+        let embeddings = embedding_client.embed(&texts).await?;
+        rag.apply_pending_embeddings(pending, embeddings)?;
     }
     if ctx.json {
-        print_enveloped(serde_json::json!({ "indexed": true }), None)?;
+        print_enveloped(
+            serde_json::json!({ "indexed": true, "items": stats.items, "chunks": stats.chunks }),
+            None,
+        )?;
     } else {
         println!("Workspace indexed.");
     }
@@ -264,14 +235,21 @@ async fn query_workspace(
     store: &WorkspaceStore,
     args: WorkspaceQueryArgs,
 ) -> Result<()> {
-    let index = RagIndex::open(store.root().join(format!("{}.idx.sqlite", args.name)))?;
+    let workspace = store.load(&args.name)?;
+    let rag = WorkspaceRagStore::open(store, &args.name)?;
     let mode: HybridMode = args.mode.into();
     let embedding = if matches!(mode, HybridMode::Semantic | HybridMode::Hybrid) {
         maybe_embed_query(ctx.http(), &ctx.config.embedding, &args.question).await?
     } else {
         None
     };
-    let chunks = index.query(&args.question, mode, embedding.as_deref(), args.limit)?;
+    let chunks = rag.query_workspace(
+        &workspace,
+        &args.question,
+        mode,
+        embedding.as_deref(),
+        args.limit,
+    )?;
     if ctx.json {
         print_enveloped(&chunks, None)?;
     } else {
