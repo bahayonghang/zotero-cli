@@ -62,3 +62,17 @@
 - There is no repo CI workflow checked in under `.github/workflows/`; local `just ci` is the current source of truth.
 - Tests are inline crate tests, not a large integration suite; `cargo test --workspace` is still the expected gate.
 - Treat `target/`, `.omx/`, `.claude/`, workspace index files, and PDF cache files as generated state, not source.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `bahayonghang/zotero-cli`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The repo uses the canonical five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses the single-context domain-doc layout. See `docs/agents/domain.md`.
