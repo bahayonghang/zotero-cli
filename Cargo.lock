@@ -3082,7 +3082,7 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "zot-cli"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3106,7 +3106,7 @@ dependencies = [
 
 [[package]]
 name = "zot-core"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "chrono",
  "dirs",
@@ -3121,7 +3121,7 @@ dependencies = [
 
 [[package]]
 name = "zot-local"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "chrono",
  "dirs",
@@ -3143,7 +3143,7 @@ dependencies = [
 
 [[package]]
 name = "zot-remote"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "chrono",
  "md5",
