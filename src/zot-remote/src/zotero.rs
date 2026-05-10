@@ -352,7 +352,7 @@ impl ZoteroRemote {
 
     pub async fn upload_attachment(&self, parent_key: &str, file_path: &Path) -> ZotResult<String> {
         let attachment_key = self.create_attachment_item(parent_key, file_path).await?;
-        let auth = self
+        let (auth, bytes) = self
             .authorize_attachment_upload(&attachment_key, file_path)
             .await?;
         if auth.exists.unwrap_or(false) {
@@ -376,12 +376,6 @@ impl ZoteroRemote {
             .unwrap_or_else(|| "multipart/form-data".to_string());
         let prefix = auth.prefix.unwrap_or_default();
         let suffix = auth.suffix.unwrap_or_default();
-        let bytes = tokio::fs::read(file_path)
-            .await
-            .map_err(|source| ZotError::Io {
-                path: file_path.to_path_buf(),
-                source,
-            })?;
         let mut payload = prefix.into_bytes();
         payload.extend_from_slice(&bytes);
         payload.extend_from_slice(suffix.as_bytes());
@@ -678,7 +672,7 @@ impl ZoteroRemote {
         &self,
         attachment_key: &str,
         file_path: &Path,
-    ) -> ZotResult<FileUploadAuthorization> {
+    ) -> ZotResult<(FileUploadAuthorization, Vec<u8>)> {
         let bytes = tokio::fs::read(file_path)
             .await
             .map_err(|source| ZotError::Io {
@@ -717,7 +711,9 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("attachment-authorize"))?;
-        self.ensure_json(response, "attachment-authorize").await
+        let auth: FileUploadAuthorization =
+            self.ensure_json(response, "attachment-authorize").await?;
+        Ok((auth, bytes))
     }
 
     async fn get_item_data(&self, key: &str) -> ZotResult<EditableObject> {

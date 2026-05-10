@@ -5,6 +5,24 @@ use zot_core::{ZotError, ZotResult};
 
 use crate::http::HttpRuntime;
 
+const CONTACT_EMAIL_ENV: &str = "ZOT_CONTACT_EMAIL";
+const DEFAULT_CONTACT_EMAIL: &str = "noreply@zot.local";
+
+fn contact_email() -> String {
+    std::env::var(CONTACT_EMAIL_ENV)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| DEFAULT_CONTACT_EMAIL.to_string())
+}
+
+fn polite_user_agent() -> String {
+    format!(
+        "{} (mailto:{})",
+        concat!("zot-cli/", env!("CARGO_PKG_VERSION")),
+        contact_email()
+    )
+}
+
 static DOI_URL_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"doi\.org/(10\.\d{4,9}/[^\s?#]+)").expect("valid DOI regex"));
 static DOI_RE: Lazy<Regex> =
@@ -109,10 +127,7 @@ impl OaClient {
             .client
             .get(format!("{}/works/{}", self.crossref_base, doi))
             .header("Accept", "application/json")
-            .header(
-                "User-Agent",
-                "zot/0.1.0 (https://example.invalid/zot; mailto:zot@example.invalid)",
-            )
+            .header("User-Agent", polite_user_agent())
             .send()
             .await
             .map_err(remote_err("crossref-request"))?;
@@ -201,7 +216,7 @@ impl OaClient {
                 "{}/v2/{}?email={}",
                 self.unpaywall_base,
                 doi,
-                urlencoding::encode("zotero-mcp@users.noreply.github.com")
+                urlencoding::encode(&contact_email())
             ))
             .send()
             .await
@@ -256,7 +271,7 @@ impl OaClient {
                 "{}/tools/idconv/api/v1/articles/?ids={}&format=json&tool=zot&email={}",
                 self.pmc_base,
                 urlencoding::encode(doi),
-                urlencoding::encode("zotero-mcp@users.noreply.github.com")
+                urlencoding::encode(&contact_email())
             ))
             .send()
             .await
@@ -431,6 +446,7 @@ struct CrossRefMessage {
     issn: Option<Vec<String>>,
     #[serde(rename = "container-title")]
     container_title: Option<Vec<String>>,
+    #[serde(rename = "abstract")]
     abstract_field: Option<String>,
     relation: Option<std::collections::BTreeMap<String, Vec<CrossRefRelationPayload>>>,
     #[serde(rename = "alternative-id")]
@@ -591,8 +607,8 @@ fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
 #[cfg(test)]
 mod tests {
     use super::{
-        CrossRefRelation, CrossRefWork, normalize_arxiv_id, normalize_doi, parse_arxiv_atom,
-        try_arxiv_from_crossref,
+        CrossRefEnvelope, CrossRefRelation, CrossRefWork, normalize_arxiv_id, normalize_doi,
+        parse_arxiv_atom, try_arxiv_from_crossref,
     };
 
     #[test]
@@ -673,5 +689,22 @@ mod tests {
             try_arxiv_from_crossref(&crossref),
             Some("https://arxiv.org/pdf/2301.00774.pdf".to_string())
         );
+    }
+
+    #[test]
+    fn parses_crossref_abstract_with_jats_wrapper() {
+        let payload = r#"{
+            "message": {
+                "type": "journal-article",
+                "DOI": "10.1234/example",
+                "abstract": "<jats:p>foo</jats:p>"
+            }
+        }"#;
+        let envelope: CrossRefEnvelope = match serde_json::from_str(payload) {
+            Ok(value) => value,
+            Err(err) => panic!("deserialize crossref envelope failed: {err}"),
+        };
+        let work = envelope.message.into_work("10.1234/example");
+        assert_eq!(work.abstract_note.as_deref(), Some("foo"));
     }
 }

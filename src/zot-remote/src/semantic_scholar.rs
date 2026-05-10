@@ -9,6 +9,14 @@ const API_BASE: &str = "https://api.semanticscholar.org/graph/v1";
 static ARXIV_VERSION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"v\d+$").expect("valid regex"));
 static BIORXIV_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(10\.1101/\d{4}\.\d{2}\.\d{2}\.\d+)(?:v\d+)?").expect("valid regex"));
+static ARXIV_PATTERNS: Lazy<[Regex; 4]> = Lazy::new(|| {
+    [
+        Regex::new(r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5}(?:v\d+)?)").expect("valid arxiv regex"),
+        Regex::new(r"arxiv\.org/(?:abs|pdf)/([a-z\-]+/\d{7}(?:v\d+)?)").expect("valid arxiv regex"),
+        Regex::new(r"10\.48550/arXiv\.(\d{4}\.\d{4,5}(?:v\d+)?)").expect("valid arxiv regex"),
+        Regex::new(r"arXiv:(\d{4}\.\d{4,5}(?:v\d+)?)").expect("valid arxiv regex"),
+    ]
+});
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreprintInfo {
@@ -34,20 +42,13 @@ pub fn extract_preprint_info(
     doi: Option<&str>,
     extra: Option<&str>,
 ) -> Option<PreprintInfo> {
-    let arxiv_patterns = [
-        r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5}(?:v\d+)?)",
-        r"arxiv\.org/(?:abs|pdf)/([a-z\-]+/\d{7}(?:v\d+)?)",
-        r"10\.48550/arXiv\.(\d{4}\.\d{4,5}(?:v\d+)?)",
-        r"arXiv:(\d{4}\.\d{4,5}(?:v\d+)?)",
-    ];
     for source in [
         url.unwrap_or_default(),
         doi.unwrap_or_default(),
         extra.unwrap_or_default(),
     ] {
-        for pattern in arxiv_patterns {
-            if let Ok(re) = Regex::new(pattern)
-                && let Some(captures) = re.captures(source)
+        for re in ARXIV_PATTERNS.iter() {
+            if let Some(captures) = re.captures(source)
                 && let Some(matched) = captures.get(1)
             {
                 let id = matched.as_str().to_string();

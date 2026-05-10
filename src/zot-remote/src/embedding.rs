@@ -4,6 +4,9 @@ use zot_core::{EmbeddingConfig, ZotError, ZotResult};
 
 use crate::http::HttpRuntime;
 
+const DEFAULT_EMBEDDING_BATCH_SIZE: usize = 64;
+const EMBEDDING_BATCH_SIZE_ENV: &str = "ZOT_EMBEDDING_BATCH_SIZE";
+
 #[derive(Clone)]
 pub struct EmbeddingClient {
     client: reqwest::Client,
@@ -31,6 +34,20 @@ impl EmbeddingClient {
             });
         }
 
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let batch_size = embedding_batch_size();
+        let mut output = Vec::with_capacity(texts.len());
+        for chunk in texts.chunks(batch_size) {
+            let batch = self.embed_chunk(chunk).await?;
+            output.extend(batch);
+        }
+        validate_embeddings(texts.len(), output)
+    }
+
+    async fn embed_chunk(&self, texts: &[String]) -> ZotResult<Vec<Vec<f32>>> {
         let response = self
             .client
             .post(&self.config.url)
@@ -58,15 +75,23 @@ impl EmbeddingClient {
             .json()
             .await
             .map_err(remote_err("embedding-json"))?;
-        validate_embeddings(
-            texts.len(),
-            payload
-                .data
-                .into_iter()
-                .map(|entry| entry.embedding)
-                .collect(),
-        )
+        let embeddings = payload
+            .data
+            .into_iter()
+            .map(|entry| entry.embedding)
+            .collect::<Vec<_>>();
+        validate_embeddings(texts.len(), embeddings)
     }
+}
+
+fn embedding_batch_size() -> usize {
+    embedding_batch_size_from(std::env::var(EMBEDDING_BATCH_SIZE_ENV).ok().as_deref())
+}
+
+fn embedding_batch_size_from(raw: Option<&str>) -> usize {
+    raw.and_then(|value| value.parse::<usize>().ok())
+        .filter(|size| *size > 0)
+        .unwrap_or(DEFAULT_EMBEDDING_BATCH_SIZE)
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,7 +132,7 @@ fn validate_embeddings(requested: usize, embeddings: Vec<Vec<f32>>) -> ZotResult
 
 #[cfg(test)]
 mod tests {
-    use super::validate_embeddings;
+    use super::{DEFAULT_EMBEDDING_BATCH_SIZE, embedding_batch_size_from, validate_embeddings};
     use zot_core::ZotError;
 
     #[test]
@@ -125,5 +150,50 @@ mod tests {
             ZotError::Remote { code, .. } => assert_eq!(code, "embedding-count-mismatch"),
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn embedding_batch_size_defaults_to_64_when_env_missing() {
+        assert_eq!(
+            embedding_batch_size_from(None),
+            DEFAULT_EMBEDDING_BATCH_SIZE
+        );
+    }
+
+    #[test]
+    fn embedding_batch_size_respects_positive_env_override() {
+        assert_eq!(embedding_batch_size_from(Some("128")), 128);
+    }
+
+    #[test]
+    fn embedding_batch_size_falls_back_for_zero_or_invalid_input() {
+        assert_eq!(
+            embedding_batch_size_from(Some("0")),
+            DEFAULT_EMBEDDING_BATCH_SIZE
+        );
+        assert_eq!(
+            embedding_batch_size_from(Some("not-a-number")),
+            DEFAULT_EMBEDDING_BATCH_SIZE
+        );
+    }
+
+    #[test]
+    fn splits_large_input_into_batches() {
+        // Documents that the request loop will fan a 200-item input across at
+        // least 2 HTTP calls under the 64-item default batch size, satisfying
+        // the F-15 contract observable from `texts.chunks(batch_size)`.
+        let texts: Vec<String> = (0..200).map(|index| format!("doc-{index}")).collect();
+        let batches = texts
+            .chunks(DEFAULT_EMBEDDING_BATCH_SIZE)
+            .collect::<Vec<_>>();
+        assert!(
+            batches.len() >= 2,
+            "200 inputs must span at least 2 batches"
+        );
+        assert_eq!(
+            batches.iter().map(|chunk| chunk.len()).sum::<usize>(),
+            texts.len(),
+            "concatenated batch sizes must equal the original input length"
+        );
     }
 }

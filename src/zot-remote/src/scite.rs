@@ -5,6 +5,8 @@ use zot_core::{EditorialNotice, SciteItemReport, SciteTally, ZotError, ZotResult
 
 use crate::http::HttpRuntime;
 
+const SCITE_BATCH_SIZE: usize = 500;
+
 #[derive(Clone)]
 pub struct SciteClient {
     client: reqwest::Client,
@@ -93,25 +95,27 @@ impl SciteClient {
         if dois.is_empty() {
             return Ok(BTreeMap::new());
         }
-        let response = self
-            .client
-            .post(format!("{}/tallies", self.base_url))
-            .json(&dois.iter().take(500).collect::<Vec<_>>())
-            .send()
-            .await
-            .map_err(remote_err("scite-tallies"))?;
-        if !response.status().is_success() {
-            return Ok(BTreeMap::new());
+        let mut merged: BTreeMap<String, SciteTally> = BTreeMap::new();
+        for chunk in dois.chunks(SCITE_BATCH_SIZE) {
+            let response = self
+                .client
+                .post(format!("{}/tallies", self.base_url))
+                .json(&chunk.iter().collect::<Vec<_>>())
+                .send()
+                .await
+                .map_err(remote_err("scite-tallies"))?;
+            if !response.status().is_success() {
+                continue;
+            }
+            let payload: TalliesBatchPayload = response
+                .json()
+                .await
+                .map_err(remote_err("scite-tallies-json"))?;
+            for (doi, tally) in payload.tallies {
+                merged.insert(doi, tally.into());
+            }
         }
-        let payload: TalliesBatchPayload = response
-            .json()
-            .await
-            .map_err(remote_err("scite-tallies-json"))?;
-        Ok(payload
-            .tallies
-            .into_iter()
-            .map(|(doi, tally)| (doi, tally.into()))
-            .collect())
+        Ok(merged)
     }
 
     async fn get_paper(&self, doi: &str) -> ZotResult<Option<PaperPayload>> {
@@ -135,21 +139,25 @@ impl SciteClient {
         if dois.is_empty() {
             return Ok(BTreeMap::new());
         }
-        let response = self
-            .client
-            .post(format!("{}/papers", self.base_url))
-            .json(&serde_json::json!({ "dois": dois.iter().take(500).collect::<Vec<_>>() }))
-            .send()
-            .await
-            .map_err(remote_err("scite-papers"))?;
-        if !response.status().is_success() {
-            return Ok(BTreeMap::new());
+        let mut merged: BTreeMap<String, PaperPayload> = BTreeMap::new();
+        for chunk in dois.chunks(SCITE_BATCH_SIZE) {
+            let response = self
+                .client
+                .post(format!("{}/papers", self.base_url))
+                .json(&serde_json::json!({ "dois": chunk.iter().collect::<Vec<_>>() }))
+                .send()
+                .await
+                .map_err(remote_err("scite-papers"))?;
+            if !response.status().is_success() {
+                continue;
+            }
+            let payload: PapersBatchPayload = response
+                .json()
+                .await
+                .map_err(remote_err("scite-papers-json"))?;
+            merged.extend(payload.papers);
         }
-        let payload: PapersBatchPayload = response
-            .json()
-            .await
-            .map_err(remote_err("scite-papers-json"))?;
-        Ok(payload.papers)
+        Ok(merged)
     }
 
     fn merge_report(
@@ -256,7 +264,9 @@ fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
 
 #[cfg(test)]
 mod tests {
-    use super::{EditorialNoticePayload, PaperPayload, SciteClient, TallyPayload};
+    use super::{
+        EditorialNoticePayload, PaperPayload, SCITE_BATCH_SIZE, SciteClient, TallyPayload,
+    };
 
     #[test]
     fn converts_tally_payload_into_core_shape() {
@@ -308,6 +318,23 @@ mod tests {
         assert_eq!(
             report.notices[0].source.as_deref(),
             Some("10.0000/retraction")
+        );
+    }
+
+    #[test]
+    fn batch_request_chunks_over_500_dois() {
+        // F-8 contract: with 600 DOIs the request loop must fan out across
+        // multiple HTTP calls (no silent `take(500)` truncation), preserving
+        // every DOI by aggregating chunks back into the merged map.
+        let dois: Vec<String> = (0..600).map(|index| format!("10.1234/{index}")).collect();
+        let chunks: Vec<&[String]> = dois.chunks(SCITE_BATCH_SIZE).collect();
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].len(), SCITE_BATCH_SIZE);
+        assert_eq!(chunks[1].len(), 100);
+        assert_eq!(
+            chunks.iter().map(|chunk| chunk.len()).sum::<usize>(),
+            dois.len(),
+            "all 600 DOIs must be visible across batches"
         );
     }
 }
