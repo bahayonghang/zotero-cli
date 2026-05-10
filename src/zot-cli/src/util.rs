@@ -2,6 +2,20 @@ use anyhow::Result;
 use zot_core::{EmbeddingConfig, PdfOutlineEntry, ZotError, ZotResult};
 use zot_remote::{EmbeddingClient, HttpRuntime, PublicationStatus};
 
+pub(crate) async fn run_pdf<F, R>(f: F) -> ZotResult<R>
+where
+    F: FnOnce() -> ZotResult<R> + Send + 'static,
+    R: Send + 'static,
+{
+    tokio::task::spawn_blocking(f)
+        .await
+        .map_err(|join| ZotError::Pdf {
+            code: "pdf-task-join".to_string(),
+            message: join.to_string(),
+            hint: None,
+        })?
+}
+
 pub(crate) async fn maybe_embed_query(
     runtime: &HttpRuntime,
     config: &EmbeddingConfig,
@@ -104,9 +118,24 @@ fn invalid_page_range(range: &str) -> ZotError {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use zot_core::ZotError;
 
-    use super::parse_page_range;
+    use super::{parse_page_range, run_pdf};
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn run_pdf_offloads_blocking_work_to_a_separate_thread() {
+        // Sleeping inside `run_pdf` must not block the single-threaded runtime,
+        // confirming that PdfBackend calls now run on a blocking-threadpool worker.
+        let outcome = run_pdf(|| {
+            std::thread::sleep(Duration::from_millis(10));
+            Ok::<_, ZotError>(42_u32)
+        })
+        .await
+        .expect("run_pdf must return Ok value");
+        assert_eq!(outcome, 42);
+    }
 
     #[test]
     fn parses_page_ranges_for_single_pages_and_spans() {

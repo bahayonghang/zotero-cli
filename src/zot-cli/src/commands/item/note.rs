@@ -9,7 +9,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemNoteCommand) -> Result
         ItemNoteCommand::List(args) => {
             let notes = ctx.local_library()?.get_notes(&args.key)?;
             if ctx.json {
-                print_enveloped(&notes, None)?;
+                print_enveloped(ctx, &notes, None)?;
             } else {
                 for note in notes {
                     println!("{}: {}", note.key, note.content);
@@ -19,7 +19,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemNoteCommand) -> Result
         ItemNoteCommand::Search(args) => {
             let notes = ctx.local_library()?.search_notes(&args.query, args.limit)?;
             if ctx.json {
-                print_enveloped(&notes, None)?;
+                print_enveloped(ctx, &notes, None)?;
             } else {
                 for note in notes {
                     println!(
@@ -34,7 +34,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemNoteCommand) -> Result
         ItemNoteCommand::Add(args) => {
             let key = ctx.remote()?.add_note(&args.key, &args.content).await?;
             if ctx.json {
-                print_enveloped(serde_json::json!({ "note_key": key }), None)?;
+                print_enveloped(ctx, serde_json::json!({ "note_key": key }), None)?;
             } else {
                 println!("Note added: {key}");
             }
@@ -44,7 +44,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemNoteCommand) -> Result
                 .update_note(&args.note_key, &args.content)
                 .await?;
             if ctx.json {
-                print_enveloped(serde_json::json!({ "updated": args.note_key }), None)?;
+                print_enveloped(ctx, serde_json::json!({ "updated": args.note_key }), None)?;
             } else {
                 println!("Note updated: {}", args.note_key);
             }
@@ -52,7 +52,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemNoteCommand) -> Result
         ItemNoteCommand::Delete(args) => {
             ctx.remote()?.delete_note(&args.key).await?;
             if ctx.json {
-                print_enveloped(serde_json::json!({ "trashed": args.key }), None)?;
+                print_enveloped(ctx, serde_json::json!({ "trashed": args.key }), None)?;
             } else {
                 println!("Note moved to trash: {}", args.key);
             }

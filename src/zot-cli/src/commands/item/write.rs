@@ -14,6 +14,7 @@ use crate::cli::{
 };
 use crate::context::AppContext;
 use crate::format::print_enveloped;
+use crate::util::run_pdf;
 
 pub(crate) async fn handle_create(ctx: &AppContext, args: ItemCreateArgs) -> Result<()> {
     let key = if let Some(pdf) = args.pdf.as_deref() {
@@ -40,7 +41,7 @@ pub(crate) async fn handle_create(ctx: &AppContext, args: ItemCreateArgs) -> Res
         .into());
     };
     if ctx.json {
-        print_enveloped(serde_json::json!({ "key": key }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "key": key }), None)?;
     } else {
         println!("Created item: {key}");
     }
@@ -57,7 +58,7 @@ pub(crate) async fn handle_add_doi(ctx: &AppContext, args: AddByDoiArgs) -> Resu
     )
     .await?;
     if ctx.json {
-        print_enveloped(serde_json::json!({ "key": key }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "key": key }), None)?;
     } else {
         println!("Created item: {key}");
     }
@@ -74,7 +75,7 @@ pub(crate) async fn handle_add_url(ctx: &AppContext, args: AddByUrlArgs) -> Resu
     )
     .await?;
     if ctx.json {
-        print_enveloped(serde_json::json!({ "key": key }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "key": key }), None)?;
     } else {
         println!("Created item: {key}");
     }
@@ -93,7 +94,7 @@ pub(crate) async fn handle_add_file(ctx: &AppContext, args: AddFromFileArgs) -> 
     )
     .await?;
     if ctx.json {
-        print_enveloped(serde_json::json!({ "key": key }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "key": key }), None)?;
     } else {
         println!("Created item: {key}");
     }
@@ -124,7 +125,7 @@ pub(crate) async fn handle_merge(ctx: &AppContext, args: ItemMergeArgs) -> Resul
     let operation = merge_item_set(&ctx.remote()?, keeper_key, &source_keys, args.confirm).await?;
 
     if ctx.json {
-        print_enveloped(operation, None)?;
+        print_enveloped(ctx, operation, None)?;
     } else {
         println!("{}", serde_json::to_string_pretty(&operation)?);
     }
@@ -147,6 +148,7 @@ pub(crate) async fn handle_update(ctx: &AppContext, args: ItemUpdateArgs) -> Res
     ctx.remote()?.update_item_fields(&args.key, &fields).await?;
     if ctx.json {
         print_enveloped(
+            ctx,
             serde_json::json!({ "updated": args.key, "fields": fields }),
             None,
         )?;
@@ -159,7 +161,7 @@ pub(crate) async fn handle_update(ctx: &AppContext, args: ItemUpdateArgs) -> Res
 pub(crate) async fn handle_trash(ctx: &AppContext, args: ItemKeyArgs) -> Result<()> {
     ctx.remote()?.delete_item(&args.key).await?;
     if ctx.json {
-        print_enveloped(serde_json::json!({ "trashed": args.key }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "trashed": args.key }), None)?;
     } else {
         println!("Moved to trash: {}", args.key);
     }
@@ -169,7 +171,7 @@ pub(crate) async fn handle_trash(ctx: &AppContext, args: ItemKeyArgs) -> Result<
 pub(crate) async fn handle_restore(ctx: &AppContext, args: ItemKeyArgs) -> Result<()> {
     ctx.remote()?.restore_item(&args.key).await?;
     if ctx.json {
-        print_enveloped(serde_json::json!({ "restored": args.key }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "restored": args.key }), None)?;
     } else {
         println!("Restored: {}", args.key);
     }
@@ -182,7 +184,7 @@ pub(crate) async fn handle_attach(ctx: &AppContext, args: ItemAttachArgs) -> Res
         .upload_attachment(&args.key, &args.file)
         .await?;
     if ctx.json {
-        print_enveloped(serde_json::json!({ "attachment_key": key }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "attachment_key": key }), None)?;
     } else {
         println!("Attachment uploaded: {key}");
     }
@@ -282,7 +284,8 @@ async fn add_item_from_file(
         .map(|ext| ext.eq_ignore_ascii_case("pdf"))
         .unwrap_or(false)
     {
-        backend.extract_doi(file)?
+        let file_owned = file.to_path_buf();
+        run_pdf(move || backend.extract_doi(&file_owned)).await?
     } else {
         None
     };

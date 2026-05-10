@@ -9,7 +9,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
         CollectionCommand::List => {
             let collections = ctx.local_library()?.get_collections()?;
             if ctx.json {
-                print_enveloped(&collections, None)?;
+                print_enveloped(ctx, &collections, None)?;
             } else {
                 print_collections(&collections, 0);
             }
@@ -24,7 +24,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                     hint: Some("Use 'zot collection list' to inspect collection keys".to_string()),
                 })?;
             if ctx.json {
-                print_enveloped(&collection, None)?;
+                print_enveloped(ctx, &collection, None)?;
             } else {
                 print_collections(std::slice::from_ref(&collection), 0);
             }
@@ -32,7 +32,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
         CollectionCommand::Subcollections(args) => {
             let collections = ctx.local_library()?.get_subcollections(&args.key)?;
             if ctx.json {
-                print_enveloped(&collections, None)?;
+                print_enveloped(ctx, &collections, None)?;
             } else if collections.is_empty() {
                 println!("No subcollections found.");
             } else {
@@ -42,7 +42,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
         CollectionCommand::Items(args) => {
             let items = ctx.local_library()?.get_collection_items(&args.key)?;
             if ctx.json {
-                print_enveloped(&items, None)?;
+                print_enveloped(ctx, &items, None)?;
             } else {
                 print_items(&items);
             }
@@ -52,7 +52,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                 .local_library()?
                 .search_collections(&args.query, args.limit)?;
             if ctx.json {
-                print_enveloped(&collections, None)?;
+                print_enveloped(ctx, &collections, None)?;
             } else {
                 print_collections(&collections, 0);
             }
@@ -61,6 +61,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
             let count = ctx.local_library()?.get_collection_item_count(&args.key)?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     serde_json::json!({ "collection_key": args.key, "item_count": count }),
                     None,
                 )?;
@@ -71,7 +72,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
         CollectionCommand::Tags(args) => {
             let tags = ctx.local_library()?.get_collection_tags(&args.key)?;
             if ctx.json {
-                print_enveloped(&tags, None)?;
+                print_enveloped(ctx, &tags, None)?;
             } else if tags.is_empty() {
                 println!("No tags found.");
             } else {
@@ -86,7 +87,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                 .create_collection(&args.name, args.parent.as_deref())
                 .await?;
             if ctx.json {
-                print_enveloped(serde_json::json!({ "collection_key": key }), None)?;
+                print_enveloped(ctx, serde_json::json!({ "collection_key": key }), None)?;
             } else {
                 println!("Collection created: {key}");
             }
@@ -97,6 +98,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                 .await?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     serde_json::json!({ "renamed": args.key, "name": args.new_name }),
                     None,
                 )?;
@@ -107,7 +109,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
         CollectionCommand::Delete(args) => {
             ctx.remote()?.delete_collection(&args.key).await?;
             if ctx.json {
-                print_enveloped(serde_json::json!({ "deleted": args.key }), None)?;
+                print_enveloped(ctx, serde_json::json!({ "deleted": args.key }), None)?;
             } else {
                 println!("Collection deleted.");
             }
@@ -118,6 +120,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                 .await?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     serde_json::json!({
                         "item_key": args.item_key,
                         "collection_key": args.collection_key,
@@ -134,6 +137,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                 .await?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     serde_json::json!({
                         "item_key": args.item_key,
                         "collection_key": args.collection_key,

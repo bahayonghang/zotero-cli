@@ -56,7 +56,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: SyncCommand) -> Result<()>
                 .map(|(key, status)| update_status_to_json(key, status))
                 .collect::<Vec<_>>();
             if ctx.json {
-                print_enveloped(payload, None)?;
+                print_enveloped(ctx, payload, None)?;
             } else {
                 for entry in payload {
                     println!("{}", serde_json::to_string_pretty(&entry)?);

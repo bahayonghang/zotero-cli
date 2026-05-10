@@ -75,7 +75,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<()> {
         "schema_version": schema_version,
     });
     if ctx.json {
-        print_enveloped(payload, None)?;
+        print_enveloped(ctx, payload, None)?;
     } else {
         println!("{DOCTOR_BANNER}");
         println!("Config: {}", AppConfig::config_file().display());

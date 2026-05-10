@@ -137,7 +137,7 @@ pub(crate) enum WorkspaceCommand {
     Import(WorkspaceImportArgs),
     Search(WorkspaceSearchArgs),
     Export(WorkspaceExportArgs),
-    Index(WorkspaceNameArgs),
+    Index(WorkspaceIndexArgs),
     Query(WorkspaceQueryArgs),
 }
 
@@ -560,6 +560,15 @@ pub(crate) struct WorkspaceNameArgs {
 }
 
 #[derive(Args)]
+pub(crate) struct WorkspaceIndexArgs {
+    pub(crate) name: String,
+    #[arg(long)]
+    pub(crate) force_rebuild: bool,
+    #[arg(long)]
+    pub(crate) no_fulltext: bool,
+}
+
+#[derive(Args)]
 pub(crate) struct WorkspaceShowArgs {
     pub(crate) name: String,
     #[arg(long, default_value_t = 50)]
@@ -649,6 +658,11 @@ pub(crate) struct AnnotationCreateArgs {
     pub(crate) comment: Option<String>,
     #[arg(long, default_value = "#ffd400")]
     pub(crate) color: String,
+    /// 1-based index of the occurrence to highlight when the same text
+    /// appears multiple times on the target page. Defaults to the first
+    /// occurrence.
+    #[arg(long, default_value_t = 1)]
+    pub(crate) occurrence: usize,
 }
 
 #[derive(Args)]

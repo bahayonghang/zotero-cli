@@ -1,6 +1,6 @@
 use anyhow::Result;
 use chrono::Utc;
-use zot_core::{EnvelopeMeta, Item, SavedSearchCondition, SemanticHit, SemanticIndexStatus};
+use zot_core::{Item, SavedSearchCondition, SemanticHit, SemanticIndexStatus};
 use zot_local::{
     HybridMode, LocalLibrary, PdfiumBackend, ReindexOpts, SearchOptions, SemanticStore,
 };
@@ -12,8 +12,8 @@ use crate::cli::{
 };
 use crate::commands::item::merge::merge_item_set;
 use crate::context::AppContext;
-use crate::format::{print_enveloped, print_items, print_stats};
-use crate::util::{maybe_embed_query, parse_json_input};
+use crate::format::{EnvelopeMetaSeed, print_enveloped, print_items, print_stats};
+use crate::util::{maybe_embed_query, parse_json_input, run_pdf};
 
 pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<()> {
     let library = ctx.local_library()?;
@@ -33,11 +33,11 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             })?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     &result.items,
-                    Some(EnvelopeMeta {
+                    Some(EnvelopeMetaSeed {
                         count: Some(result.items.len()),
                         total: Some(result.total),
-                        profile: ctx.profile.clone(),
                     }),
                 )?;
             } else {
@@ -48,11 +48,11 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             let items = library.list_items(args.collection.as_deref(), args.limit, args.offset)?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     &items,
-                    Some(EnvelopeMeta {
+                    Some(EnvelopeMetaSeed {
                         count: Some(items.len()),
                         total: None,
-                        profile: ctx.profile.clone(),
                     }),
                 )?;
             } else {
@@ -68,7 +68,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 library.get_recent_items_by_count(10)?
             };
             if ctx.json {
-                print_enveloped(&items, None)?;
+                print_enveloped(ctx, &items, None)?;
             } else {
                 print_items(&items);
             }
@@ -76,7 +76,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
         LibraryCommand::Stats => {
             let stats = library.get_stats()?;
             if ctx.json {
-                print_enveloped(stats, None)?;
+                print_enveloped(ctx, stats, None)?;
             } else {
                 print_stats(&stats);
             }
@@ -113,7 +113,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 hint: None,
             })?;
             if ctx.json {
-                print_enveloped(&item, None)?;
+                print_enveloped(ctx, &item, None)?;
             } else {
                 print_items(std::slice::from_ref(&item.item));
             }
@@ -121,7 +121,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
         LibraryCommand::Tags => {
             let tags = library.get_tags()?;
             if ctx.json {
-                print_enveloped(&tags, None)?;
+                print_enveloped(ctx, &tags, None)?;
             } else {
                 for tag in tags {
                     println!("{} ({})", tag.name, tag.count);
@@ -131,7 +131,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
         LibraryCommand::Libraries => {
             let libraries = library.get_libraries()?;
             if ctx.json {
-                print_enveloped(&libraries, None)?;
+                print_enveloped(ctx, &libraries, None)?;
             } else {
                 for entry in libraries {
                     println!(
@@ -156,7 +156,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
         LibraryCommand::Feeds => {
             let feeds = library.get_feeds()?;
             if ctx.json {
-                print_enveloped(&feeds, None)?;
+                print_enveloped(ctx, &feeds, None)?;
             } else if feeds.is_empty() {
                 println!("No RSS feeds found.");
             } else {
@@ -169,7 +169,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
         LibraryCommand::FeedItems(args) => {
             let items = library.get_feed_items(args.library_id, args.limit)?;
             if ctx.json {
-                print_enveloped(&items, None)?;
+                print_enveloped(ctx, &items, None)?;
             } else {
                 print_items(&items);
             }
@@ -177,7 +177,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
         LibraryCommand::SemanticSearch(args) => {
             let hits = semantic_search(ctx, &library, args).await?;
             if ctx.json {
-                print_enveloped(&hits, None)?;
+                print_enveloped(ctx, &hits, None)?;
             } else {
                 for hit in hits {
                     println!("{} [{:.3}] {}", hit.item.key, hit.score, hit.item.title);
@@ -188,9 +188,9 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             }
         }
         LibraryCommand::SemanticIndex(args) => {
-            let payload = semantic_index(ctx, &library, args).await?;
+            let payload = semantic_index(ctx, args).await?;
             if ctx.json {
-                print_enveloped(payload, None)?;
+                print_enveloped(ctx, payload, None)?;
             } else {
                 println!("Library semantic index updated.");
             }
@@ -198,7 +198,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
         LibraryCommand::SemanticStatus => {
             let status = semantic_status(ctx).await?;
             if ctx.json {
-                print_enveloped(status, None)?;
+                print_enveloped(ctx, status, None)?;
             } else {
                 println!(
                     "{} chunks={} items={} embeddings={}",
@@ -216,7 +216,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 args.limit,
             )?;
             if ctx.json {
-                print_enveloped(&groups, None)?;
+                print_enveloped(ctx, &groups, None)?;
             } else {
                 for group in groups {
                     println!("{} ({:.2})", group.match_type, group.score);
@@ -229,7 +229,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             let payload =
                 merge_duplicates(ctx, &args.keeper, &args.duplicates, args.confirm).await?;
             if ctx.json {
-                print_enveloped(payload, None)?;
+                print_enveloped(ctx, payload, None)?;
             } else {
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             }
@@ -245,11 +245,11 @@ async fn handle_saved_search(ctx: &AppContext, command: LibrarySavedSearchComman
             let searches = ctx.remote()?.list_saved_searches().await?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     &searches,
-                    Some(EnvelopeMeta {
+                    Some(EnvelopeMetaSeed {
                         count: Some(searches.len()),
                         total: Some(searches.len()),
-                        profile: ctx.profile.clone(),
                     }),
                 )?;
             } else if searches.is_empty() {
@@ -263,7 +263,7 @@ async fn handle_saved_search(ctx: &AppContext, command: LibrarySavedSearchComman
         LibrarySavedSearchCommand::Create(args) => {
             let payload = create_saved_search(ctx, args).await?;
             if ctx.json {
-                print_enveloped(payload, None)?;
+                print_enveloped(ctx, payload, None)?;
             } else {
                 println!("Saved search created.");
             }
@@ -271,7 +271,7 @@ async fn handle_saved_search(ctx: &AppContext, command: LibrarySavedSearchComman
         LibrarySavedSearchCommand::Delete(args) => {
             let payload = delete_saved_searches(ctx, args).await?;
             if ctx.json {
-                print_enveloped(payload, None)?;
+                print_enveloped(ctx, payload, None)?;
             } else {
                 println!("Saved search deleted.");
             }
@@ -332,9 +332,9 @@ pub(crate) async fn semantic_status(ctx: &AppContext) -> Result<SemanticIndexSta
 
 async fn semantic_index(
     ctx: &AppContext,
-    library: &LocalLibrary,
     args: LibrarySemanticIndexArgs,
 ) -> Result<serde_json::Value> {
+    let library = ctx.local_library()?;
     let store = SemanticStore::open(
         ctx.library_index_path(),
         Some(
@@ -349,16 +349,22 @@ async fn semantic_index(
     let backend = PdfiumBackend;
     let embedding_client = EmbeddingClient::new(ctx.http(), ctx.config.embedding.clone());
     let limit = effective_semantic_index_limit(args.limit);
-    let items = load_semantic_index_items(library, args.collection.as_deref(), limit)?;
-    let (stats, pending) = store.reindex_chunks(
-        library,
-        &backend,
-        ReindexOpts {
-            items: &items,
-            fulltext: args.fulltext,
-            force_rebuild: args.force_rebuild,
-        },
-    )?;
+    let items = load_semantic_index_items(&library, args.collection.as_deref(), limit)?;
+    let fulltext = args.fulltext;
+    let force_rebuild = args.force_rebuild;
+    let (store, stats, pending) = run_pdf(move || {
+        let (stats, pending) = store.reindex_chunks(
+            &library,
+            &backend,
+            ReindexOpts {
+                items: &items,
+                fulltext,
+                force_rebuild,
+            },
+        )?;
+        Ok::<_, zot_core::ZotError>((store, stats, pending))
+    })
+    .await?;
 
     if embedding_client.configured() && !pending.is_empty() {
         let texts: Vec<String> = pending.iter().map(|p| p.text.clone()).collect();

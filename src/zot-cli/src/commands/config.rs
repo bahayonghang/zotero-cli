@@ -39,7 +39,7 @@ async fn handle_init(ctx: &AppContext, args: ConfigInitArgs) -> Result<()> {
     let path = canonicalize_or_original(&config.save()?);
     let payload = config_change_payload(&config, path, target_profile, "initialized");
     if ctx.json {
-        print_enveloped(payload, None)?;
+        print_enveloped(ctx, payload, None)?;
     } else {
         print_config_change(&payload);
     }
@@ -63,7 +63,7 @@ async fn handle_show(ctx: &AppContext) -> Result<()> {
     });
 
     if ctx.json {
-        print_enveloped(payload, None)?;
+        print_enveloped(ctx, payload, None)?;
     } else {
         println!("Config file: {}", path.display());
         println!(
@@ -111,7 +111,7 @@ async fn handle_set(ctx: &AppContext, args: ConfigSetArgs) -> Result<()> {
     let path = canonicalize_or_original(&config.save()?);
     let payload = config_change_payload(&config, path, target_profile, "updated");
     if ctx.json {
-        print_enveloped(payload, None)?;
+        print_enveloped(ctx, payload, None)?;
     } else {
         print_config_change(&payload);
     }
@@ -127,7 +127,7 @@ async fn handle_profiles(ctx: &AppContext, command: ConfigProfilesCommand) -> Re
                 "profiles": config.profile.keys().cloned().collect::<Vec<_>>(),
             });
             if ctx.json {
-                print_enveloped(payload, None)?;
+                print_enveloped(ctx, payload, None)?;
             } else if config.profile.is_empty() {
                 println!("No named profiles configured.");
             } else {
@@ -163,7 +163,7 @@ async fn handle_profiles_use(ctx: &AppContext, args: ConfigProfilesUseArgs) -> R
         "default_profile": args.name,
     });
     if ctx.json {
-        print_enveloped(payload, None)?;
+        print_enveloped(ctx, payload, None)?;
     } else {
         println!("Default profile set to {}", args.name);
         println!("Config file: {}", path.display());

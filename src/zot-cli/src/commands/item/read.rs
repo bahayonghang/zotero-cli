@@ -9,7 +9,7 @@ use crate::cli::{
 };
 use crate::context::AppContext;
 use crate::format::{print_enveloped, print_item, print_items};
-use crate::util::{open_target, parse_page_range, print_outline_entries};
+use crate::util::{open_target, parse_page_range, print_outline_entries, run_pdf};
 
 pub(crate) async fn handle_get(ctx: &AppContext, args: ItemKeyArgs) -> Result<()> {
     let library = ctx.local_library()?;
@@ -28,7 +28,7 @@ pub(crate) async fn handle_get(ctx: &AppContext, args: ItemKeyArgs) -> Result<()
             "notes": notes,
             "attachments": attachments,
         });
-        print_enveloped(payload, None)?;
+        print_enveloped(ctx, payload, None)?;
     } else {
         print_item(&item, &notes, &attachments);
     }
@@ -39,7 +39,7 @@ pub(crate) async fn handle_related(ctx: &AppContext, args: ItemRelatedArgs) -> R
     let library = ctx.local_library()?;
     let items = library.get_related_items(&args.key, args.limit)?;
     if ctx.json {
-        print_enveloped(&items, None)?;
+        print_enveloped(ctx, &items, None)?;
     } else {
         print_items(&items);
     }
@@ -80,7 +80,7 @@ pub(crate) async fn handle_open(ctx: &AppContext, args: ItemOpenArgs) -> Result<
     };
     open_target(&target)?;
     if ctx.json {
-        print_enveloped(serde_json::json!({ "opened": target }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "opened": target }), None)?;
     } else {
         println!("Opened {target}");
     }
@@ -101,9 +101,12 @@ pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<()
     let backend = PdfiumBackend;
     let cache = PdfCache::new(None)?;
     if args.annotations {
-        let annotations = backend.extract_annotations(&pdf_path)?;
+        let annotations = {
+            let pdf_path = pdf_path.clone();
+            run_pdf(move || backend.extract_annotations(&pdf_path)).await?
+        };
         if ctx.json {
-            print_enveloped(&annotations, None)?;
+            print_enveloped(ctx, &annotations, None)?;
         } else {
             for annotation in annotations {
                 println!(
@@ -119,15 +122,19 @@ pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<()
         if let Some(cached) = cache.get(&pdf_path)? {
             cached
         } else {
-            let extracted = backend.extract_text(&pdf_path, None)?;
+            let extracted = {
+                let pdf_path = pdf_path.clone();
+                run_pdf(move || backend.extract_text(&pdf_path, None)).await?
+            };
             cache.put(&pdf_path, &extracted)?;
             extracted
         }
     } else {
-        backend.extract_text(&pdf_path, page_range)?
+        let pdf_path = pdf_path.clone();
+        run_pdf(move || backend.extract_text(&pdf_path, page_range)).await?
     };
     if ctx.json {
-        print_enveloped(serde_json::json!({ "text": text }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "text": text }), None)?;
     } else {
         println!("{text}");
     }
@@ -137,7 +144,7 @@ pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<()
 pub(crate) async fn handle_children(ctx: &AppContext, args: ItemChildrenArgs) -> Result<()> {
     let children = ctx.local_library()?.get_items_children(&args.keys)?;
     if ctx.json {
-        print_enveloped(&children, None)?;
+        print_enveloped(ctx, &children, None)?;
     } else {
         for (key, values) in children {
             println!("{key}");
@@ -182,6 +189,7 @@ pub(crate) async fn handle_download(ctx: &AppContext, args: ItemDownloadArgs) ->
     })?;
     if ctx.json {
         print_enveloped(
+            ctx,
             serde_json::json!({
                 "attachment_key": args.key,
                 "path": zot_core::canonicalize_or_original(&destination),
@@ -197,7 +205,7 @@ pub(crate) async fn handle_download(ctx: &AppContext, args: ItemDownloadArgs) ->
 pub(crate) async fn handle_deleted(ctx: &AppContext, args: ItemDeletedArgs) -> Result<()> {
     let items = ctx.local_library()?.get_trash_items(args.limit)?;
     if ctx.json {
-        print_enveloped(&items, None)?;
+        print_enveloped(ctx, &items, None)?;
     } else {
         print_items(&items);
     }
@@ -207,7 +215,7 @@ pub(crate) async fn handle_deleted(ctx: &AppContext, args: ItemDeletedArgs) -> R
 pub(crate) async fn handle_versions(ctx: &AppContext, args: ItemVersionsArgs) -> Result<()> {
     let versions = ctx.remote()?.list_item_versions(args.since).await?;
     if ctx.json {
-        print_enveloped(&versions, None)?;
+        print_enveloped(ctx, &versions, None)?;
     } else if versions.is_empty() {
         println!("No item versions found.");
     } else {
@@ -229,9 +237,10 @@ pub(crate) async fn handle_outline(ctx: &AppContext, key: &str) -> Result<()> {
                 hint: None,
             })?;
     let backend = PdfiumBackend;
-    let entries = backend.extract_outline(&library.pdf_path(&attachment))?;
+    let pdf_path = library.pdf_path(&attachment);
+    let entries = run_pdf(move || backend.extract_outline(&pdf_path)).await?;
     if ctx.json {
-        print_enveloped(&entries, None)?;
+        print_enveloped(ctx, &entries, None)?;
     } else if entries.is_empty() {
         println!("This PDF does not contain a table of contents/outline.");
     } else {
@@ -251,6 +260,7 @@ pub(crate) async fn handle_export(ctx: &AppContext, args: ItemExportArgs) -> Res
         })?;
     if ctx.json {
         print_enveloped(
+            ctx,
             serde_json::json!({ "format": args.format, "content": export }),
             None,
         )?;
@@ -271,7 +281,7 @@ pub(crate) async fn handle_cite(ctx: &AppContext, args: ItemCiteArgs) -> Result<
         })?;
     let citation = zot_local::format_citation(&item, args.style.into());
     if ctx.json {
-        print_enveloped(serde_json::json!({ "citation": citation }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "citation": citation }), None)?;
     } else {
         println!("{citation}");
     }

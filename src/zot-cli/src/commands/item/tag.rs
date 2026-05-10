@@ -16,7 +16,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<
                 }
             })?;
             if ctx.json {
-                print_enveloped(&item.tags, None)?;
+                print_enveloped(ctx, &item.tags, None)?;
             } else {
                 for tag in item.tags {
                     println!("{tag}");
@@ -27,6 +27,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<
             ctx.remote()?.add_tags(&args.key, &args.tags).await?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     serde_json::json!({ "key": args.key, "added": args.tags }),
                     None,
                 )?;
@@ -38,6 +39,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<
             ctx.remote()?.remove_tags(&args.key, &args.tags).await?;
             if ctx.json {
                 print_enveloped(
+                    ctx,
                     serde_json::json!({ "key": args.key, "removed": args.tags }),
                     None,
                 )?;
@@ -48,7 +50,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<
         ItemTagCommand::Batch(args) => {
             let payload = batch_update_tags(ctx, args).await?;
             if ctx.json {
-                print_enveloped(payload, None)?;
+                print_enveloped(ctx, payload, None)?;
             } else {
                 println!("{}", serde_json::to_string_pretty(&payload)?);
             }

@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use zot_local::{HybridMode, PdfiumBackend, SearchOptions, WorkspaceRagStore, WorkspaceStore};
+use zot_local::{
+    HybridMode, PdfiumBackend, SearchOptions, WorkspaceRagStore, WorkspaceReindexOpts,
+    WorkspaceStore,
+};
 use zot_remote::EmbeddingClient;
 
 use crate::cli::{
@@ -12,7 +15,7 @@ use crate::context::AppContext;
 use crate::format::{
     print_enveloped, print_items, print_json, print_query_chunks, print_workspace,
 };
-use crate::util::maybe_embed_query;
+use crate::util::{maybe_embed_query, run_pdf};
 
 pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Result<()> {
     let store = WorkspaceStore::new(None);
@@ -20,7 +23,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
         WorkspaceCommand::New(args) => {
             let workspace = store.create(&args.name, &args.description)?;
             if ctx.json {
-                print_enveloped(workspace, None)?;
+                print_enveloped(ctx, workspace, None)?;
             } else {
                 print_workspace(&workspace);
             }
@@ -28,7 +31,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
         WorkspaceCommand::Delete(args) => {
             store.delete(&args.name)?;
             if ctx.json {
-                print_enveloped(serde_json::json!({ "deleted": args.name }), None)?;
+                print_enveloped(ctx, serde_json::json!({ "deleted": args.name }), None)?;
             } else {
                 println!("Workspace deleted.");
             }
@@ -36,7 +39,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
         WorkspaceCommand::List => {
             let workspaces = store.list()?;
             if ctx.json {
-                print_enveloped(&workspaces, None)?;
+                print_enveloped(ctx, &workspaces, None)?;
             } else {
                 for workspace in workspaces {
                     print_workspace(&workspace);
@@ -47,7 +50,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
         WorkspaceCommand::Show(args) => {
             let workspace = store.load(&args.name)?;
             if ctx.json {
-                print_enveloped(&workspace, None)?;
+                print_enveloped(ctx, &workspace, None)?;
             } else {
                 print_workspace(&workspace);
             }
@@ -64,7 +67,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
             let added = store.add_items(&mut workspace, &items);
             store.save(&workspace)?;
             if ctx.json {
-                print_enveloped(serde_json::json!({ "added": added }), None)?;
+                print_enveloped(ctx, serde_json::json!({ "added": added }), None)?;
             } else {
                 println!("Added {added} item(s).");
             }
@@ -74,7 +77,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
             let removed = store.remove_keys(&mut workspace, &args.keys);
             store.save(&workspace)?;
             if ctx.json {
-                print_enveloped(serde_json::json!({ "removed": removed }), None)?;
+                print_enveloped(ctx, serde_json::json!({ "removed": removed }), None)?;
             } else {
                 println!("Removed {removed} item(s).");
             }
@@ -82,7 +85,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
         WorkspaceCommand::Import(args) => import_items(ctx, &store, args).await?,
         WorkspaceCommand::Search(args) => search_workspace(ctx, &store, args).await?,
         WorkspaceCommand::Export(args) => export_workspace(ctx, &store, args).await?,
-        WorkspaceCommand::Index(args) => index_workspace(ctx, &store, &args.name).await?,
+        WorkspaceCommand::Index(args) => index_workspace(ctx, &store, args).await?,
         WorkspaceCommand::Query(args) => query_workspace(ctx, &store, args).await?,
     }
     Ok(())
@@ -122,7 +125,7 @@ async fn import_items(
     let added = store.add_items(&mut workspace, &items);
     store.save(&workspace)?;
     if ctx.json {
-        print_enveloped(serde_json::json!({ "added": added }), None)?;
+        print_enveloped(ctx, serde_json::json!({ "added": added }), None)?;
     } else {
         println!("Imported {added} item(s).");
     }
@@ -151,7 +154,7 @@ async fn search_workspace(
         .filter(|item| allowed.contains(&item.key))
         .collect::<Vec<_>>();
     if ctx.json {
-        print_enveloped(&filtered, None)?;
+        print_enveloped(ctx, &filtered, None)?;
     } else {
         print_items(&filtered);
     }
@@ -174,7 +177,7 @@ async fn export_workspace(
     match args.format.as_str() {
         "json" => {
             if ctx.json {
-                print_enveloped(&items, None)?;
+                print_enveloped(ctx, &items, None)?;
             } else {
                 print_json(&items)?;
             }
@@ -204,13 +207,25 @@ async fn export_workspace(
     Ok(())
 }
 
-async fn index_workspace(ctx: &AppContext, store: &WorkspaceStore, name: &str) -> Result<()> {
-    let workspace = store.load(name)?;
+async fn index_workspace(
+    ctx: &AppContext,
+    store: &WorkspaceStore,
+    args: crate::cli::WorkspaceIndexArgs,
+) -> Result<()> {
+    let workspace = store.load(&args.name)?;
     let library = ctx.local_library()?;
-    let rag = WorkspaceRagStore::open(store, name)?;
+    let rag = WorkspaceRagStore::open(store, &args.name)?;
     let backend = PdfiumBackend;
     let embedding_client = EmbeddingClient::new(ctx.http(), ctx.config.embedding.clone());
-    let (stats, pending) = rag.reindex_workspace(&library, &workspace, &backend, true)?;
+    let opts = WorkspaceReindexOpts {
+        fulltext: !args.no_fulltext,
+        force_rebuild: args.force_rebuild,
+    };
+    let (rag, stats, pending) = run_pdf(move || {
+        let (stats, pending) = rag.reindex_workspace(&library, &workspace, &backend, opts)?;
+        Ok::<_, zot_core::ZotError>((rag, stats, pending))
+    })
+    .await?;
     if embedding_client.configured() && !pending.is_empty() {
         let texts = pending
             .iter()
@@ -221,6 +236,7 @@ async fn index_workspace(ctx: &AppContext, store: &WorkspaceStore, name: &str) -
     }
     if ctx.json {
         print_enveloped(
+            ctx,
             serde_json::json!({ "indexed": true, "items": stats.items, "chunks": stats.chunks }),
             None,
         )?;
@@ -251,7 +267,7 @@ async fn query_workspace(
         args.limit,
     )?;
     if ctx.json {
-        print_enveloped(&chunks, None)?;
+        print_enveloped(ctx, &chunks, None)?;
     } else {
         print_query_chunks(&chunks);
     }

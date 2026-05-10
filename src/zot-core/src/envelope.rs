@@ -8,6 +8,8 @@ pub struct EnvelopeMeta {
     pub total: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_version: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
