@@ -198,6 +198,94 @@
         "Calls out the gap as missing functionality rather than user error.",
         "Keeps the response aligned with the current Rust CLI surface."
       ]
+    },
+    {
+      "id": 19,
+      "prompt": "把 ATTN001 这条用浏览器打开它的 DOI 看一眼，不要给我贴 PDF 文本。",
+      "expected_output": "走 item open ATTN001 --url 路径，区别于 item pdf / library search；条目无 DOI/URL 时直说，不要伪造。",
+      "files": [],
+      "expectations": [
+        "Routes to item open with --url for a DOI/URL launch, not item pdf or library search.",
+        "Does not collapse the request into PDF text extraction or full-text retrieval.",
+        "Honors the no-DOI/no-URL fallback by stopping cleanly instead of fabricating one."
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "我想看哪些 collection 名字里含 'reading'，不要按条目内容搜。",
+      "expected_output": "走 collection search 'reading'，明确这是 collection 名内检索，区别于 library search 或 collection list。",
+      "files": [],
+      "expectations": [
+        "Routes to collection search keyed on the collection name field.",
+        "Does not collapse the request into library search over item metadata.",
+        "Distinguishes collection name search from full collection enumeration."
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "我那个 llm-safety workspace 现在里面有哪些条目？看完之后帮我导出成 BibTeX。",
+      "expected_output": "先 workspace show llm-safety，再 workspace export llm-safety --format bibtex；区别于 workspace search 或 library 级 export。",
+      "files": [],
+      "expectations": [
+        "Sequences workspace show -> workspace export with the bibtex format.",
+        "Does not reroute through workspace search or library-level export.",
+        "Mentions that items without bibtex data are skipped during export."
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "在我所有 Zotero notes 里搜 'reward shaping'，不要按条目元数据搜。",
+      "expected_output": "走 item note search 'reward shaping'，区别于 library search；强调这是 note 内容级搜索。",
+      "files": [],
+      "expectations": [
+        "Routes to item note search instead of library search over metadata.",
+        "Keeps the search scoped to note bodies, not item titles or abstracts.",
+        "Returns notes with parent context when present."
+      ]
+    },
+    {
+      "id": 23,
+      "prompt": "我库里整体扫一眼有没有撤稿，不要只看某一篇，也不要去外面重新搜。",
+      "expected_output": "走 item scite retractions --limit N，区别于 item scite search 或 item scite report；保留库内条目作为输入边界。",
+      "files": [],
+      "expectations": [
+        "Routes to item scite retractions with library-scoped input.",
+        "Does not collapse the task into per-item Scite report or external search.",
+        "Treats Scite as an external service and degrades cleanly when unreachable."
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "回收站现在 20 条以内的有什么？我想确认一下我之前没误删。",
+      "expected_output": "走 item deleted --limit 20，不要走 library search 或 library list；区别于 sync update-status / item versions。",
+      "files": [],
+      "expectations": [
+        "Routes to item deleted with the requested limit.",
+        "Does not confuse trash enumeration with sync update-status or item versions.",
+        "Keeps the result scoped to trashed items rather than active library state."
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "把所有 tag 是 reading-list 的条目都加上 priority 标签；这是批量写，先告诉我会动几条，再问我要不要真的执行。",
+      "expected_output": "走 item tag batch --tag reading-list --add-tag priority；先在 dry-run 思路下说明影响范围，按层 C 批量写流程要二次确认。",
+      "files": [],
+      "expectations": [
+        "Routes to item tag batch with --tag and --add-tag rather than per-item item tag add.",
+        "Treats this as a layer-C bulk write and surfaces affected count before executing.",
+        "Pauses for explicit confirmation instead of silently writing across the matched set."
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "我只想看库里整体的条目数和按类型分布，不要按关键词搜，也不要列具体条目。",
+      "expected_output": "走 library stats，不要走 library search 或 library list；保留为整库统计而不是逐条枚举。",
+      "files": [],
+      "expectations": [
+        "Routes to library stats for aggregate counts and type distribution.",
+        "Does not reroute the task to library search or library list.",
+        "Keeps the response at the aggregate level rather than enumerating items."
+      ]
     }
   ]
 }

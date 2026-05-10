@@ -9,14 +9,11 @@ rust-version.workspace = true
 description = "Shared config, models, errors, and JSON envelope support for zot."
 
 [dependencies]
-chrono.workspace = true
 dirs.workspace = true
 regex.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
 toml.workspace = true
-uuid.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55.0"

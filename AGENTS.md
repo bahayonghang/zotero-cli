@@ -76,3 +76,9 @@ The repo uses the canonical five-label triage vocabulary. See `docs/agents/triag
 ### Domain docs
 
 This repo uses the single-context domain-doc layout. See `docs/agents/domain.md`.
+
+### Performance and behaviour limits
+
+Operational ceilings (semantic search O(N), embedding batch size, LIKE escape
+semantics, Scite chunking, PDF outline depth, polite-pool email, envelope
+`api_version`). See `docs/agents/limits.md`.
