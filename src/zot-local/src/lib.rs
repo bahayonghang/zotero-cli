@@ -15,4 +15,6 @@ pub use workspace::{
     HybridMode, RagIndex, WorkspaceStore, build_metadata_chunk, chunk_text,
     compute_term_frequencies, tokenize,
 };
-pub use workspace_rag::{WorkspaceRagLibrary, WorkspaceRagStore, WorkspaceReindexStats};
+pub use workspace_rag::{
+    WorkspaceRagLibrary, WorkspaceRagStore, WorkspaceReindexOpts, WorkspaceReindexStats,
+};

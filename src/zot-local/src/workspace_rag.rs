@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use zot_core::{Item, QueryChunk, Workspace, ZotError, ZotResult};
@@ -23,6 +24,18 @@ pub struct WorkspaceReindexStats {
     pub items: usize,
     pub chunks: usize,
     pub fulltext: bool,
+}
+
+/// Options controlling [`WorkspaceRagStore::reindex_workspace`].
+///
+/// `force_rebuild = false` (the default) only re-embeds workspace items that
+/// are not already indexed; existing chunks are kept verbatim and items that
+/// have been removed from the workspace are pruned. `force_rebuild = true`
+/// clears the entire index first and reprocesses every workspace item.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WorkspaceReindexOpts {
+    pub fulltext: bool,
+    pub force_rebuild: bool,
 }
 
 pub trait WorkspaceRagLibrary {
@@ -76,8 +89,12 @@ impl WorkspaceRagStore {
         library: &L,
         workspace: &Workspace,
         backend: &B,
-        fulltext: bool,
+        opts: WorkspaceReindexOpts,
     ) -> ZotResult<(WorkspaceReindexStats, Vec<PendingEmbedding>)> {
+        let WorkspaceReindexOpts {
+            fulltext,
+            force_rebuild,
+        } = opts;
         let mut stats = WorkspaceReindexStats {
             items: workspace.items.len(),
             chunks: 0,
@@ -89,10 +106,32 @@ impl WorkspaceRagStore {
         } else {
             None
         };
+        let workspace_keys: HashSet<&str> = workspace
+            .items
+            .iter()
+            .map(|entry| entry.key.as_str())
+            .collect();
         self.index.with_write_tx(|| {
-            self.index.clear()?;
-            for entry in &workspace.items {
-                if let Some(item) = library.get_item(&entry.key)? {
+            let to_process: Vec<&str> = if force_rebuild {
+                self.index.clear()?;
+                workspace.items.iter().map(|e| e.key.as_str()).collect()
+            } else {
+                let indexed: Vec<String> = self.index.indexed_keys()?;
+                for indexed_key in &indexed {
+                    if !workspace_keys.contains(indexed_key.as_str()) {
+                        self.index.remove_item_chunks(indexed_key)?;
+                    }
+                }
+                let indexed_set: HashSet<&str> = indexed.iter().map(String::as_str).collect();
+                workspace
+                    .items
+                    .iter()
+                    .map(|e| e.key.as_str())
+                    .filter(|key| !indexed_set.contains(key))
+                    .collect()
+            };
+            for key in to_process {
+                if let Some(item) = library.get_item(key)? {
                     let metadata_chunk = build_metadata_chunk(&item);
                     let chunk_id =
                         self.index
@@ -318,6 +357,7 @@ mod tests {
             _pdf_path: &Path,
             _page: usize,
             _text: &str,
+            _occurrence: usize,
         ) -> ZotResult<Option<crate::pdf::PdfMatchPosition>> {
             Ok(None)
         }
@@ -390,7 +430,12 @@ mod tests {
             pdf_path: PathBuf::new(),
         };
         let (_stats, pending) = rag
-            .reindex_workspace(&lib, &workspace, &FakeBackend::new(""), false)
+            .reindex_workspace(
+                &lib,
+                &workspace,
+                &FakeBackend::new(""),
+                WorkspaceReindexOpts::default(),
+            )
             .unwrap();
         assert_eq!(pending.len(), 1);
         let hits = rag
@@ -416,8 +461,13 @@ mod tests {
             attachment: None,
             pdf_path: PathBuf::new(),
         };
-        rag.reindex_workspace(&lib, &indexed_workspace, &FakeBackend::new(""), false)
-            .unwrap();
+        rag.reindex_workspace(
+            &lib,
+            &indexed_workspace,
+            &FakeBackend::new(""),
+            WorkspaceReindexOpts::default(),
+        )
+        .unwrap();
 
         let current_workspace = Workspace {
             name: "demo".into(),
@@ -466,8 +516,13 @@ mod tests {
             pdf_path: PathBuf::new(),
         };
 
-        rag.reindex_workspace(&lib, &indexed_workspace, &FakeBackend::new(""), false)
-            .unwrap();
+        rag.reindex_workspace(
+            &lib,
+            &indexed_workspace,
+            &FakeBackend::new(""),
+            WorkspaceReindexOpts::default(),
+        )
+        .unwrap();
 
         let hits = rag
             .query_workspace(&current_workspace, "needle", HybridMode::Bm25, None, 1)
@@ -490,7 +545,12 @@ mod tests {
         };
 
         let (stats, pending) = rag
-            .reindex_workspace(&lib, &workspace, &FakeBackend::new(""), false)
+            .reindex_workspace(
+                &lib,
+                &workspace,
+                &FakeBackend::new(""),
+                WorkspaceReindexOpts::default(),
+            )
             .unwrap();
 
         assert_eq!(stats.items, 1);
@@ -528,10 +588,26 @@ mod tests {
         };
         let backend = FakeBackend::new("cached pdf attention content");
 
-        rag.reindex_workspace(&lib, &workspace, &backend, true)
-            .unwrap();
-        rag.reindex_workspace(&lib, &workspace, &backend, true)
-            .unwrap();
+        rag.reindex_workspace(
+            &lib,
+            &workspace,
+            &backend,
+            WorkspaceReindexOpts {
+                fulltext: true,
+                force_rebuild: true,
+            },
+        )
+        .unwrap();
+        rag.reindex_workspace(
+            &lib,
+            &workspace,
+            &backend,
+            WorkspaceReindexOpts {
+                fulltext: true,
+                force_rebuild: true,
+            },
+        )
+        .unwrap();
 
         assert_eq!(backend.extracted.get(), 1);
         let hits = rag.query("cached", HybridMode::Bm25, None, 10).unwrap();
@@ -574,6 +650,78 @@ mod tests {
             )
             .unwrap_err();
         assert!(matches!(err, ZotError::InvalidInput { .. }));
+    }
+
+    #[test]
+    fn incremental_reindex_does_not_reembed_unchanged_items() {
+        let dir = tempdir().unwrap();
+        let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
+        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let item = sample_item("INC001", "Incremental Paper", "abstract content");
+        let workspace = workspace_with(&item);
+        let lib = FakeLibrary {
+            items: vec![item],
+            attachment: None,
+            pdf_path: PathBuf::new(),
+        };
+        let (_, first_pending) = rag
+            .reindex_workspace(
+                &lib,
+                &workspace,
+                &FakeBackend::new(""),
+                WorkspaceReindexOpts::default(),
+            )
+            .unwrap();
+        assert_eq!(first_pending.len(), 1);
+        let (_, second_pending) = rag
+            .reindex_workspace(
+                &lib,
+                &workspace,
+                &FakeBackend::new(""),
+                WorkspaceReindexOpts::default(),
+            )
+            .unwrap();
+        assert!(
+            second_pending.is_empty(),
+            "unchanged workspace must not produce pending embeddings on a second reindex"
+        );
+    }
+
+    #[test]
+    fn force_rebuild_clears_and_re_embeds() {
+        let dir = tempdir().unwrap();
+        let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
+        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let item = sample_item("REB001", "Rebuild Paper", "abstract content");
+        let workspace = workspace_with(&item);
+        let lib = FakeLibrary {
+            items: vec![item],
+            attachment: None,
+            pdf_path: PathBuf::new(),
+        };
+        rag.reindex_workspace(
+            &lib,
+            &workspace,
+            &FakeBackend::new(""),
+            WorkspaceReindexOpts::default(),
+        )
+        .unwrap();
+        let (_, rebuild_pending) = rag
+            .reindex_workspace(
+                &lib,
+                &workspace,
+                &FakeBackend::new(""),
+                WorkspaceReindexOpts {
+                    fulltext: false,
+                    force_rebuild: true,
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            rebuild_pending.len(),
+            1,
+            "force_rebuild must clear and re-embed every workspace item"
+        );
     }
 
     #[test]

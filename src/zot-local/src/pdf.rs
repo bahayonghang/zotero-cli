@@ -17,6 +17,10 @@ pub struct PdfMatchPosition {
     pub matched_text: String,
     pub rects: Vec<[f32; 4]>,
     pub sort_index: String,
+    /// Total number of times the queried text appears on the requested page,
+    /// or `None` when the backend could not enumerate matches. Useful for
+    /// reporting "there are still N more occurrences" hints.
+    pub total_matches: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -68,6 +72,7 @@ pub trait PdfBackend {
         pdf_path: &Path,
         page: usize,
         text: &str,
+        occurrence: usize,
     ) -> ZotResult<Option<PdfMatchPosition>>;
     fn build_area_position(
         &self,
@@ -94,6 +99,7 @@ pub trait PdfBackend {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
 pub struct PdfiumBackend;
 
 impl PdfiumBackend {
@@ -257,11 +263,18 @@ impl PdfBackend for PdfiumBackend {
             })?;
         let mut entries = Vec::new();
         for bookmark in document.bookmarks().iter() {
-            let level = bookmark
-                .title()
-                .as_deref()
-                .map(|title| title.matches('.').count() + 1)
-                .unwrap_or(1);
+            // Walk the parent chain to determine the actual outline depth
+            // instead of relying on dot-count heuristics in the title.
+            // pdfium-render 0.9 omits the synthetic root from `iter()`, so
+            // top-level bookmarks have one parent (the root) and resolve to
+            // level = 1.
+            let mut depth = 0_usize;
+            let mut current = bookmark.parent();
+            while let Some(parent) = current {
+                depth += 1;
+                current = parent.parent();
+            }
+            let level = depth.max(1);
             let title = bookmark.title().unwrap_or_default();
             let page = bookmark
                 .destination()
@@ -277,7 +290,9 @@ impl PdfBackend for PdfiumBackend {
         pdf_path: &Path,
         page: usize,
         text: &str,
+        occurrence: usize,
     ) -> ZotResult<Option<PdfMatchPosition>> {
+        let occurrence = occurrence.max(1);
         let pdfium = self.pdfium(PdfiumLoadMode::AllowDownload)?;
         let document = pdfium
             .load_pdf_from_file(pdf_path, None)
@@ -314,39 +329,49 @@ impl PdfBackend for PdfiumBackend {
                 message: err.to_string(),
                 hint: None,
             })?;
-        if let Some(result) = search.find_next() {
-            let rects = result
-                .iter()
-                .map(|segment| {
-                    let bounds = segment.bounds();
-                    [
-                        bounds.left().value,
-                        bounds.bottom().value,
-                        bounds.right().value,
-                        bounds.top().value,
-                    ]
-                })
-                .collect::<Vec<_>>();
-            let first = rects.first().copied().unwrap_or([0.0, 0.0, 0.0, 0.0]);
-            let sort_index = format!(
-                "{:05}|{:06}|{:05}",
-                page.saturating_sub(1),
-                first[1].round() as i64,
-                first[0].round() as i64
-            );
-            return Ok(Some(PdfMatchPosition {
-                page_index: page.saturating_sub(1),
-                page_label,
-                matched_text: result
+        let mut selected: Option<(Vec<[f32; 4]>, String)> = None;
+        let mut total = 0_usize;
+        while let Some(result) = search.find_next() {
+            total += 1;
+            if total == occurrence {
+                let rects = result
+                    .iter()
+                    .map(|segment| {
+                        let bounds = segment.bounds();
+                        [
+                            bounds.left().value,
+                            bounds.bottom().value,
+                            bounds.right().value,
+                            bounds.top().value,
+                        ]
+                    })
+                    .collect::<Vec<_>>();
+                let matched_text = result
                     .iter()
                     .map(|segment| segment.text())
                     .collect::<Vec<_>>()
-                    .join(" "),
-                rects,
-                sort_index,
-            }));
+                    .join(" ");
+                selected = Some((rects, matched_text));
+            }
         }
-        Ok(None)
+        let Some((rects, matched_text)) = selected else {
+            return Ok(None);
+        };
+        let first = rects.first().copied().unwrap_or([0.0, 0.0, 0.0, 0.0]);
+        let sort_index = format!(
+            "{:05}|{:06}|{:05}",
+            page.saturating_sub(1),
+            first[1].round() as i64,
+            first[0].round() as i64
+        );
+        Ok(Some(PdfMatchPosition {
+            page_index: page.saturating_sub(1),
+            page_label,
+            matched_text,
+            rects,
+            sort_index,
+            total_matches: Some(total),
+        }))
     }
 
     fn build_area_position(

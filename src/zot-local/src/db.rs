@@ -18,6 +18,22 @@ use crate::citation::export_item;
 
 const EXCLUDED_TYPE_NAMES: &[&str] = &["attachment", "note", "annotation"];
 
+/// Escape SQLite `LIKE` wildcards in user-provided text so that `%` and `_`
+/// are matched literally. Pair with `LIKE ? ESCAPE '\\'` in SQL.
+fn escape_like(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' | '%' | '_' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortField {
     DateAdded,
@@ -172,7 +188,7 @@ impl LocalLibrary {
                 item_ids.insert(row.map_err(sql_err("search-all"))?);
             }
         } else {
-            let like = format!("%{}%", options.query);
+            let like = format!("%{}%", escape_like(&options.query));
             self.collect_matching_item_ids_from_field_search(&like, &mut item_ids)?;
             self.collect_matching_item_ids_from_creator_search(&like, &mut item_ids)?;
             self.collect_matching_item_ids_from_tag_search(&like, &mut item_ids)?;
@@ -282,7 +298,7 @@ impl LocalLibrary {
     }
 
     pub fn search_notes(&self, query: &str, limit: usize) -> ZotResult<Vec<NoteSearchResult>> {
-        let pattern = format!("%{query}%");
+        let pattern = format!("%{}%", escape_like(query));
         let title_field_id = self.field_id("title")?.unwrap_or(4);
         let sql = format!(
             "SELECT i.key, n.note, n.title, pi.key, pdv.value
@@ -291,7 +307,7 @@ impl LocalLibrary {
              LEFT JOIN items pi ON n.parentItemID = pi.itemID
              LEFT JOIN itemData pd ON pi.itemID = pd.itemID AND pd.fieldID = {title_field_id}
              LEFT JOIN itemDataValues pdv ON pd.valueID = pdv.valueID
-             WHERE n.note LIKE ?1
+             WHERE n.note LIKE ?1 ESCAPE '\\'
              AND i.libraryID = ?2
              AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
              LIMIT ?3"
@@ -514,7 +530,7 @@ impl LocalLibrary {
         if !self.table_exists("itemAnnotations")? {
             return Ok(Vec::new());
         }
-        let pattern = format!("%{query}%");
+        let pattern = format!("%{}%", escape_like(query));
         let title_field_id = self.field_id("title")?.unwrap_or(4);
         let sql = format!(
             "SELECT i.key, ia.text, ia.comment, ia.color, ia.pageLabel, ia.type,
@@ -526,7 +542,7 @@ impl LocalLibrary {
              LEFT JOIN items gpi ON iatt.parentItemID = gpi.itemID
              LEFT JOIN itemData gpd ON gpi.itemID = gpd.itemID AND gpd.fieldID = {title_field_id}
              LEFT JOIN itemDataValues gpdv ON gpd.valueID = gpdv.valueID
-             WHERE (ia.text LIKE ?1 OR ia.comment LIKE ?1)
+             WHERE (ia.text LIKE ?1 ESCAPE '\\' OR ia.comment LIKE ?1 ESCAPE '\\')
              AND i.libraryID = ?2
              AND i.itemID NOT IN (SELECT itemID FROM deletedItems)
              LIMIT ?3"
@@ -1380,7 +1396,11 @@ impl LocalLibrary {
                         let _ = fs::copy(source_path, target_path);
                     }
                 }
-                let conn = Connection::open(&temp_db).map_err(sql_err("open-fallback-db"))?;
+                let conn = Connection::open_with_flags(
+                    &temp_db,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+                )
+                .map_err(sql_err("open-fallback-db"))?;
                 Ok((conn, Some(temp_dir)))
             }
         }
@@ -1466,7 +1486,7 @@ impl LocalLibrary {
              JOIN itemData id ON i.itemID = id.itemID
              JOIN itemDataValues iv ON id.valueID = iv.valueID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
-             WHERE iv.value LIKE ?1 AND i.libraryID = ?2
+             WHERE iv.value LIKE ?1 ESCAPE '\\' AND i.libraryID = ?2
              AND it.typeName NOT IN ('attachment','note','annotation')",
             )
             .map_err(sql_err("search-fields"))?;
@@ -1491,7 +1511,7 @@ impl LocalLibrary {
              JOIN creators c ON ic.creatorID = c.creatorID
              JOIN items i ON ic.itemID = i.itemID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
-             WHERE (c.firstName LIKE ?1 OR c.lastName LIKE ?1) AND i.libraryID = ?2
+             WHERE (c.firstName LIKE ?1 ESCAPE '\\' OR c.lastName LIKE ?1 ESCAPE '\\') AND i.libraryID = ?2
              AND it.typeName NOT IN ('attachment','note','annotation')",
             )
             .map_err(sql_err("search-creators"))?;
@@ -1516,7 +1536,7 @@ impl LocalLibrary {
              JOIN tags t ON it.tagID = t.tagID
              JOIN items i ON it.itemID = i.itemID
              JOIN itemTypes ity ON i.itemTypeID = ity.itemTypeID
-             WHERE t.name LIKE ?1 AND i.libraryID = ?2
+             WHERE t.name LIKE ?1 ESCAPE '\\' AND i.libraryID = ?2
              AND ity.typeName NOT IN ('attachment','note','annotation')",
             )
             .map_err(sql_err("search-tags"))?;
@@ -1542,7 +1562,7 @@ impl LocalLibrary {
              JOIN itemAttachments ia ON fw.itemID = ia.itemID
              JOIN items i ON ia.parentItemID = i.itemID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
-             WHERE w.word LIKE ?1 AND ia.parentItemID IS NOT NULL AND i.libraryID = ?2
+             WHERE w.word LIKE ?1 ESCAPE '\\' AND ia.parentItemID IS NOT NULL AND i.libraryID = ?2
              AND it.typeName NOT IN ('attachment','note','annotation')",
             )
             .map_err(sql_err("search-fulltext"))?;
@@ -1817,8 +1837,8 @@ impl LocalLibrary {
     ) -> ZotResult<HashSet<i64>> {
         self.filter_item_ids_by_exact_name(
             item_ids,
-            "SELECT DISTINCT ic.itemID FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE LOWER(TRIM(COALESCE(c.firstName, '') || ' ' || c.lastName)) LIKE ? AND ic.itemID IN",
-            format!("%{}%", creator.to_lowercase()),
+            "SELECT DISTINCT ic.itemID FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE LOWER(TRIM(COALESCE(c.firstName, '') || ' ' || c.lastName)) LIKE ? ESCAPE '\\' AND ic.itemID IN",
+            format!("%{}%", escape_like(&creator.to_lowercase())),
             "creator-filter-batch",
         )
     }
@@ -2240,8 +2260,41 @@ mod tests {
     use tempfile::TempDir;
     use zot_core::LibraryScope;
 
-    use super::{DuplicateMatchMethod, LocalLibrary, SearchOptions};
+    use super::{DuplicateMatchMethod, LocalLibrary, SearchOptions, escape_like};
     use zot_core::ChildItem;
+
+    #[test]
+    fn escape_like_quotes_percent_underscore_and_backslash() {
+        // F-11: every LIKE wildcard plus the escape char itself must be
+        // backslash-prefixed so users searching for `50%`, `foo_bar`, or paths
+        // containing `\` get literal matches when the SQL pairs LIKE ? ESCAPE '\\'.
+        assert_eq!(escape_like("plain"), "plain");
+        assert_eq!(escape_like("50%"), "50\\%");
+        assert_eq!(escape_like("foo_bar"), "foo\\_bar");
+        assert_eq!(escape_like("path\\to"), "path\\\\to");
+        assert_eq!(escape_like("a%b_c\\d"), "a\\%b\\_c\\\\d");
+    }
+
+    #[test]
+    fn search_with_percent_in_query_does_not_match_arbitrary_chars() {
+        // F-11 regression: the escaped LIKE pattern must not let `%` act as a
+        // wildcard. ATTN001's title is "Attention Is All You Need", so a
+        // search for `tion%You` would historically match across "tion ... You"
+        // through the unescaped wildcard. With ESCAPE '\' the literal phrase
+        // is required and cannot land on ATTN001.
+        let fixture = rich_fixture_library();
+        let result = match fixture.lib.search(SearchOptions {
+            query: "tion%You".to_string(),
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("search failed: {err}"),
+        };
+        assert!(
+            result.items.iter().all(|item| item.key != "ATTN001"),
+            "literal `%` must not behave as a wildcard between substrings"
+        );
+    }
 
     struct TestFixture {
         lib: LocalLibrary,
