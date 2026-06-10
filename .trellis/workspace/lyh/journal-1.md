@@ -74,3 +74,38 @@ Filled project-specific Trellis specs for zot-core, zot-local, zot-remote, and z
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Implement zot-brainstorm skill
+
+**Date**: 2026-06-10
+**Task**: Implement zot-brainstorm skill
+**Package**: zot-core
+**Branch**: `main`
+
+### Summary
+
+Created the Zotero reference-grounded brainstorming skill with Markdown/HTML report templates, regression prompts, evals, and documentation entry points.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f1a34a1` | (see git log) |
+| `a5c8007` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
