@@ -39,3 +39,38 @@ Filled project-specific Trellis specs for zot-core, zot-local, zot-remote, and z
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Rename zot skill package
+
+**Date**: 2026-06-10
+**Task**: Rename zot skill package
+**Package**: zot-core
+**Branch**: `main`
+
+### Summary
+
+将 bundled skill 从 zot-skills 更名为 zot，同步 README/docs/AGENTS/eval 引用，并记录 zot-brainstorm 待办。验证通过 just ci 与 VitePress build。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3d15e02` | (see git log) |
+| `eaef1d7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
