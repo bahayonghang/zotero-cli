@@ -11,6 +11,8 @@ docs/.vitepress/dist/
 skills-lock.json
 
 .agents/
+.codex/
+
 
 # File-based planning artifacts
 task_plan.md
