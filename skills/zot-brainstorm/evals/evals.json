@@ -1,0 +1,140 @@
+{
+  "skill_name": "zot-brainstorm",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "基于 Zotero 里 LLM/FoundationModels 和 Time-Series 这两个 collection，帮我做一次真实文献驱动的 brainstorming，找出下一步创新点，并默认保存 Markdown 和 HTML 报告。",
+      "expected_output": "触发 zot-brainstorm；先 doctor，再解析两个 collection，去重后做证据分级、缺陷分析、创新方向排序，并保存 report.md 和 report.html。",
+      "files": [],
+      "expectations": [
+        "Treats Zotero collections as source inputs for synthesis rather than ordinary browsing.",
+        "Runs or requires doctor before source-scale evidence extraction.",
+        "Deduplicates items by key and preserves source membership.",
+        "Defaults to both Markdown and HTML saved reports with exact local paths."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "用 llm-safety workspace 里的论文做一个研究方向 brainstorm，如果需要问答检索就用 workspace query。",
+      "expected_output": "把 workspace 作为一等输入，先 workspace show；需要 query 时检查 doctor/索引/embedding，必要时用 bm25 fallback。",
+      "files": [],
+      "expectations": [
+        "Treats the workspace as a first-class source set.",
+        "Starts from workspace show instead of library-wide search.",
+        "Checks indexing and embedding prerequisites before workspace query.",
+        "Uses or recommends bm25 fallback when embeddings are unavailable."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "基于 ATTN001、KG326EEI、RLHF2024 这几个 item key，分析共同缺陷并提出两个实验创意。",
+      "expected_output": "把显式 item keys 作为一等输入，逐个 item get；缺失 key 要明确停止或询问，不可悄悄忽略。",
+      "files": [],
+      "expectations": [
+        "Treats explicit item keys as source inputs.",
+        "Resolves each requested item with item get.",
+        "Reports unresolved keys clearly before synthesis.",
+        "Links defect analysis and experiment ideas back to item keys."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "把 collection P5WKAC5Y、workspace llm-safety 和 item key ATTN001 混在一起做一个创新机会报告。",
+      "expected_output": "支持混合输入，按 item key 去重，并保留 collection/workspace/item-key 来源归属用于 traceability。",
+      "files": [],
+      "expectations": [
+        "Accepts mixed collection, workspace, and item-key source sets.",
+        "Deduplicates across all source types by Zotero item key.",
+        "Preserves source membership in coverage and traceability tables."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "只用这个 collection 的 metadata 和 abstract 先做研究缺口分析，不能把结论说得像读过全文。",
+      "expected_output": "允许 metadata+abstract 证据层级，但必须标注证据限制、弱化强结论，并在报告中列出 fulltext 缺口。",
+      "files": [],
+      "expectations": [
+        "Uses metadata and abstracts without overstating evidence strength.",
+        "Labels detailed claims as uncertain when fulltext is unavailable.",
+        "Includes unresolved evidence gaps in the report."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "这个 collection 有 300 篇，别一篇篇展开，先给我一个 broad review brainstorm。",
+      "expected_output": "先做覆盖统计和分层/主题化策略，避免逐篇散讲；必要时建议按 collection、workspace、年份或主题缩小。",
+      "files": [],
+      "expectations": [
+        "Handles large corpora with coverage and thematic grouping first.",
+        "Avoids item-by-item narration as the primary output.",
+        "Mentions scoping strategies for broad or O(N) workflows."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Generate an English brainstorm report from workspace llm-safety and item keys ATTN001 KG326EEI.",
+      "expected_output": "English prompt produces English report prose and visible section labels while preserving Zotero identifiers.",
+      "files": [],
+      "expectations": [
+        "Follows the user's prompt language for generated report content.",
+        "Keeps Zotero item keys, DOIs, titles, and source terminology intact.",
+        "Does not force Chinese output for an English request."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "基于这个 collection 的真实文献找创新点，报告用中文；不要去网上重新搜论文。",
+      "expected_output": "中文输出，Zotero-only，不做 generic web search；所有主要想法都要链接到 Zotero item key 或标注 speculative。",
+      "files": [],
+      "expectations": [
+        "Produces Chinese report content for a Chinese request.",
+        "Keeps the corpus limited to Zotero unless external search is separately requested.",
+        "Requires traceability for major findings, gaps, and ideas."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "分析完后直接把创新点写回每篇 Zotero note，并同步到 Obsidian。",
+      "expected_output": "默认拒绝/暂停 Zotero note 和 Obsidian 写入，说明本 skill 只生成本地报告；写入需要单独明确授权和 zot 安全门。",
+      "files": [],
+      "expectations": [
+        "Keeps Zotero read-only by default.",
+        "Does not write notes, collections, saved searches, vault files, or external publications without separate explicit permission.",
+        "Explains the local report output boundary clearly."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "帮我总结 ATTN001 这篇论文。",
+      "expected_output": "不应触发 zot-brainstorm；这是普通单篇 item 摘要，应交给 zot 或普通阅读流程，除非用户要求 gap/innovation/brainstorm。",
+      "files": [],
+      "expectations": [
+        "Does not over-trigger for ordinary single-paper summary requests.",
+        "Keeps zot-brainstorm scoped to synthesis, gaps, brainstorming, and innovation directions.",
+        "Does not invent a brainstorm report when the user asked only for a paper summary."
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "请创建 HTML 形式的参考文献 brainstorm 报告模板，要求离线打开也好看。",
+      "expected_output": "使用 self-contained HTML 模板，无 CDN/远程资源/fetch/analytics，包含可访问导航、表格 caption、证据标签和打印样式。",
+      "files": [],
+      "expectations": [
+        "Uses the bundled report.html template as a self-contained offline artifact.",
+        "Avoids external network dependencies and dynamic fetches.",
+        "Includes accessible structure and print-friendly styling."
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "像 zotagent 一样跑 zot brainstorm --collection P5WKAC5Y。",
+      "expected_output": "明确当前没有 zot brainstorm 命令；应使用现有 zot collection/item/workspace 读取面加 agent-side synthesis，不编造 CLI。",
+      "files": [],
+      "expectations": [
+        "Does not fabricate unsupported zot commands.",
+        "Uses existing collection, workspace, and item read surfaces.",
+        "Explains that brainstorming is the agent-side synthesis workflow."
+      ]
+    }
+  ]
+}

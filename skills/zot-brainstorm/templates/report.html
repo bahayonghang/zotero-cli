@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="{{html_lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{report_title}}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1f2933;
+      --muted: #5b6573;
+      --line: #d8dee8;
+      --soft: #f5f7fa;
+      --paper: #ffffff;
+      --accent: #0f766e;
+      --accent-strong: #115e59;
+      --warn: #9a3412;
+      --risk: #991b1b;
+      --ok: #166534;
+      --focus: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--soft);
+      color: var(--ink);
+      font-family: Arial, "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+    }
+
+    a {
+      color: var(--accent-strong);
+    }
+
+    a:focus,
+    button:focus {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: -4rem;
+      z-index: 10;
+      padding: 0.55rem 0.8rem;
+      background: var(--paper);
+      border: 2px solid var(--focus);
+      border-radius: 0.25rem;
+    }
+
+    .skip-link:focus {
+      top: 1rem;
+    }
+
+    header {
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.7fr);
+      gap: 2rem;
+      max-width: 72rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 2rem;
+    }
+
+    h1 {
+      margin: 0 0 0.8rem;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 2.25rem 0 0.8rem;
+      font-size: 1.55rem;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 1.25rem 0 0.45rem;
+      font-size: 1.08rem;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 0;
+      max-width: 48rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .evidence-rail {
+      border-left: 4px solid var(--accent);
+      padding-left: 1rem;
+    }
+
+    .rail-label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+
+    .rail-value {
+      margin: 0.25rem 0 1rem;
+      font-weight: 700;
+    }
+
+    nav {
+      border-top: 1px solid var(--line);
+    }
+
+    nav ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      max-width: 72rem;
+      margin: 0 auto;
+      padding: 0.9rem 1.5rem;
+      list-style: none;
+    }
+
+    nav a {
+      display: inline-block;
+      padding: 0.35rem 0.55rem;
+      border: 1px solid var(--line);
+      border-radius: 0.25rem;
+      background: var(--paper);
+      text-decoration: none;
+      font-size: 0.92rem;
+    }
+
+    main {
+      max-width: 72rem;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    section {
+      padding: 1.4rem 0 0;
+    }
+
+    .panel {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 0.5rem;
+      padding: 1rem;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.8rem;
+    }
+
+    .stat {
+      min-height: 6rem;
+      border: 1px solid var(--line);
+      border-radius: 0.5rem;
+      padding: 0.8rem;
+      background: var(--paper);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.6rem;
+      line-height: 1.2;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+
+    .bars {
+      display: grid;
+      gap: 0.7rem;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(8rem, 12rem) 1fr auto;
+      gap: 0.7rem;
+      align-items: center;
+    }
+
+    .bar-track {
+      height: 0.75rem;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      display: block;
+      height: 100%;
+      width: var(--w);
+      background: var(--accent);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+
+    caption {
+      padding: 0.75rem 0;
+      color: var(--muted);
+      text-align: left;
+      font-weight: 700;
+    }
+
+    th,
+    td {
+      padding: 0.65rem 0.7rem;
+      border-top: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    thead th {
+      border-top: 0;
+      background: #eef3f7;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.55rem;
+      padding: 0.1rem 0.45rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-ok {
+      color: var(--ok);
+      border-color: #bbd7c2;
+      background: #eef9f0;
+    }
+
+    .badge-warn {
+      color: var(--warn);
+      border-color: #fed7aa;
+      background: #fff7ed;
+    }
+
+    .badge-risk {
+      color: var(--risk);
+      border-color: #fecaca;
+      background: #fef2f2;
+    }
+
+    .idea-list {
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    .idea {
+      display: grid;
+      gap: 0.45rem;
+      border: 1px solid var(--line);
+      border-radius: 0.5rem;
+      padding: 0.9rem;
+      background: var(--paper);
+    }
+
+    .idea header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      border: 0;
+      background: transparent;
+    }
+
+    .idea h3 {
+      margin: 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    @media (max-width: 820px) {
+      .hero,
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .bar-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      main,
+      .hero,
+      nav ul {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        color: #000;
+      }
+
+      nav,
+      .skip-link {
+        display: none;
+      }
+
+      main,
+      .hero {
+        max-width: none;
+        padding: 0;
+      }
+
+      .panel,
+      .stat,
+      .idea,
+      table {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to report content</a>
+  <header>
+    <div class="hero">
+      <div>
+        <h1>{{report_title}}</h1>
+        <p class="subtitle">{{bottom_line_finding}}</p>
+      </div>
+      <aside class="evidence-rail" aria-label="Evidence summary">
+        <p class="rail-label">{{label_generated}}</p>
+        <p class="rail-value">{{generated_at}}</p>
+        <p class="rail-label">{{label_sources}}</p>
+        <p class="rail-value">{{source_summary}}</p>
+        <p class="rail-label">{{label_confidence}}</p>
+        <p class="rail-value">{{report_confidence}}</p>
+      </aside>
+    </div>
+    <nav aria-label="Report sections">
+      <ul>
+        <li><a href="#coverage">{{nav_coverage}}</a></li>
+        <li><a href="#sources">{{nav_sources}}</a></li>
+        <li><a href="#themes">{{nav_themes}}</a></li>
+        <li><a href="#defects">{{nav_defects}}</a></li>
+        <li><a href="#ideas">{{nav_ideas}}</a></li>
+        <li><a href="#traceability">{{nav_traceability}}</a></li>
+        <li><a href="#gaps">{{nav_gaps}}</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section id="coverage" aria-labelledby="coverage-title">
+      <h2 id="coverage-title">{{section_coverage}}</h2>
+      <div class="stats" aria-label="Quick statistics">
+        <div class="stat"><strong>{{unique_item_count}}</strong><span>{{label_unique_items}}</span></div>
+        <div class="stat"><strong>{{year_span}}</strong><span>{{label_year_span}}</span></div>
+        <div class="stat"><strong>{{evidence_mix}}</strong><span>{{label_evidence_mix}}</span></div>
+        <div class="stat"><strong>{{duplicate_title_count}}</strong><span>{{label_duplicate_titles}}</span></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h3>{{heading_evidence_distribution}}</h3>
+          <div class="bars" role="list" aria-label="Evidence-level distribution">
+            <div class="bar-row" role="listitem"><span>{{label_fulltext}}</span><span class="bar-track"><span class="bar-fill" style="--w: {{fulltext_percent}}"></span></span><strong>{{fulltext_count}}</strong></div>
+            <div class="bar-row" role="listitem"><span>{{label_metadata_abstract}}</span><span class="bar-track"><span class="bar-fill" style="--w: {{metadata_abstract_percent}}"></span></span><strong>{{metadata_abstract_count}}</strong></div>
+            <div class="bar-row" role="listitem"><span>{{label_annotations_notes}}</span><span class="bar-track"><span class="bar-fill" style="--w: {{annotations_notes_percent}}"></span></span><strong>{{annotations_notes_count}}</strong></div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>{{heading_source_distribution}}</h3>
+          <table>
+            <caption>{{caption_source_distribution}}</caption>
+            <thead><tr><th scope="col">{{th_source_type}}</th><th scope="col">{{th_count}}</th><th scope="col">{{th_notes}}</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">{{label_collections}}</th><td>{{collection_source_count}}</td><td>{{collection_source_notes}}</td></tr>
+              <tr><th scope="row">{{label_workspaces}}</th><td>{{workspace_source_count}}</td><td>{{workspace_source_notes}}</td></tr>
+              <tr><th scope="row">{{label_item_keys}}</th><td>{{item_key_source_count}}</td><td>{{item_key_source_notes}}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="sources" aria-labelledby="sources-title">
+      <h2 id="sources-title">{{section_sources}}</h2>
+      <table>
+        <caption>{{caption_source_table}}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{{th_item_key}}</th>
+            <th scope="col">{{th_citation}}</th>
+            <th scope="col">{{th_year}}</th>
+            <th scope="col">{{th_source_membership}}</th>
+            <th scope="col">{{th_evidence_level}}</th>
+            <th scope="col">{{th_used_for}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">{{item_key}}</th>
+            <td>{{short_citation}}</td>
+            <td>{{year}}</td>
+            <td>{{source_membership}}</td>
+            <td><span class="badge {{evidence_badge_class}}">{{evidence_level_text}}</span></td>
+            <td>{{used_for}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="themes" aria-labelledby="themes-title">
+      <h2 id="themes-title">{{section_themes}}</h2>
+      <table>
+        <caption>{{caption_theme_map}}</caption>
+        <thead><tr><th scope="col">{{th_theme}}</th><th scope="col">{{th_items}}</th><th scope="col">{{th_explains}}</th><th scope="col">{{th_open_questions}}</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">{{theme_name}}</th><td>{{theme_items}}</td><td>{{theme_summary}}</td><td>{{theme_questions}}</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="defects" aria-labelledby="defects-title">
+      <h2 id="defects-title">{{section_defects}}</h2>
+      <table>
+        <caption>{{caption_defect_matrix}}</caption>
+        <thead><tr><th scope="col">{{th_limitation}}</th><th scope="col">{{th_evidence}}</th><th scope="col">{{th_consequence}}</th><th scope="col">{{th_opportunity}}</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">{{limitation}}</th><td>{{affected_sources}}</td><td>{{consequence}}</td><td>{{opportunity}}</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="ideas" aria-labelledby="ideas-title">
+      <h2 id="ideas-title">{{section_ideas}}</h2>
+      <div class="idea-list">
+        <article class="idea">
+          <header>
+            <h3>{{rank}}. {{idea_title}}</h3>
+            <span class="badge {{confidence_badge_class}}">{{confidence_text}}</span>
+          </header>
+          <p>{{idea_summary}}</p>
+          <p class="muted">{{idea_scores}}</p>
+          <p><strong>{{label_first_experiment}}:</strong> {{first_experiment}}</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="traceability" aria-labelledby="traceability-title">
+      <h2 id="traceability-title">{{section_traceability}}</h2>
+      <table>
+        <caption>{{caption_traceability}}</caption>
+        <thead><tr><th scope="col">{{th_claim}}</th><th scope="col">{{th_evidence_items}}</th><th scope="col">{{th_inference}}</th><th scope="col">{{th_confidence}}</th><th scope="col">{{th_caveat}}</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">{{claim_or_idea}}</th><td>{{evidence_items}}</td><td>{{inference}}</td><td>{{confidence}}</td><td>{{caveat}}</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="gaps" aria-labelledby="gaps-title">
+      <h2 id="gaps-title">{{section_gaps}}</h2>
+      <div class="panel">
+        <ul>
+          <li>{{unresolved_gap}}</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

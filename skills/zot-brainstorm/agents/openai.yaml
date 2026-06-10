@@ -1,0 +1,4 @@
+interface:
+  display_name: "Zot Brainstorm"
+  short_description: "Reference-grounded Zotero brainstorming"
+  default_prompt: "Use $zot-brainstorm to turn selected Zotero references into a grounded brainstorm report."

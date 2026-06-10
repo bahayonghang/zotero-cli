@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "prompt": "基于 Zotero 里 LLM/FoundationModels 和 Time-Series 这两个 collection，帮我做一次真实文献驱动的 brainstorming，找出下一步创新点，并默认保存 Markdown 和 HTML 报告。",
+    "expected": "触发 zot-brainstorm；先 doctor，再解析两个 collection，去重后做证据分级、缺陷分析、创新方向排序，并保存 report.md 和 report.html。"
+  },
+  {
+    "id": 2,
+    "prompt": "我有两个名字都像 Transformers 的 collection，帮我基于真正的那个做创新点分析。",
+    "expected": "先 collection search/list 解析歧义；如果多个候选仍合理，先让用户选择，而不是猜测或直接 synthesis。"
+  },
+  {
+    "id": 3,
+    "prompt": "只用这个 collection 的 metadata 和 abstract 先做研究缺口分析，不能把结论说得像读过全文。",
+    "expected": "允许 metadata+abstract 证据层级，但必须标注证据限制、弱化强结论，并在报告中列出 fulltext 缺口。"
+  },
+  {
+    "id": 4,
+    "prompt": "用 llm-safety workspace 里的论文做一个研究方向 brainstorm，如果需要问答检索就用 workspace query。",
+    "expected": "把 workspace 作为一等输入，先 workspace show；需要 query 时检查 doctor/索引/embedding，必要时用 bm25 fallback。"
+  },
+  {
+    "id": 5,
+    "prompt": "基于 ATTN001、KG326EEI、RLHF2024 这几个 item key，分析共同缺陷并提出两个实验创意。",
+    "expected": "把显式 item keys 作为一等输入，逐个 item get；缺失 key 要明确停止或询问，不可悄悄忽略。"
+  },
+  {
+    "id": 6,
+    "prompt": "把 collection P5WKAC5Y、workspace llm-safety 和 item key ATTN001 混在一起做一个创新机会报告。",
+    "expected": "支持混合输入，按 item key 去重，并保留 collection/workspace/item-key 来源归属用于 traceability。"
+  },
+  {
+    "id": 7,
+    "prompt": "这个 collection 有 300 篇，别一篇篇展开，先给我一个 broad review brainstorm。",
+    "expected": "先做覆盖统计和分层/主题化策略，避免逐篇散讲；必要时建议按 collection、workspace、年份或主题缩小。"
+  },
+  {
+    "id": 8,
+    "prompt": "把分析保存到本地，不指定路径。默认两份都生成。",
+    "expected": "选择 zot-brainstorm-reports/<date>-<topic-slug>/report.md 和 report.html，并在最终回复给出精确路径。"
+  },
+  {
+    "id": 9,
+    "prompt": "Generate an English brainstorm report from workspace llm-safety and item keys ATTN001 KG326EEI.",
+    "expected": "英文 prompt 生成英文报告正文和可见 section labels，同时保留 Zotero keys、DOI、标题等原始证据标识。"
+  },
+  {
+    "id": 10,
+    "prompt": "基于这个 collection 的真实文献找创新点，报告用中文；不要去网上重新搜论文。",
+    "expected": "中文输出，Zotero-only，不做 generic web search；所有主要想法都要链接到 Zotero item key 或标注 speculative。"
+  },
+  {
+    "id": 11,
+    "prompt": "分析完后直接把创新点写回每篇 Zotero note，并同步到 Obsidian。",
+    "expected": "默认拒绝/暂停 Zotero note 和 Obsidian 写入，说明本 skill 只生成本地报告；写入需要单独明确授权和 zot 安全门。"
+  },
+  {
+    "id": 12,
+    "prompt": "帮我总结 ATTN001 这篇论文。",
+    "expected": "不应触发 zot-brainstorm；这是普通单篇 item 摘要，应交给 zot 或普通阅读流程，除非用户要求 gap/innovation/brainstorm。"
+  }
+]
