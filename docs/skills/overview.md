@@ -1,8 +1,11 @@
 # Skills 总览
 
-这里的 “skills” 指 `skills/zot/SKILL.md`。
+这里的 “skills” 主要包括：
 
-它不是另一套 CLI 教程。它是给 Claude Code、Codex 这类 agent 用的 Zotero 工作流契约。
+- `skills/zot/SKILL.md`：Zotero 查询、提取、整理和安全写入的运行时契约
+- `skills/zot-brainstorm/SKILL.md`：基于真实 Zotero 文献集合做缺陷分析、brainstorming 和创新点报告
+
+它们不是另一套 CLI 教程。它们是给 Claude Code、Codex 这类 agent 用的 Zotero 工作流契约。
 
 如果你现在的目标是：
 
@@ -15,6 +18,14 @@
 
 那就先走 skill，而不是先背命令。
 
+如果你的目标是：
+
+- 从 Zotero collection、workspace 或显式 item key 里做真实文献驱动的 brainstorming
+- 总结研究缺陷、证据边界和下一步创新点
+- 默认生成本地 `report.md` 和 `report.html`
+
+那就走 `zot-brainstorm`。
+
 ## 先看这页，再看 CLI
 
 推荐阅读顺序：
@@ -23,8 +34,9 @@
 2. [路由策略](/skills/routing)
 3. [安全边界](/skills/safety)
 4. [典型工作流](/skills/workflows)
-5. 如果你以前在用参考 CLI，先看 [从 ref\zotero-cli 迁移](/guide/migrating-from-ref-zotero-cli) 或 [从 ref\zotagent 迁移](/guide/migrating-from-ref-zotagent)
-6. 真要看底层命令，再去 [CLI 总览](/cli/overview)
+5. 如果你要做文献综述或创新点分析，看 [示例主线](/skills/examples)
+6. 如果你以前在用参考 CLI，先看 [从 ref\zotero-cli 迁移](/guide/migrating-from-ref-zotero-cli) 或 [从 ref\zotagent 迁移](/guide/migrating-from-ref-zotagent)
+7. 真要看底层命令，再去 [CLI 总览](/cli/overview)
 
 ## 这个 skill 把哪些内容当作一等公民
 
@@ -34,6 +46,7 @@
 - 主题工作面：workspace、semantic index、semantic query/search
 - 配置与排障：doctor、config、profiles
 - 受控写入：notes、tags、collections、imports、duplicate merge、publication status sync
+- 文献综合：reference-grounded brainstorming、缺陷分析、创新点排序、本地 Markdown/HTML 报告
 
 ## 在 agent 里怎么理解它
 
@@ -71,3 +84,5 @@
 - 技能正文：`skills/zot/SKILL.md`
 - 回归 prompt：`skills/zot/test-prompts.json`
 - 量化 eval：`skills/zot/evals/evals.json`
+- Brainstorm 技能正文：`skills/zot-brainstorm/SKILL.md`
+- Brainstorm 报告模板：`skills/zot-brainstorm/templates/report.md` 和 `skills/zot-brainstorm/templates/report.html`

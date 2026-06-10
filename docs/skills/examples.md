@@ -96,6 +96,29 @@ zot --json collection items P5WKAC5Y
 2. 再把证据等级写清楚
 3. 最后才进入主题化综述
 
+## Brainstorm 报告主线
+
+如果用户的目标不是写综述正文，而是从真实文献里找缺陷和下一步创新点，优先使用 `skills/zot-brainstorm/SKILL.md`。
+
+典型输入可以是：
+
+- 一个或多个 Zotero collection
+- 一个或多个 workspace
+- 显式 Zotero item key 列表
+- 三者混合
+
+这条主线仍然先用 `zot` 做只读证据提取，但输出契约不同：
+
+1. 先做 source coverage、证据等级和重复项检查
+2. 再做主题图、共识/冲突和 defect matrix
+3. 最后给出 ranked innovation directions
+4. 默认保存 `report.md` 和 `report.html`
+
+报告模板在：
+
+- `skills/zot-brainstorm/templates/report.md`
+- `skills/zot-brainstorm/templates/report.html`
+
 ## 配套示例文件
 
 - [LLM/FoundationModels collection 总表](./examples/llm-foundationmodels-collection-summary)

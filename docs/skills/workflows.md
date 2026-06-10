@@ -168,11 +168,33 @@ agent 应该做的事：
 - 会 re-parent 多少 children
 - 会跳过多少重复 attachment
 
+## J：基于真实文献做 brainstorming
+
+用户会说：
+
+> 基于这个 Zotero collection 和 llm-safety workspace 里的论文，分析缺陷并找下一步创新点，默认保存 Markdown 和 HTML 报告
+
+agent 应该做的事：
+
+1. 识别这是 `zot-brainstorm`，不是普通 collection 浏览或 workspace 维护
+2. 先解析 collection、workspace 或显式 item key，并按 item key 去重
+3. 先做覆盖统计、证据分级和缺陷分析，再提出创新方向
+4. 默认生成本地 `report.md` 和 `report.html`
+
+回答重点：
+
+- 输入源和去重后的真实 Zotero item 数
+- 当前证据是 fulltext、metadata/abstract、annotations、notes 还是 mixed
+- 主要缺陷、可验证的创新方向和 traceability
+- 两个本地报告文件的精确路径
+
 ## 回归验证
 
 仓库里已有这些回归资产：
 
 - `skills/zot/test-prompts.json`
 - `skills/zot/evals/evals.json`
+- `skills/zot-brainstorm/test-prompts.json`
+- `skills/zot-brainstorm/evals/evals.json`
 
-它们覆盖查条目、取证据、workspace、saved search、recent-N、手工 merge、附件下载、配置排障等场景。
+它们覆盖查条目、取证据、workspace、saved search、recent-N、手工 merge、附件下载、配置排障、真实文献驱动 brainstorming、本地 Markdown/HTML 报告等场景。

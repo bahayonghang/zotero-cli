@@ -168,11 +168,33 @@ The reply should focus on:
 - how many child items would be re-parented
 - how many duplicate attachments would be skipped
 
+## J: Brainstorm from real references
+
+User says:
+
+> Use this Zotero collection and the llm-safety workspace to analyze defects and find next-step innovation points. Save Markdown and HTML reports by default.
+
+The agent should:
+
+1. recognize this as `zot-brainstorm`, not ordinary collection browsing or workspace maintenance
+2. resolve collections, workspaces, or explicit item keys, then deduplicate by item key
+3. produce coverage, evidence grading, and defect analysis before proposing ideas
+4. save local `report.md` and `report.html` by default
+
+The reply should focus on:
+
+- selected sources and unique Zotero item count
+- whether evidence is fulltext, metadata/abstract, annotations, notes, or mixed
+- defects, testable innovation directions, and traceability
+- exact local paths for both report files
+
 ## Regression coverage
 
 The repo already includes:
 
 - `skills/zot/test-prompts.json`
 - `skills/zot/evals/evals.json`
+- `skills/zot-brainstorm/test-prompts.json`
+- `skills/zot-brainstorm/evals/evals.json`
 
-They cover search, evidence extraction, workspace setup, saved searches, recent-N routing, manual merge preview, attachment download, and config inspection.
+They cover search, evidence extraction, workspace setup, saved searches, recent-N routing, manual merge preview, attachment download, config inspection, reference-grounded brainstorming, and local Markdown/HTML reports.

@@ -1,8 +1,11 @@
 # Skills Overview
 
-Here, “skills” means `skills/zot/SKILL.md`.
+Here, “skills” mainly means:
 
-It is not a second CLI tutorial. It is the Zotero workflow contract for Claude Code, Codex, and similar agents.
+- `skills/zot/SKILL.md`: the runtime contract for Zotero lookup, extraction, organization, and safe writes
+- `skills/zot-brainstorm/SKILL.md`: reference-grounded gap analysis, brainstorming, innovation directions, and local reports from real Zotero sources
+
+They are not a second CLI tutorial. They are Zotero workflow contracts for Claude Code, Codex, and similar agents.
 
 If your goal is to:
 
@@ -14,6 +17,14 @@ If your goal is to:
 - update the library safely
 
 start from the skill, not the command list.
+
+If your goal is to:
+
+- brainstorm from real Zotero collections, workspaces, or explicit item keys
+- analyze research defects, evidence limits, and next-step innovation points
+- generate local `report.md` and `report.html` outputs by default
+
+use `zot-brainstorm`.
 
 ## Read this before the CLI pages
 
@@ -34,6 +45,7 @@ Recommended order:
 - Working sets: workspaces, semantic indexing, semantic query/search
 - Configuration and troubleshooting: doctor, config, profiles
 - Controlled writes: notes, tags, collections, imports, duplicate merge, publication-status sync
+- Literature synthesis: reference-grounded brainstorming, defect analysis, innovation ranking, local Markdown/HTML reports
 
 ## How the agent should think about it
 
@@ -71,3 +83,5 @@ Those requests do not treat Zotero as the primary content source.
 - Main skill file: `skills/zot/SKILL.md`
 - Regression prompts: `skills/zot/test-prompts.json`
 - Eval set: `skills/zot/evals/evals.json`
+- Brainstorm skill file: `skills/zot-brainstorm/SKILL.md`
+- Brainstorm report templates: `skills/zot-brainstorm/templates/report.md` and `skills/zot-brainstorm/templates/report.html`
