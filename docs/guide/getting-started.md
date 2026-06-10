@@ -2,9 +2,9 @@
 
 ## 先记住这个定位
 
-这个仓库的主交互面是 `zot-skills`，不是命令列表。
+这个仓库的主交互面是 `zot` skill，不是命令列表。
 
-- `zot-skills` 负责理解用户想从 Zotero 里拿什么内容
+- `zot` skill 负责理解用户想从 Zotero 里拿什么内容
 - Rust `zot` 负责真正执行读取、检索、索引和写入
 - CLI 页面是参考面，主要给排障、脚本化和直接调用使用
 
@@ -26,7 +26,7 @@
 ### 1. 安装 skill
 
 ```bash
-npx skills add https://github.com/bahayonghang/zotero-cli --skill zot-skills
+npx skills add https://github.com/bahayonghang/zotero-cli --skill zot
 ```
 
 ### 2. 提供运行时
@@ -81,7 +81,7 @@ zot config init --target-profile work --library-id <你的 library id> --api-key
 - “检查这篇预印本是否已经正式发表”
 - “给这篇文献加一条 note，再打上 priority 标签”
 
-这些都是 `zot-skills` 应该直接接管的请求。
+这些都是 `zot` skill 应该直接接管的请求。
 
 更完整的开口方式，见：[Agent 用法](/skills/agent-usage)
 

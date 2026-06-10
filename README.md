@@ -35,7 +35,7 @@ Turn an existing Zotero library into a dependable content surface for AI workflo
 
 `zot` has two layers:
 
-- `skills/zot-skills/SKILL.md` is the main operator surface. Install it when you want Claude Code or a similar agent to handle Zotero work from plain-language requests.
+- `skills/zot/SKILL.md` is the main operator surface. Install it when you want Claude Code or a similar agent to handle Zotero work from plain-language requests.
 - The Rust `zot` binary is the execution layer behind that skill. Humans can run it directly for debugging, scripting, or local verification.
 
 If the real goal is “use the papers, notes, tags, PDFs, annotations, or feeds already inside Zotero”, start from the skill. The CLI is the runtime, not the main mental model.
@@ -53,7 +53,7 @@ This matches the underlying products:
 
 ## What the skill can do with Zotero content
 
-| What you want | What `zot-skills` can surface |
+| What you want | What the `zot` skill can surface |
 | --- | --- |
 | Find the right source | Search by query, tag, creator, year, collection, citation key, library, or feed |
 | Read the evidence | Return item metadata, child items, citations, PDF text, outline, notes, and annotations |
@@ -71,10 +71,10 @@ Install the skill first. Then provide the runtime it calls.
 ### 1. Install the skill
 
 ```bash
-npx skills add https://github.com/bahayonghang/zotero-cli --skill zot-skills
+npx skills add https://github.com/bahayonghang/zotero-cli --skill zot
 ```
 
-This installs the bundled workflow contract from [`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md).
+This installs the bundled workflow contract from [`skills/zot/SKILL.md`](./skills/zot/SKILL.md).
 
 ### 2. Install the runtime
 
@@ -224,7 +224,7 @@ Before opening a PR:
 
 1. Run `just ci` locally.
 2. Update `docs/` and `docs/en/` if you change a user-facing workflow.
-3. Keep [`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md) aligned with the runtime behavior.
+3. Keep [`skills/zot/SKILL.md`](./skills/zot/SKILL.md) aligned with the runtime behavior.
 
 ---
 

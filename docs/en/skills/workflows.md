@@ -172,7 +172,7 @@ The reply should focus on:
 
 The repo already includes:
 
-- `skills/zot-skills/test-prompts.json`
-- `skills/zot-skills/evals/evals.json`
+- `skills/zot/test-prompts.json`
+- `skills/zot/evals/evals.json`
 
 They cover search, evidence extraction, workspace setup, saved searches, recent-N routing, manual merge preview, attachment download, and config inspection.

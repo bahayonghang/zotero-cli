@@ -188,7 +188,7 @@
 
 主要工作：
 
-- 更新 `skills/zot-skills/SKILL.md`
+- 更新 `skills/zot/SKILL.md`
 - 增加 ref\zotagent 迁移 prompt / eval
 - 同步中英文 docs
 

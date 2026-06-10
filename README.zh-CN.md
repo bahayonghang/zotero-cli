@@ -35,7 +35,7 @@
 
 `zot` 分两层：
 
-- `skills/zot-skills/SKILL.md` 是主交互面。你想让 Claude Code 或类似 Agent 用自然语言处理 Zotero 任务时，先装它。
+- `skills/zot/SKILL.md` 是主交互面。你想让 Claude Code 或类似 Agent 用自然语言处理 Zotero 任务时，先装它。
 - Rust `zot` 二进制是 skill 背后的执行层。人也可以直接调用它做排障、脚本化或本地验证。
 
 如果你的真实目标是“把 Zotero 里已经有的论文、笔记、标签、PDF、批注、feeds 用起来”，就先从 skill 出发，不要先背子命令。
@@ -53,7 +53,7 @@
 
 ## 这个 skill 能拿 Zotero 里的什么内容
 
-| 你真正想做什么 | `zot-skills` 能提供什么 |
+| 你真正想做什么 | `zot` skill 能提供什么 |
 | --- | --- |
 | 找到对的文献 | 按 query、tag、creator、year、collection、citation key、library、feed 找条目 |
 | 读取证据面 | 返回 item metadata、children、citation、PDF 正文、outline、notes、annotations |
@@ -71,10 +71,10 @@
 ### 1. 安装 skill
 
 ```bash
-npx skills add https://github.com/bahayonghang/zotero-cli --skill zot-skills
+npx skills add https://github.com/bahayonghang/zotero-cli --skill zot
 ```
 
-这会安装仓库里内置的工作流契约：[`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md)。
+这会安装仓库里内置的工作流契约：[`skills/zot/SKILL.md`](./skills/zot/SKILL.md)。
 
 ### 2. 安装运行时
 
@@ -224,7 +224,7 @@ just ci
 
 1. 本地跑 `just ci`。
 2. 如果改了用户可见工作流，同步更新 `docs/` 和 `docs/en/`。
-3. 保持 [`skills/zot-skills/SKILL.md`](./skills/zot-skills/SKILL.md) 和运行时行为一致。
+3. 保持 [`skills/zot/SKILL.md`](./skills/zot/SKILL.md) 和运行时行为一致。
 
 ---
 

@@ -111,7 +111,7 @@ So these legacy traits are intentionally not coming back:
 
 ## What this means for agents and the skill
 
-If you installed `zot-skills`, the migrated natural-language routes should now read like this:
+If you installed the `zot` skill, the migrated natural-language routes should now read like this:
 
 - “Show me the last 10 items added to the library” -> `library recent --count`
 - “Preview a merge for these two items first” -> `item merge`

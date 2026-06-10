@@ -172,7 +172,7 @@ agent 应该做的事：
 
 仓库里已有这些回归资产：
 
-- `skills/zot-skills/test-prompts.json`
-- `skills/zot-skills/evals/evals.json`
+- `skills/zot/test-prompts.json`
+- `skills/zot/evals/evals.json`
 
 它们覆盖查条目、取证据、workspace、saved search、recent-N、手工 merge、附件下载、配置排障等场景。

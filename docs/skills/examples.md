@@ -2,7 +2,7 @@
 
 这一页给出一个完整的 Zotero -> ZoteroSynth 文献综述主线示例，目标是让操作者快速理解：
 
-1. 先让 `zot-skills` 稳定拿到 Zotero 里的只读内容
+1. 先让 `zot` skill 稳定拿到 Zotero 里的只读内容
 2. 再用 ZoteroSynth 的 `review` 工作流做主题综述
 3. 明确证据边界，不把 `metadata+abstract` 冒充成 `fulltext`
 
@@ -87,7 +87,7 @@ zot --json collection items P5WKAC5Y
 
 这个主线体现了两个层级的分工：
 
-- `zot-skills` 负责把 Zotero 检索面跑稳：`doctor`、`collection list`、`collection items`
+- `zot` skill 负责把 Zotero 检索面跑稳：`doctor`、`collection list`、`collection items`
 - `ZoteroSynth` 负责把检索结果变成可复用的分析输出：总表、review、后续可同步的页面
 
 也就是说，真正稳定的做法不是一上来就“让模型自由总结”，而是：

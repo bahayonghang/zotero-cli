@@ -1,6 +1,6 @@
 # Skills 总览
 
-这里的 “skills” 指 `skills/zot-skills/SKILL.md`。
+这里的 “skills” 指 `skills/zot/SKILL.md`。
 
 它不是另一套 CLI 教程。它是给 Claude Code、Codex 这类 agent 用的 Zotero 工作流契约。
 
@@ -68,6 +68,6 @@
 
 ## 相关文件
 
-- 技能正文：`skills/zot-skills/SKILL.md`
-- 回归 prompt：`skills/zot-skills/test-prompts.json`
-- 量化 eval：`skills/zot-skills/evals/evals.json`
+- 技能正文：`skills/zot/SKILL.md`
+- 回归 prompt：`skills/zot/test-prompts.json`
+- 量化 eval：`skills/zot/evals/evals.json`

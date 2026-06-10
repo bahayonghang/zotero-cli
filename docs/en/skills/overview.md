@@ -1,6 +1,6 @@
 # Skills Overview
 
-Here, “skills” means `skills/zot-skills/SKILL.md`.
+Here, “skills” means `skills/zot/SKILL.md`.
 
 It is not a second CLI tutorial. It is the Zotero workflow contract for Claude Code, Codex, and similar agents.
 
@@ -68,6 +68,6 @@ Those requests do not treat Zotero as the primary content source.
 
 ## Related files
 
-- Main skill file: `skills/zot-skills/SKILL.md`
-- Regression prompts: `skills/zot-skills/test-prompts.json`
-- Eval set: `skills/zot-skills/evals/evals.json`
+- Main skill file: `skills/zot/SKILL.md`
+- Regression prompts: `skills/zot/test-prompts.json`
+- Eval set: `skills/zot/evals/evals.json`

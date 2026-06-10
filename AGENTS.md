@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Prefer `justfile`, root `Cargo.toml`, and `src/zot-cli/src/main.rs` over prose when they differ.
-- `skills/zot-skills/SKILL.md` is worth checking for real operator workflows around `doctor`, write actions, and workspaces.
+- `skills/zot/SKILL.md` is worth checking for real operator workflows around `doctor`, write actions, and workspaces.
 
 ## Workspace map
 - This is a Rust workspace (`edition = 2024`, `rust-version = 1.85`) with 4 crates under `src/`:

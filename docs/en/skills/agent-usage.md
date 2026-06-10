@@ -2,7 +2,7 @@
 
 This page covers one thing only: **how to ask in plain language**.
 
-If `zot-skills` is installed, do not start from commands. Start from the task.
+If the `zot` skill is installed, do not start from commands. Start from the task.
 
 ## The most common ways to ask
 

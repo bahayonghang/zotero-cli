@@ -188,7 +188,7 @@ Goal:
 
 Main work:
 
-- update `skills/zot-skills/SKILL.md`
+- update `skills/zot/SKILL.md`
 - add ref\zotagent migration prompts and evals
 - sync the bilingual docs
 

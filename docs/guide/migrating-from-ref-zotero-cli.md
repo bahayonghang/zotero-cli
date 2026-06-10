@@ -111,7 +111,7 @@ Rust 版不是 connector 的平铺包装层。它的边界已经写死了：
 
 ## 对 agent / skill 的影响
 
-如果你装了 `zot-skills`，迁移后的自然语言路由应该这样理解：
+如果你装了 `zot` skill，迁移后的自然语言路由应该这样理解：
 
 - “给我看最近 10 条刚进库的文献” -> `library recent --count`
 - “先预览再合并这两篇” -> `item merge`

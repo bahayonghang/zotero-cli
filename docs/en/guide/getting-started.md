@@ -2,9 +2,9 @@
 
 ## Keep this framing in mind
 
-The primary interface in this repository is `zot-skills`, not the subcommand list.
+The primary interface in this repository is the `zot` skill, not the subcommand list.
 
-- `zot-skills` decides what kind of Zotero content the user is asking for
+- The `zot` skill decides what kind of Zotero content the user is asking for
 - Rust `zot` performs the actual reads, retrieval, indexing, and writes
 - The CLI pages remain reference material for debugging, scripts, and direct invocation
 
@@ -26,7 +26,7 @@ If you are migrating from `ref/zotagent`, also read [Migrating from ref\\zotagen
 ### 1. Install the skill
 
 ```bash
-npx skills add https://github.com/bahayonghang/zotero-cli --skill zot-skills
+npx skills add https://github.com/bahayonghang/zotero-cli --skill zot
 ```
 
 ### 2. Provide the runtime
@@ -81,7 +81,7 @@ zot config init --target-profile work --library-id <your library id> --api-key <
 - “Check whether this preprint has an official publication record now.”
 - “Add a note and a `priority` tag to this item.”
 
-These are all first-class `zot-skills` requests.
+These are all first-class `zot` skill requests.
 
 For fuller phrasing patterns, read [Agent Usage](/en/skills/agent-usage).
 
