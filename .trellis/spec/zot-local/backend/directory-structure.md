@@ -10,6 +10,7 @@ or remote writes in this crate.
 src/zot-local/src/
 ├── citation.rs       # Citation formatting and export helpers
 ├── db.rs             # LocalLibrary over zotero.sqlite
+├── graph.rs          # Knowledge-graph assembly + analysis (pure, no SQLite)
 ├── lib.rs            # Public exports
 ├── pdf.rs            # PdfBackend, PdfiumBackend, PdfCache
 ├── semantic.rs       # Library-level semantic index facade
@@ -30,6 +31,13 @@ src/zot-local/tests/
 - `db.rs` owns `LocalLibrary`, `SearchOptions`, Zotero schema joins, collection
   tree reads, child item reads, duplicate grouping, note/annotation reads, and
   fixture-backed local search behavior.
+- `graph.rs` owns knowledge-graph assembly (`assemble_graph`) and pure
+  structural analysis (degree, union-find components, deterministic label
+  propagation). It never opens SQLite. `LocalLibrary::build_knowledge_graph`
+  lives in `db.rs` and performs the reads — reusing `search`/`get_items_batch`
+  plus one `itemRelations` query — then hands loaded `Item`s to `graph.rs`,
+  because `LocalLibrary`'s private fields are only reachable from `db.rs`. Keep
+  DB access in `db.rs`; keep deterministic computation in `graph.rs`.
 - `pdf.rs` owns the `PdfBackend` trait, Pdfium loading/auto-download probing,
   text extraction, outline extraction, annotation geometry, and the PDF text
   cache database.
