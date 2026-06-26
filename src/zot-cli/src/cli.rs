@@ -38,6 +38,7 @@ pub(crate) enum Commands {
         #[command(subcommand)]
         command: CollectionCommand,
     },
+    Graph(GraphArgs),
     Workspace {
         #[command(subcommand)]
         command: WorkspaceCommand,
@@ -242,6 +243,20 @@ mod tests {
             ["zot", "collection", "subcollections", "COLTR02"].as_slice(),
             ["zot", "collection", "item-count", "COLTR02"].as_slice(),
             ["zot", "collection", "tags", "COLTR02"].as_slice(),
+            ["zot", "graph"].as_slice(),
+            ["zot", "graph", "--collection", "COLTR02"].as_slice(),
+            ["zot", "--json", "graph", "--collection", "COLTR02"].as_slice(),
+            ["zot", "graph", "serve"].as_slice(),
+            ["zot", "graph", "serve", "--no-open", "--port", "7901"].as_slice(),
+            [
+                "zot",
+                "graph",
+                "serve",
+                "--collection",
+                "COLTR02",
+                "--no-open",
+            ]
+            .as_slice(),
             ["zot", "completions", "powershell"].as_slice(),
         ] {
             if let Err(err) = Cli::try_parse_from(argv) {

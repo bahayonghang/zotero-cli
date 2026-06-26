@@ -1,7 +1,7 @@
 use zot_core::envelope::EnvelopeError;
 use zot_core::{
-    Attachment, CliEnvelope, Collection, EnvelopeMeta, Item, LibraryStats, Note, QueryChunk,
-    Workspace, ZotError,
+    Attachment, CliEnvelope, Collection, EnvelopeMeta, Item, KnowledgeGraph, LibraryStats, Note,
+    QueryChunk, Workspace, ZotError,
 };
 
 use crate::context::AppContext;
@@ -132,6 +132,39 @@ pub fn print_stats(stats: &LibraryStats) {
     println!("\nBy type:");
     for (kind, count) in &stats.by_type {
         println!("- {kind}: {count}");
+    }
+}
+
+pub fn print_graph_summary(graph: &KnowledgeGraph) {
+    let metrics = &graph.metrics;
+    println!("Scope: {}", graph.scope);
+    println!(
+        "Nodes: {}  Edges: {}  Components: {}  Communities: {}",
+        metrics.node_count,
+        metrics.edge_count,
+        metrics.connected_components,
+        metrics.communities.len()
+    );
+    if !metrics.top_by_weighted_degree.is_empty() {
+        println!("\nTop papers (by weighted connections):");
+        for ranked in &metrics.top_by_weighted_degree {
+            println!(
+                "- {} [{}] (score {})",
+                ranked.title, ranked.key, ranked.score
+            );
+        }
+    }
+    if !metrics.top_authors.is_empty() {
+        println!("\nTop authors:");
+        for author in &metrics.top_authors {
+            println!("- {} ({})", author.name, author.count);
+        }
+    }
+    if !metrics.top_tags.is_empty() {
+        println!("\nTop tags:");
+        for tag in &metrics.top_tags {
+            println!("- {} ({})", tag.name, tag.count);
+        }
     }
 }
 

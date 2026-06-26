@@ -328,6 +328,34 @@ pub(crate) struct ItemKeyArgs {
 }
 
 #[derive(Args)]
+pub(crate) struct GraphArgs {
+    #[command(subcommand)]
+    pub(crate) command: Option<GraphCommand>,
+    /// Restrict the graph to a single collection key (default: whole library).
+    #[arg(long)]
+    pub(crate) collection: Option<String>,
+}
+
+#[derive(Subcommand)]
+pub(crate) enum GraphCommand {
+    /// Serve an interactive web visualization of the knowledge graph.
+    Serve(GraphServeArgs),
+}
+
+#[derive(Args)]
+pub(crate) struct GraphServeArgs {
+    /// Restrict the graph to a single collection key (default: whole library).
+    #[arg(long)]
+    pub(crate) collection: Option<String>,
+    /// Port to bind on 127.0.0.1 (falls back to a free port if taken).
+    #[arg(long, default_value_t = 7878)]
+    pub(crate) port: u16,
+    /// Do not open the browser automatically.
+    #[arg(long)]
+    pub(crate) no_open: bool,
+}
+
+#[derive(Args)]
 pub(crate) struct ItemRelatedArgs {
     pub(crate) key: String,
     #[arg(long, default_value_t = 20)]
