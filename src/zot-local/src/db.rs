@@ -9,9 +9,9 @@ use strsim::normalized_levenshtein;
 use tempfile::TempDir;
 use zot_core::{
     AnnotationRecord, Attachment, ChildAnnotation, ChildAttachment, ChildItem, ChildNote,
-    CitationKeyMatch, Collection, Creator, DuplicateGroup, FeedInfo, Item, LibraryInfo,
-    LibraryScope, LibraryStats, Note, NoteSearchResult, SearchResult, TagSummary, ZotError,
-    ZotResult,
+    CitationKeyMatch, Collection, Creator, DuplicateGroup, FeedInfo, GraphOptions, Item,
+    KnowledgeGraph, LibraryInfo, LibraryScope, LibraryStats, Note, NoteSearchResult, SearchResult,
+    TagSummary, ZotError, ZotResult,
 };
 
 use crate::citation::export_item;
@@ -1238,6 +1238,59 @@ impl LocalLibrary {
             .map(|(item_id, _)| item_id)
             .collect::<Vec<_>>();
         self.get_items_batch(&item_ids)
+    }
+
+    /// Build a local relationship knowledge graph for the current scope (whole
+    /// library, or a single collection when `opts.collection` is set). Node and
+    /// edge data come from existing batched loaders; assembly and structural
+    /// analysis live in [`crate::graph`].
+    pub fn build_knowledge_graph(&self, opts: &GraphOptions) -> ZotResult<KnowledgeGraph> {
+        let items = self.list_items(opts.collection.as_deref(), usize::MAX, 0)?;
+        let explicit = if opts.relations.related {
+            self.load_explicit_relations()?
+        } else {
+            Vec::new()
+        };
+        let scope = match &opts.collection {
+            Some(key) => format!("collection:{key}"),
+            None => format!("library:{}", self.scope_label()),
+        };
+        Ok(crate::graph::assemble_graph(&items, &explicit, opts, scope))
+    }
+
+    fn scope_label(&self) -> String {
+        match &self.library_scope {
+            LibraryScope::User => "user".to_string(),
+            LibraryScope::Group { group_id } => format!("group-{group_id}"),
+        }
+    }
+
+    /// Load explicit Zotero relations (`dc:relation`, predicateID 1) for the
+    /// current library as `(source_key, target_key)` pairs. The related item's
+    /// key is the final path segment of the stored relation URI.
+    fn load_explicit_relations(&self) -> ZotResult<Vec<(String, String)>> {
+        let mut stmt = self
+            .conn
+            .prepare_cached(
+                "SELECT i.key, ir.object FROM itemRelations ir
+                 JOIN items i ON ir.itemID = i.itemID
+                 WHERE ir.predicateID = 1 AND i.libraryID = ?1",
+            )
+            .map_err(sql_err("graph-relations"))?;
+        let rows = stmt
+            .query_map(params![self.library_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(sql_err("graph-relations"))?;
+        let mut relations = Vec::new();
+        for row in rows {
+            let (source_key, object) = row.map_err(sql_err("graph-relations"))?;
+            let target_key = object.rsplit('/').next().unwrap_or_default();
+            if !target_key.is_empty() {
+                relations.push((source_key, target_key.to_string()));
+            }
+        }
+        Ok(relations)
     }
 
     pub fn get_stats(&self) -> ZotResult<LibraryStats> {
@@ -2562,6 +2615,92 @@ Original Date: 2017');
             Err(err) => panic!("search failed: {err}"),
         };
         assert!(result.items.iter().any(|item| item.key == "ATTN001"));
+    }
+
+    #[test]
+    fn builds_knowledge_graph_with_expected_edges_and_determinism() {
+        let fixture = rich_fixture_library();
+        let opts = zot_core::GraphOptions::default();
+        let graph = match fixture.lib.build_knowledge_graph(&opts) {
+            Ok(graph) => graph,
+            Err(err) => panic!("build_knowledge_graph failed: {err}"),
+        };
+
+        // Nodes only cover primary items, never child types.
+        for node in &graph.nodes {
+            assert!(
+                !["attachment", "note", "annotation"].contains(&node.item_type.as_str()),
+                "unexpected child node type {}",
+                node.item_type
+            );
+        }
+        let keys: std::collections::HashSet<&str> =
+            graph.nodes.iter().map(|node| node.key.as_str()).collect();
+        assert!(keys.contains("ATTN001"));
+        assert!(keys.contains("BERT002"));
+
+        // ATTN001 shares a collection with BERT002 and has an explicit relation
+        // to it: weight 100 (related) + 1 (one shared collection) = 101.
+        let edge = graph
+            .edges
+            .iter()
+            .find(|edge| {
+                (edge.source == "ATTN001" && edge.target == "BERT002")
+                    || (edge.source == "BERT002" && edge.target == "ATTN001")
+            })
+            .expect("expected an ATTN001<->BERT002 edge");
+        assert!(edge.relations.contains(&zot_core::EdgeRelation::Related));
+        assert!(edge.relations.contains(&zot_core::EdgeRelation::Collection));
+        assert!(!edge.relations.contains(&zot_core::EdgeRelation::Tag));
+        assert_eq!(edge.weight, 101);
+        assert!(edge.source < edge.target, "edge endpoints must be ordered");
+
+        // Each node's degree equals its incident edge count (handshake lemma).
+        for node in &graph.nodes {
+            let incident = graph
+                .edges
+                .iter()
+                .filter(|edge| edge.source == node.key || edge.target == node.key)
+                .count();
+            assert_eq!(node.degree, incident, "degree mismatch for {}", node.key);
+        }
+        let degree_sum: usize = graph.nodes.iter().map(|node| node.degree).sum();
+        assert_eq!(degree_sum, graph.edges.len() * 2);
+
+        // Metrics stay self-consistent.
+        assert_eq!(graph.metrics.node_count, graph.nodes.len());
+        assert_eq!(graph.metrics.edge_count, graph.edges.len());
+        assert!(graph.metrics.connected_components >= 1);
+        assert!(graph.metrics.connected_components <= graph.nodes.len());
+
+        // Deterministic: an identical build yields an identical graph.
+        let again = fixture
+            .lib
+            .build_knowledge_graph(&opts)
+            .expect("rebuild knowledge graph");
+        assert_eq!(graph, again);
+    }
+
+    #[test]
+    fn collection_scoped_graph_only_includes_collection_items() {
+        let fixture = rich_fixture_library();
+        let opts = zot_core::GraphOptions {
+            collection: Some("COLML01".to_string()),
+            ..zot_core::GraphOptions::default()
+        };
+        let graph = fixture
+            .lib
+            .build_knowledge_graph(&opts)
+            .expect("collection graph");
+        // COLML01 holds items 1,2,3,6 (ATTN001, BERT002, DEEP003, SCAL006).
+        let keys: std::collections::HashSet<&str> =
+            graph.nodes.iter().map(|node| node.key.as_str()).collect();
+        assert_eq!(keys.len(), graph.nodes.len());
+        for expected in ["ATTN001", "BERT002", "DEEP003", "SCAL006"] {
+            assert!(keys.contains(expected), "missing {expected}");
+        }
+        assert!(!keys.contains("DUPE008"), "DUPE008 is not in COLML01");
+        assert_eq!(graph.scope, "collection:COLML01");
     }
 
     #[test]

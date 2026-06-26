@@ -1,5 +1,6 @@
 pub mod citation;
 pub mod db;
+pub mod graph;
 pub mod pdf;
 pub mod semantic;
 pub mod workspace;
