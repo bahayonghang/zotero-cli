@@ -109,3 +109,38 @@ Created the Zotero reference-grounded brainstorming skill with Markdown/HTML rep
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: 本地 Zotero 知识图谱与可视化分析
+
+**Date**: 2026-06-26
+**Task**: 本地 Zotero 知识图谱与可视化分析
+**Branch**: `main`
+
+### Summary
+
+新增 zot graph / zot graph serve：从本地 zotero.sqlite 构建论文关系知识图谱（合著/共享标签/同collection/Zotero相关条目四类加权边），手写确定性分析（度中心性、并查集连通分量、标签传播社区、Top榜）。Slice A：zot-core 图类型 + zot-local graph.rs/db.rs（复用 search+get_items_batch，单条 itemRelations 查询），fixture 单测。Slice B：tiny_http 本地静态服务（127.0.0.1，端口回退，Ctrl-C，include_str! 内联资源）+ Cytoscape.js 前端（社区着色/搜索/权重·度过滤/节点详情，离线vendored）。验证 clippy 零问题 + 78 tests + 真实库 1538节点·16224边端到端 + server 全路由。Phase 2 待办：引文图谱(Semantic Scholar)、服务端实时重查、petgraph 介数/Louvain、多类型节点。子代理派发遇 429 故主会话内联实现。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7ab712a` | (see git log) |
+| `d4caef1` | (see git log) |
+| `a0a11ee` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
