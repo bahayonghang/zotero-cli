@@ -1,0 +1,10 @@
+{"file": ".trellis/spec/zot-core/backend/directory-structure.md", "reason": "图类型 GraphNode/GraphEdge/KnowledgeGraph/GraphOptions 加在 model.rs 并经 lib.rs 重导出，需遵守 core 模块归属与公共重导出规范"}
+{"file": ".trellis/spec/zot-core/backend/error-handling.md", "reason": "GraphOptions 校验与 envelope 字段需符合 ZotError/ZotResult 与 envelope 规则"}
+{"file": ".trellis/spec/zot-local/backend/directory-structure.md", "reason": "新模块 graph.rs 的落位、LocalLibrary 方法/纯函数命名与导出约定"}
+{"file": ".trellis/spec/zot-local/backend/database-guidelines.md", "reason": "新增 itemRelations(predicateID=1) 批量查询，须只读、prepare_cached、按 libraryID/scope 过滤"}
+{"file": ".trellis/spec/zot-local/backend/error-handling.md", "reason": "rusqlite 失败映射到 ZotError::Database 的 sql_err 模式"}
+{"file": ".trellis/spec/zot-cli/backend/directory-structure.md", "reason": "新增 graph 命令的 clap enum/args.rs/commands 分发与 command pattern"}
+{"file": ".trellis/spec/zot-cli/backend/database-guidelines.md", "reason": "命令须经 AppContext::local_library() 取数据，不在 helper 内直接建库"}
+{"file": ".trellis/spec/zot-cli/backend/logging-guidelines.md", "reason": "graph 的人类可读摘要 vs --json envelope 输出分流规则"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "图类型贯穿 core→local→cli，须避免跨层裸字段转换、统一契约"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "构图复用现有 search/get_items_batch/get_related_items 权重思路，避免重复实现"}

@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/zot-core/backend/quality-guidelines.md", "reason": "图类型的序列化稳定性、依赖与 lint 约定（serde 命名、无新依赖）"}
+{"file": ".trellis/spec/zot-local/backend/quality-guidelines.md", "reason": "构图/算法/SQL 的搜索-索引不变量与测试要求（fixture 单测、确定性）"}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "CLI parse 测试、JSON contract 测试、workspace 依赖清单守卫（新增 tiny_http）"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "anyhow 边界与 envelope 错误输出一致性核对"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "核对 core/local/cli 跨层数据流一致、无裸 payload 转换"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "核对是否复用既有读取/权重逻辑、未重复造轮子"}
