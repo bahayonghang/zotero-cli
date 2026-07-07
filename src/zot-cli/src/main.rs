@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod context;
 mod format;
+mod output;
 mod util;
 
 use anyhow::Result;
