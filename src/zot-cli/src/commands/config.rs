@@ -9,9 +9,9 @@ use crate::cli::{
     ConfigSetArgs,
 };
 use crate::context::AppContext;
-use crate::format::print_enveloped;
+use crate::output::CommandOutput;
 
-pub(crate) async fn handle(ctx: &AppContext, command: ConfigCommand) -> Result<()> {
+pub(crate) async fn handle(ctx: &AppContext, command: ConfigCommand) -> Result<CommandOutput> {
     match command {
         ConfigCommand::Init(args) => handle_init(ctx, args).await,
         ConfigCommand::Show => handle_show(ctx).await,
@@ -20,7 +20,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ConfigCommand) -> Result<(
     }
 }
 
-async fn handle_init(ctx: &AppContext, args: ConfigInitArgs) -> Result<()> {
+async fn handle_init(ctx: &AppContext, args: ConfigInitArgs) -> Result<CommandOutput> {
     let mut config = AppConfig::load_raw()?;
     let target_profile = args.target_profile.clone();
     let default_data_dir = detect_default_data_dir(&config);
@@ -38,15 +38,10 @@ async fn handle_init(ctx: &AppContext, args: ConfigInitArgs) -> Result<()> {
 
     let path = canonicalize_or_original(&config.save()?);
     let payload = config_change_payload(&config, path, target_profile, "initialized");
-    if ctx.json {
-        print_enveloped(ctx, payload, None)?;
-    } else {
-        print_config_change(&payload);
-    }
-    Ok(())
+    CommandOutput::new(ctx, payload, None, print_config_change)
 }
 
-async fn handle_show(ctx: &AppContext) -> Result<()> {
+async fn handle_show(ctx: &AppContext) -> Result<CommandOutput> {
     let raw = AppConfig::load_raw()?;
     let effective = AppConfig::load(ctx.profile.as_deref())?;
     let selected_profile = ctx
@@ -62,9 +57,7 @@ async fn handle_show(ctx: &AppContext) -> Result<()> {
         "effective": config_view(&effective),
     });
 
-    if ctx.json {
-        print_enveloped(ctx, payload, None)?;
-    } else {
+    CommandOutput::new(ctx, payload, None, move |_| {
         println!("Config file: {}", path.display());
         println!(
             "Default profile: {}",
@@ -94,11 +87,10 @@ async fn handle_show(ctx: &AppContext) -> Result<()> {
             redact_or_missing(&effective.embedding.api_key)
         );
         println!("Embedding model: {}", effective.embedding.model);
-    }
-    Ok(())
+    })
 }
 
-async fn handle_set(ctx: &AppContext, args: ConfigSetArgs) -> Result<()> {
+async fn handle_set(ctx: &AppContext, args: ConfigSetArgs) -> Result<CommandOutput> {
     let mut config = AppConfig::load_raw()?;
     let target_profile = args.target_profile.clone();
     if let Some(profile_name) = target_profile.as_deref() {
@@ -110,15 +102,13 @@ async fn handle_set(ctx: &AppContext, args: ConfigSetArgs) -> Result<()> {
 
     let path = canonicalize_or_original(&config.save()?);
     let payload = config_change_payload(&config, path, target_profile, "updated");
-    if ctx.json {
-        print_enveloped(ctx, payload, None)?;
-    } else {
-        print_config_change(&payload);
-    }
-    Ok(())
+    CommandOutput::new(ctx, payload, None, print_config_change)
 }
 
-async fn handle_profiles(ctx: &AppContext, command: ConfigProfilesCommand) -> Result<()> {
+async fn handle_profiles(
+    ctx: &AppContext,
+    command: ConfigProfilesCommand,
+) -> Result<CommandOutput> {
     match command {
         ConfigProfilesCommand::List => {
             let config = AppConfig::load_raw()?;
@@ -126,27 +116,29 @@ async fn handle_profiles(ctx: &AppContext, command: ConfigProfilesCommand) -> Re
                 "default_profile": config.default_profile_name(),
                 "profiles": config.profile.keys().cloned().collect::<Vec<_>>(),
             });
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else if config.profile.is_empty() {
-                println!("No named profiles configured.");
-            } else {
-                let default_profile = config.default_profile_name();
-                for profile_name in config.profile.keys() {
-                    if Some(profile_name.as_str()) == default_profile {
-                        println!("{profile_name} (default)");
-                    } else {
-                        println!("{profile_name}");
+            CommandOutput::new(ctx, payload, None, move |_| {
+                if config.profile.is_empty() {
+                    println!("No named profiles configured.");
+                } else {
+                    let default_profile = config.default_profile_name();
+                    for profile_name in config.profile.keys() {
+                        if Some(profile_name.as_str()) == default_profile {
+                            println!("{profile_name} (default)");
+                        } else {
+                            println!("{profile_name}");
+                        }
                     }
                 }
-            }
+            })
         }
-        ConfigProfilesCommand::Use(args) => handle_profiles_use(ctx, args).await?,
+        ConfigProfilesCommand::Use(args) => handle_profiles_use(ctx, args).await,
     }
-    Ok(())
 }
 
-async fn handle_profiles_use(ctx: &AppContext, args: ConfigProfilesUseArgs) -> Result<()> {
+async fn handle_profiles_use(
+    ctx: &AppContext,
+    args: ConfigProfilesUseArgs,
+) -> Result<CommandOutput> {
     let mut config = AppConfig::load_raw()?;
     if !config.profile.contains_key(&args.name) {
         return Err(zot_core::ZotError::InvalidInput {
@@ -158,17 +150,15 @@ async fn handle_profiles_use(ctx: &AppContext, args: ConfigProfilesUseArgs) -> R
     }
     config.set_default_profile(Some(&args.name));
     let path = canonicalize_or_original(&config.save()?);
+    let name = args.name;
     let payload = serde_json::json!({
         "config_file": path,
-        "default_profile": args.name,
+        "default_profile": name,
     });
-    if ctx.json {
-        print_enveloped(ctx, payload, None)?;
-    } else {
-        println!("Default profile set to {}", args.name);
+    CommandOutput::new(ctx, payload, None, move |_| {
+        println!("Default profile set to {name}");
         println!("Config file: {}", path.display());
-    }
-    Ok(())
+    })
 }
 
 fn apply_root_init(config: &mut AppConfig, args: &ConfigInitArgs, default_data_dir: String) {

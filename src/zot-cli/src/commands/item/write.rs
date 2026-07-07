@@ -13,10 +13,10 @@ use crate::cli::{
     ItemKeyArgs, ItemMergeArgs, ItemUpdateArgs,
 };
 use crate::context::AppContext;
-use crate::format::print_enveloped;
+use crate::output::CommandOutput;
 use crate::util::run_pdf;
 
-pub(crate) async fn handle_create(ctx: &AppContext, args: ItemCreateArgs) -> Result<()> {
+pub(crate) async fn handle_create(ctx: &AppContext, args: ItemCreateArgs) -> Result<CommandOutput> {
     let key = if let Some(pdf) = args.pdf.as_deref() {
         add_item_from_file(
             ctx,
@@ -40,15 +40,11 @@ pub(crate) async fn handle_create(ctx: &AppContext, args: ItemCreateArgs) -> Res
         }
         .into());
     };
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "key": key }), None)?;
-    } else {
-        println!("Created item: {key}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "key": key });
+    CommandOutput::new(ctx, payload, None, move |_| println!("Created item: {key}"))
 }
 
-pub(crate) async fn handle_add_doi(ctx: &AppContext, args: AddByDoiArgs) -> Result<()> {
+pub(crate) async fn handle_add_doi(ctx: &AppContext, args: AddByDoiArgs) -> Result<CommandOutput> {
     let key = add_item_by_doi(
         ctx,
         &args.doi,
@@ -57,15 +53,11 @@ pub(crate) async fn handle_add_doi(ctx: &AppContext, args: AddByDoiArgs) -> Resu
         args.attach_mode,
     )
     .await?;
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "key": key }), None)?;
-    } else {
-        println!("Created item: {key}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "key": key });
+    CommandOutput::new(ctx, payload, None, move |_| println!("Created item: {key}"))
 }
 
-pub(crate) async fn handle_add_url(ctx: &AppContext, args: AddByUrlArgs) -> Result<()> {
+pub(crate) async fn handle_add_url(ctx: &AppContext, args: AddByUrlArgs) -> Result<CommandOutput> {
     let key = add_item_by_url(
         ctx,
         &args.url,
@@ -74,15 +66,14 @@ pub(crate) async fn handle_add_url(ctx: &AppContext, args: AddByUrlArgs) -> Resu
         args.attach_mode,
     )
     .await?;
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "key": key }), None)?;
-    } else {
-        println!("Created item: {key}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "key": key });
+    CommandOutput::new(ctx, payload, None, move |_| println!("Created item: {key}"))
 }
 
-pub(crate) async fn handle_add_file(ctx: &AppContext, args: AddFromFileArgs) -> Result<()> {
+pub(crate) async fn handle_add_file(
+    ctx: &AppContext,
+    args: AddFromFileArgs,
+) -> Result<CommandOutput> {
     let key = add_item_from_file(
         ctx,
         &args.file,
@@ -93,15 +84,11 @@ pub(crate) async fn handle_add_file(ctx: &AppContext, args: AddFromFileArgs) -> 
         &args.tags,
     )
     .await?;
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "key": key }), None)?;
-    } else {
-        println!("Created item: {key}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "key": key });
+    CommandOutput::new(ctx, payload, None, move |_| println!("Created item: {key}"))
 }
 
-pub(crate) async fn handle_merge(ctx: &AppContext, args: ItemMergeArgs) -> Result<()> {
+pub(crate) async fn handle_merge(ctx: &AppContext, args: ItemMergeArgs) -> Result<CommandOutput> {
     let keeper_key = match args.keep.as_deref() {
         Some(key) if key == args.key1 => args.key1.as_str(),
         Some(key) if key == args.key2 => args.key2.as_str(),
@@ -124,15 +111,15 @@ pub(crate) async fn handle_merge(ctx: &AppContext, args: ItemMergeArgs) -> Resul
         .collect::<Vec<_>>();
     let operation = merge_item_set(&ctx.remote()?, keeper_key, &source_keys, args.confirm).await?;
 
-    if ctx.json {
-        print_enveloped(ctx, operation, None)?;
-    } else {
-        println!("{}", serde_json::to_string_pretty(&operation)?);
-    }
-    Ok(())
+    CommandOutput::new(ctx, operation, None, |operation| {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(operation).expect("serialize merge operation")
+        );
+    })
 }
 
-pub(crate) async fn handle_update(ctx: &AppContext, args: ItemUpdateArgs) -> Result<()> {
+pub(crate) async fn handle_update(ctx: &AppContext, args: ItemUpdateArgs) -> Result<CommandOutput> {
     let mut fields = BTreeMap::new();
     if let Some(title) = args.title {
         fields.insert("title".to_string(), title);
@@ -146,49 +133,34 @@ pub(crate) async fn handle_update(ctx: &AppContext, args: ItemUpdateArgs) -> Res
         }
     }
     ctx.remote()?.update_item_fields(&args.key, &fields).await?;
-    if ctx.json {
-        print_enveloped(
-            ctx,
-            serde_json::json!({ "updated": args.key, "fields": fields }),
-            None,
-        )?;
-    } else {
-        println!("Updated {}", args.key);
-    }
-    Ok(())
+    let key = args.key;
+    let payload = serde_json::json!({ "updated": key, "fields": fields });
+    CommandOutput::new(ctx, payload, None, move |_| println!("Updated {key}"))
 }
 
-pub(crate) async fn handle_trash(ctx: &AppContext, args: ItemKeyArgs) -> Result<()> {
+pub(crate) async fn handle_trash(ctx: &AppContext, args: ItemKeyArgs) -> Result<CommandOutput> {
     ctx.remote()?.delete_item(&args.key).await?;
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "trashed": args.key }), None)?;
-    } else {
-        println!("Moved to trash: {}", args.key);
-    }
-    Ok(())
+    let key = args.key;
+    let payload = serde_json::json!({ "trashed": key });
+    CommandOutput::new(ctx, payload, None, move |_| println!("Moved to trash: {key}"))
 }
 
-pub(crate) async fn handle_restore(ctx: &AppContext, args: ItemKeyArgs) -> Result<()> {
+pub(crate) async fn handle_restore(ctx: &AppContext, args: ItemKeyArgs) -> Result<CommandOutput> {
     ctx.remote()?.restore_item(&args.key).await?;
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "restored": args.key }), None)?;
-    } else {
-        println!("Restored: {}", args.key);
-    }
-    Ok(())
+    let key = args.key;
+    let payload = serde_json::json!({ "restored": key });
+    CommandOutput::new(ctx, payload, None, move |_| println!("Restored: {key}"))
 }
 
-pub(crate) async fn handle_attach(ctx: &AppContext, args: ItemAttachArgs) -> Result<()> {
+pub(crate) async fn handle_attach(ctx: &AppContext, args: ItemAttachArgs) -> Result<CommandOutput> {
     let key = ctx
         .remote()?
         .upload_attachment(&args.key, &args.file)
         .await?;
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "attachment_key": key }), None)?;
-    } else {
-        println!("Attachment uploaded: {key}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "attachment_key": key });
+    CommandOutput::new(ctx, payload, None, move |_| {
+        println!("Attachment uploaded: {key}")
+    })
 }
 
 async fn add_item_by_doi(
