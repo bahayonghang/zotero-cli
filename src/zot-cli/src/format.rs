@@ -1,4 +1,3 @@
-use zot_core::envelope::EnvelopeError;
 use zot_core::{
     Attachment, CliEnvelope, Collection, EnvelopeMeta, Item, KnowledgeGraph, LibraryStats, Note,
     QueryChunk, Workspace, ZotError,
@@ -40,15 +39,7 @@ pub fn print_enveloped<T: serde::Serialize>(
 
 pub fn print_error(err: &ZotError, json: bool) -> anyhow::Result<()> {
     if json {
-        let payload = CliEnvelope::<serde_json::Value>::Err {
-            ok: false,
-            error: EnvelopeError {
-                code: err.payload().code,
-                message: err.payload().message,
-                hint: err.payload().hint,
-            },
-        };
-        print_json(&payload)?;
+        print_json(&CliEnvelope::<serde_json::Value>::err(err))?;
     } else {
         eprintln!("Error: {}", err);
         if let Some(hint) = err.payload().hint {
@@ -234,5 +225,35 @@ mod tests {
         .expect("serialize envelope");
         assert!(json.contains("\"profile\": \"work\""));
         assert!(json.contains("\"api_version\": 1"));
+    }
+
+    #[test]
+    fn serializes_error_envelope_byte_exact() {
+        let err = zot_core::ZotError::InvalidInput {
+            code: "invalid-input".to_string(),
+            message: "bad key".to_string(),
+            hint: Some("check the item key".to_string()),
+        };
+        let json = to_pretty_json(&CliEnvelope::<serde_json::Value>::err(&err))
+            .expect("serialize error envelope");
+        assert_eq!(
+            json,
+            "{\n  \"ok\": false,\n  \"error\": {\n    \"code\": \"invalid-input\",\n    \"message\": \"bad key\",\n    \"hint\": \"check the item key\"\n  }\n}"
+        );
+    }
+
+    #[test]
+    fn serializes_error_envelope_without_hint() {
+        let err = zot_core::ZotError::Database {
+            code: "db".to_string(),
+            message: "locked".to_string(),
+            hint: None,
+        };
+        let json = to_pretty_json(&CliEnvelope::<serde_json::Value>::err(&err))
+            .expect("serialize error envelope");
+        assert_eq!(
+            json,
+            "{\n  \"ok\": false,\n  \"error\": {\n    \"code\": \"db\",\n    \"message\": \"locked\"\n  }\n}"
+        );
     }
 }

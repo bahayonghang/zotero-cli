@@ -30,8 +30,11 @@ pub struct ErrorPayload {
 }
 ```
 
-The CLI wraps this in `CliEnvelope::Err` for `--json` output. Preserve this
-shape unless intentionally changing the JSON API version in `zot-cli`.
+The CLI wraps this in `CliEnvelope::Err` for `--json` output via the single
+constructor `CliEnvelope::err(&ZotError)` (envelope.rs). `ErrorPayload` is the
+canonical envelope error type (`EnvelopeError` is a type alias); do not copy
+fields manually. Preserve this shape unless intentionally changing the JSON
+API version in `zot-cli`.
 
 ## Patterns
 

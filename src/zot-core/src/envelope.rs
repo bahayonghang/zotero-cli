@@ -1,5 +1,7 @@
 use serde::Serialize;
 
+use crate::error::{ErrorPayload, ZotError};
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct EnvelopeMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -30,13 +32,9 @@ where
     },
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct EnvelopeError {
-    pub code: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hint: Option<String>,
-}
+/// Alias kept for backwards compatibility; the canonical type is
+/// [`ErrorPayload`] in `error.rs`.
+pub type EnvelopeError = ErrorPayload;
 
 impl<T> CliEnvelope<T>
 where
@@ -55,6 +53,13 @@ where
             ok: true,
             data,
             meta: Some(meta),
+        }
+    }
+
+    pub fn err(error: &ZotError) -> Self {
+        Self::Err {
+            ok: false,
+            error: error.payload(),
         }
     }
 }
