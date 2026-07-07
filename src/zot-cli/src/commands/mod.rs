@@ -29,7 +29,7 @@ pub(crate) async fn dispatch(ctx: &AppContext, command: Commands) -> Result<()> 
     let output = match command {
         Commands::Doctor => doctor::handle(ctx).await?,
         Commands::Config { command } => config::handle(ctx, command).await?,
-        Commands::Library { command } => legacy(library::handle(ctx, command)).await?,
+        Commands::Library { command } => library::handle(ctx, command).await?,
         Commands::Item { command } => item::handle(ctx, command).await?,
         Commands::Collection { command } => collection::handle(ctx, command).await?,
         Commands::Graph(args) => graph::handle(ctx, args).await?,

@@ -12,10 +12,11 @@ use crate::cli::{
 };
 use crate::commands::item::merge::merge_item_set;
 use crate::context::AppContext;
-use crate::format::{EnvelopeMetaSeed, print_enveloped, print_items, print_stats};
+use crate::format::{EnvelopeMetaSeed, print_items, print_stats};
+use crate::output::CommandOutput;
 use crate::util::{maybe_embed_query, parse_json_input, run_pdf};
 
-pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<()> {
+pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     match command {
         LibraryCommand::Search(args) => {
@@ -31,33 +32,19 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 limit: args.limit,
                 offset: args.offset,
             })?;
-            if ctx.json {
-                print_enveloped(
-                    ctx,
-                    &result.items,
-                    Some(EnvelopeMetaSeed {
-                        count: Some(result.items.len()),
-                        total: Some(result.total),
-                    }),
-                )?;
-            } else {
-                print_items(&result.items);
-            }
+            let seed = Some(EnvelopeMetaSeed {
+                count: Some(result.items.len()),
+                total: Some(result.total),
+            });
+            CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
         }
         LibraryCommand::List(args) => {
             let items = library.list_items(args.collection.as_deref(), args.limit, args.offset)?;
-            if ctx.json {
-                print_enveloped(
-                    ctx,
-                    &items,
-                    Some(EnvelopeMetaSeed {
-                        count: Some(items.len()),
-                        total: None,
-                    }),
-                )?;
-            } else {
-                print_items(&items);
-            }
+            let seed = Some(EnvelopeMetaSeed {
+                count: Some(items.len()),
+                total: None,
+            });
+            CommandOutput::new(ctx, items, seed, |items| print_items(items))
         }
         LibraryCommand::Recent(args) => {
             let items = if let Some(count) = args.count {
@@ -67,19 +54,11 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             } else {
                 library.get_recent_items_by_count(10)?
             };
-            if ctx.json {
-                print_enveloped(ctx, &items, None)?;
-            } else {
-                print_items(&items);
-            }
+            CommandOutput::new(ctx, items, None, |items| print_items(items))
         }
         LibraryCommand::Stats => {
             let stats = library.get_stats()?;
-            if ctx.json {
-                print_enveloped(ctx, stats, None)?;
-            } else {
-                print_stats(&stats);
-            }
+            CommandOutput::new(ctx, stats, None, print_stats)
         }
         LibraryCommand::Citekey(args) => {
             let match_opt = match library.search_by_citation_key(&args.citekey)? {
@@ -112,27 +91,21 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 message: format!("Citation key '{}' not found", args.citekey),
                 hint: None,
             })?;
-            if ctx.json {
-                print_enveloped(ctx, &item, None)?;
-            } else {
-                print_items(std::slice::from_ref(&item.item));
-            }
+            CommandOutput::new(ctx, item, None, |item| {
+                print_items(std::slice::from_ref(&item.item))
+            })
         }
         LibraryCommand::Tags => {
             let tags = library.get_tags()?;
-            if ctx.json {
-                print_enveloped(ctx, &tags, None)?;
-            } else {
+            CommandOutput::new(ctx, tags, None, |tags| {
                 for tag in tags {
                     println!("{} ({})", tag.name, tag.count);
                 }
-            }
+            })
         }
         LibraryCommand::Libraries => {
             let libraries = library.get_libraries()?;
-            if ctx.json {
-                print_enveloped(ctx, &libraries, None)?;
-            } else {
+            CommandOutput::new(ctx, libraries, None, |libraries| {
                 for entry in libraries {
                     println!(
                         "{} [{}] items={}{}{}",
@@ -151,55 +124,45 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                             .unwrap_or_default()
                     );
                 }
-            }
+            })
         }
         LibraryCommand::Feeds => {
             let feeds = library.get_feeds()?;
-            if ctx.json {
-                print_enveloped(ctx, &feeds, None)?;
-            } else if feeds.is_empty() {
-                println!("No RSS feeds found.");
-            } else {
-                for feed in feeds {
-                    println!("{} [{}] {}", feed.library_id, feed.item_count, feed.name);
-                    println!("  URL: {}", feed.url);
+            CommandOutput::new(ctx, feeds, None, |feeds| {
+                if feeds.is_empty() {
+                    println!("No RSS feeds found.");
+                } else {
+                    for feed in feeds {
+                        println!("{} [{}] {}", feed.library_id, feed.item_count, feed.name);
+                        println!("  URL: {}", feed.url);
+                    }
                 }
-            }
+            })
         }
         LibraryCommand::FeedItems(args) => {
             let items = library.get_feed_items(args.library_id, args.limit)?;
-            if ctx.json {
-                print_enveloped(ctx, &items, None)?;
-            } else {
-                print_items(&items);
-            }
+            CommandOutput::new(ctx, items, None, |items| print_items(items))
         }
         LibraryCommand::SemanticSearch(args) => {
             let hits = semantic_search(ctx, &library, args).await?;
-            if ctx.json {
-                print_enveloped(ctx, &hits, None)?;
-            } else {
+            CommandOutput::new(ctx, hits, None, |hits| {
                 for hit in hits {
                     println!("{} [{:.3}] {}", hit.item.key, hit.score, hit.item.title);
-                    if let Some(chunk) = hit.matched_chunk {
+                    if let Some(chunk) = &hit.matched_chunk {
                         println!("  {}", chunk);
                     }
                 }
-            }
+            })
         }
         LibraryCommand::SemanticIndex(args) => {
             let payload = semantic_index(ctx, args).await?;
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else {
-                println!("Library semantic index updated.");
-            }
+            CommandOutput::new(ctx, payload, None, |_| {
+                println!("Library semantic index updated.")
+            })
         }
         LibraryCommand::SemanticStatus => {
             let status = semantic_status(ctx).await?;
-            if ctx.json {
-                print_enveloped(ctx, status, None)?;
-            } else {
+            CommandOutput::new(ctx, status, None, |status| {
                 println!(
                     "{} chunks={} items={} embeddings={}",
                     status.path,
@@ -207,7 +170,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                     status.indexed_items,
                     status.chunks_with_embeddings
                 );
-            }
+            })
         }
         LibraryCommand::Duplicates(args) => {
             let groups = library.find_duplicates(
@@ -215,69 +178,58 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 args.collection.as_deref(),
                 args.limit,
             )?;
-            if ctx.json {
-                print_enveloped(ctx, &groups, None)?;
-            } else {
+            CommandOutput::new(ctx, groups, None, |groups| {
                 for group in groups {
                     println!("{} ({:.2})", group.match_type, group.score);
                     print_items(&group.items);
                     println!();
                 }
-            }
+            })
         }
         LibraryCommand::DuplicatesMerge(args) => {
             let payload =
                 merge_duplicates(ctx, &args.keeper, &args.duplicates, args.confirm).await?;
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else {
-                println!("{}", serde_json::to_string_pretty(&payload)?);
-            }
+            CommandOutput::new(ctx, payload, None, |payload| {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(payload).expect("serialize merge operation")
+                );
+            })
         }
-        LibraryCommand::SavedSearch { command } => handle_saved_search(ctx, command).await?,
+        LibraryCommand::SavedSearch { command } => handle_saved_search(ctx, command).await,
     }
-    Ok(())
 }
 
-async fn handle_saved_search(ctx: &AppContext, command: LibrarySavedSearchCommand) -> Result<()> {
+async fn handle_saved_search(
+    ctx: &AppContext,
+    command: LibrarySavedSearchCommand,
+) -> Result<CommandOutput> {
     match command {
         LibrarySavedSearchCommand::List => {
             let searches = ctx.remote()?.list_saved_searches().await?;
-            if ctx.json {
-                print_enveloped(
-                    ctx,
-                    &searches,
-                    Some(EnvelopeMetaSeed {
-                        count: Some(searches.len()),
-                        total: Some(searches.len()),
-                    }),
-                )?;
-            } else if searches.is_empty() {
-                println!("No saved searches found.");
-            } else {
-                for search in searches {
-                    println!("{} {}", search.key, search.name);
+            let seed = Some(EnvelopeMetaSeed {
+                count: Some(searches.len()),
+                total: Some(searches.len()),
+            });
+            CommandOutput::new(ctx, searches, seed, |searches| {
+                if searches.is_empty() {
+                    println!("No saved searches found.");
+                } else {
+                    for search in searches {
+                        println!("{} {}", search.key, search.name);
+                    }
                 }
-            }
+            })
         }
         LibrarySavedSearchCommand::Create(args) => {
             let payload = create_saved_search(ctx, args).await?;
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else {
-                println!("Saved search created.");
-            }
+            CommandOutput::new(ctx, payload, None, |_| println!("Saved search created."))
         }
         LibrarySavedSearchCommand::Delete(args) => {
             let payload = delete_saved_searches(ctx, args).await?;
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else {
-                println!("Saved search deleted.");
-            }
+            CommandOutput::new(ctx, payload, None, |_| println!("Saved search deleted."))
         }
     }
-    Ok(())
 }
 
 async fn create_saved_search(
@@ -463,12 +415,24 @@ mod tests {
     use std::sync::Arc;
 
     use super::{
-        create_saved_search, effective_semantic_index_limit, truncate_semantic_index_items,
+        create_saved_search, delete_saved_searches, effective_semantic_index_limit,
+        truncate_semantic_index_items,
     };
-    use crate::cli::LibrarySavedSearchCreateArgs;
+    use crate::cli::{LibrarySavedSearchCreateArgs, LibrarySavedSearchDeleteArgs};
     use crate::context::AppContext;
+    use crate::output::CommandOutput;
     use zot_core::{AppConfig, LibraryScope};
     use zot_remote::HttpRuntime;
+
+    fn json_ctx() -> AppContext {
+        AppContext {
+            json: true,
+            profile: Some("default".to_string()),
+            scope: LibraryScope::User,
+            config: AppConfig::default(),
+            http: Arc::new(HttpRuntime::default()),
+        }
+    }
 
     #[test]
     fn semantic_index_limit_defaults_to_ten_thousand() {
@@ -480,6 +444,53 @@ mod tests {
     fn truncate_semantic_index_items_applies_collection_limit() {
         let limited = truncate_semantic_index_items(vec![1, 2, 3], 2);
         assert_eq!(limited, vec![1, 2]);
+    }
+
+    #[test]
+    fn semantic_status_output_envelope_carries_fields() {
+        // Exercises the `SemanticStatus` handler's json-mode return value
+        // without touching stdout or the on-disk index.
+        let ctx = json_ctx();
+        let status = zot_core::SemanticIndexStatus {
+            exists: false,
+            path: "/tmp/idx.sqlite".to_string(),
+            indexed_items: 3,
+            indexed_chunks: 12,
+            chunks_with_embeddings: 7,
+            last_indexed_at: None,
+        };
+        let out = CommandOutput::new(&ctx, status, None, |_| unreachable!()).expect("build output");
+        let json = out.as_json().expect("json payload");
+        assert!(json.contains("\"ok\": true"));
+        assert!(json.contains("\"indexed_items\": 3"));
+        assert!(json.contains("\"indexed_chunks\": 12"));
+        assert!(json.contains("\"chunks_with_embeddings\": 7"));
+    }
+
+    #[test]
+    fn saved_search_delete_output_is_enveloped() {
+        let ctx = json_ctx();
+        let payload = serde_json::json!({ "deleted": ["SRCH01", "SRCH02"] });
+        let out = CommandOutput::new(&ctx, payload, None, |_| unreachable!()).expect("build output");
+        let json = out.as_json().expect("json payload");
+        assert!(json.contains("\"ok\": true"));
+        assert!(json.contains("\"deleted\""));
+        assert!(json.contains("SRCH01"));
+    }
+
+    #[tokio::test]
+    async fn delete_saved_searches_requires_at_least_one_key() {
+        let ctx = json_ctx();
+        let err = delete_saved_searches(&ctx, LibrarySavedSearchDeleteArgs { keys: vec![] })
+            .await
+            .expect_err("empty keys should fail before any remote call");
+        let err = err.downcast_ref::<zot_core::ZotError>().expect("zot error");
+        match err {
+            zot_core::ZotError::InvalidInput { code, .. } => {
+                assert_eq!(code, "saved-search-delete")
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 
     #[tokio::test]
