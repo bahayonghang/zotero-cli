@@ -14,10 +14,6 @@ enum Payload {
     /// Human-readable rendering closure (constructed only when not json;
     /// captures owned data, deferred until `emit`).
     Human(Box<dyn FnOnce() + Send>),
-    /// Mode-independent verbatim text (e.g. non-json workspace/item export).
-    /// Constructed starting in the workspace-export migration batch.
-    #[allow(dead_code)]
-    Raw(String),
     /// No output (completions, mcp serve, etc. write stdout themselves).
     Silent,
 }
@@ -56,11 +52,6 @@ impl CommandOutput {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn raw(text: String) -> Self {
-        Self(Payload::Raw(text))
-    }
-
     pub(crate) fn silent() -> Self {
         Self(Payload::Silent)
     }
@@ -68,7 +59,7 @@ impl CommandOutput {
     /// The single print action, invoked once by the dispatch layer.
     pub(crate) fn emit(self) {
         match self.0 {
-            Payload::Json(text) | Payload::Raw(text) => println!("{text}"),
+            Payload::Json(text) => println!("{text}"),
             Payload::Human(render) => render(),
             Payload::Silent => {}
         }
@@ -92,7 +83,6 @@ mod tests {
     use zot_remote::HttpRuntime;
 
     use super::*;
-    use crate::format::print_enveloped;
 
     fn ctx(json: bool) -> AppContext {
         AppContext {
@@ -104,43 +94,34 @@ mod tests {
         }
     }
 
-    /// Capture what `print_enveloped` writes to stdout by rebuilding the exact
-    /// same serialization path (it is a thin wrapper over `to_pretty_json`).
-    fn expected_enveloped<T: serde::Serialize>(
-        c: &AppContext,
-        data: &T,
-        seed: Option<EnvelopeMetaSeed>,
-    ) -> String {
-        let seed = seed.unwrap_or_default();
-        let meta = zot_core::EnvelopeMeta {
-            count: seed.count,
-            total: seed.total,
-            profile: c.profile.clone(),
-            api_version: Some(ENVELOPE_API_VERSION),
-        };
-        to_pretty_json(&zot_core::CliEnvelope::ok_with_meta(data, meta)).expect("serialize")
-    }
-
     #[test]
-    fn json_output_matches_print_enveloped_with_seed() {
+    fn json_output_is_byte_exact_with_seed() {
         let c = ctx(true);
         let data = serde_json::json!({ "key": "WORK001", "title": "Sample" });
         let seed = Some(EnvelopeMetaSeed {
             count: Some(3),
             total: Some(10),
         });
-        let expected = expected_enveloped(&c, &data, seed.clone());
         let out = CommandOutput::new(&c, data, seed, |_| unreachable!()).expect("build");
-        assert_eq!(out.as_json(), Some(expected.as_str()));
+        assert_eq!(
+            out.as_json(),
+            Some(
+                "{\n  \"ok\": true,\n  \"data\": {\n    \"key\": \"WORK001\",\n    \"title\": \"Sample\"\n  },\n  \"meta\": {\n    \"count\": 3,\n    \"total\": 10,\n    \"profile\": \"default\",\n    \"api_version\": 1\n  }\n}"
+            )
+        );
     }
 
     #[test]
-    fn json_output_matches_print_enveloped_without_seed() {
+    fn json_output_is_byte_exact_without_seed() {
         let c = ctx(true);
         let data = vec!["a".to_string(), "b".to_string()];
-        let expected = expected_enveloped(&c, &data, None);
         let out = CommandOutput::new(&c, data, None, |_| unreachable!()).expect("build");
-        assert_eq!(out.as_json(), Some(expected.as_str()));
+        assert_eq!(
+            out.as_json(),
+            Some(
+                "{\n  \"ok\": true,\n  \"data\": [\n    \"a\",\n    \"b\"\n  ],\n  \"meta\": {\n    \"profile\": \"default\",\n    \"api_version\": 1\n  }\n}"
+            )
+        );
     }
 
     #[test]
@@ -159,12 +140,5 @@ mod tests {
         let json = out.as_json().expect("json payload");
         assert!(json.contains("\"profile\": \"default\""));
         assert!(json.contains("\"api_version\": 1"));
-    }
-
-    #[test]
-    fn print_enveloped_still_reachable() {
-        // Keep a reference so the migration-era helper stays wired until batch 6.
-        let c = ctx(true);
-        print_enveloped(&c, serde_json::json!({"ok": 1}), None).expect("print");
     }
 }

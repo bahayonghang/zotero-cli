@@ -1,9 +1,7 @@
 use zot_core::{
-    Attachment, CliEnvelope, Collection, EnvelopeMeta, Item, KnowledgeGraph, LibraryStats, Note,
-    QueryChunk, Workspace, ZotError,
+    Attachment, CliEnvelope, Collection, Item, KnowledgeGraph, LibraryStats, Note, QueryChunk,
+    Workspace, ZotError,
 };
-
-use crate::context::AppContext;
 
 pub const ENVELOPE_API_VERSION: u32 = 1;
 
@@ -20,21 +18,6 @@ pub fn to_pretty_json<T: serde::Serialize>(value: &T) -> anyhow::Result<String> 
 pub fn print_json<T: serde::Serialize>(value: &T) -> anyhow::Result<()> {
     println!("{}", to_pretty_json(value)?);
     Ok(())
-}
-
-pub fn print_enveloped<T: serde::Serialize>(
-    ctx: &AppContext,
-    data: T,
-    seed: Option<EnvelopeMetaSeed>,
-) -> anyhow::Result<()> {
-    let seed = seed.unwrap_or_default();
-    let meta = EnvelopeMeta {
-        count: seed.count,
-        total: seed.total,
-        profile: ctx.profile.clone(),
-        api_version: Some(ENVELOPE_API_VERSION),
-    };
-    print_json(&CliEnvelope::ok_with_meta(data, meta))
 }
 
 pub fn print_error(err: &ZotError, json: bool) -> anyhow::Result<()> {
@@ -211,7 +194,7 @@ mod tests {
     fn envelope_meta_carries_profile_from_context_and_api_version() {
         // We don't construct an `AppContext` here (it carries non-trivial
         // dependencies); instead exercise the same `EnvelopeMeta` shape that
-        // `print_enveloped` would emit, ensuring the new `api_version` field
+        // `CommandOutput::new` emits, ensuring the `api_version` field
         // round-trips through JSON.
         let json = to_pretty_json(&CliEnvelope::ok_with_meta(
             serde_json::json!({"key": "WORK001"}),

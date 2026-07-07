@@ -12,48 +12,34 @@ use crate::cli::{
     WorkspaceSearchArgs,
 };
 use crate::context::AppContext;
-use crate::format::{
-    print_enveloped, print_items, print_json, print_query_chunks, print_workspace,
-};
+use crate::format::{print_items, print_query_chunks, print_workspace, to_pretty_json};
+use crate::output::CommandOutput;
 use crate::util::{maybe_embed_query, run_pdf};
 
-pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Result<()> {
+pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Result<CommandOutput> {
     let store = WorkspaceStore::new(None);
     match command {
         WorkspaceCommand::New(args) => {
             let workspace = store.create(&args.name, &args.description)?;
-            if ctx.json {
-                print_enveloped(ctx, workspace, None)?;
-            } else {
-                print_workspace(&workspace);
-            }
+            CommandOutput::new(ctx, workspace, None, print_workspace)
         }
         WorkspaceCommand::Delete(args) => {
             store.delete(&args.name)?;
-            if ctx.json {
-                print_enveloped(ctx, serde_json::json!({ "deleted": args.name }), None)?;
-            } else {
-                println!("Workspace deleted.");
-            }
+            let payload = serde_json::json!({ "deleted": args.name });
+            CommandOutput::new(ctx, payload, None, |_| println!("Workspace deleted."))
         }
         WorkspaceCommand::List => {
             let workspaces = store.list()?;
-            if ctx.json {
-                print_enveloped(ctx, &workspaces, None)?;
-            } else {
+            CommandOutput::new(ctx, workspaces, None, |workspaces| {
                 for workspace in workspaces {
-                    print_workspace(&workspace);
+                    print_workspace(workspace);
                     println!();
                 }
-            }
+            })
         }
         WorkspaceCommand::Show(args) => {
             let workspace = store.load(&args.name)?;
-            if ctx.json {
-                print_enveloped(ctx, &workspace, None)?;
-            } else {
-                print_workspace(&workspace);
-            }
+            CommandOutput::new(ctx, workspace, None, print_workspace)
         }
         WorkspaceCommand::Add(args) => {
             let mut workspace = store.load(&args.name)?;
@@ -66,36 +52,33 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
             }
             let added = store.add_items(&mut workspace, &items);
             store.save(&workspace)?;
-            if ctx.json {
-                print_enveloped(ctx, serde_json::json!({ "added": added }), None)?;
-            } else {
-                println!("Added {added} item(s).");
-            }
+            let payload = serde_json::json!({ "added": added });
+            CommandOutput::new(ctx, payload, None, move |_| {
+                println!("Added {added} item(s).")
+            })
         }
         WorkspaceCommand::Remove(args) => {
             let mut workspace = store.load(&args.name)?;
             let removed = store.remove_keys(&mut workspace, &args.keys);
             store.save(&workspace)?;
-            if ctx.json {
-                print_enveloped(ctx, serde_json::json!({ "removed": removed }), None)?;
-            } else {
-                println!("Removed {removed} item(s).");
-            }
+            let payload = serde_json::json!({ "removed": removed });
+            CommandOutput::new(ctx, payload, None, move |_| {
+                println!("Removed {removed} item(s).")
+            })
         }
-        WorkspaceCommand::Import(args) => import_items(ctx, &store, args).await?,
-        WorkspaceCommand::Search(args) => search_workspace(ctx, &store, args).await?,
-        WorkspaceCommand::Export(args) => export_workspace(ctx, &store, args).await?,
-        WorkspaceCommand::Index(args) => index_workspace(ctx, &store, args).await?,
-        WorkspaceCommand::Query(args) => query_workspace(ctx, &store, args).await?,
+        WorkspaceCommand::Import(args) => import_items(ctx, &store, args).await,
+        WorkspaceCommand::Search(args) => search_workspace(ctx, &store, args).await,
+        WorkspaceCommand::Export(args) => export_workspace(ctx, &store, args).await,
+        WorkspaceCommand::Index(args) => index_workspace(ctx, &store, args).await,
+        WorkspaceCommand::Query(args) => query_workspace(ctx, &store, args).await,
     }
-    Ok(())
 }
 
 async fn import_items(
     ctx: &AppContext,
     store: &WorkspaceStore,
     args: WorkspaceImportArgs,
-) -> Result<()> {
+) -> Result<CommandOutput> {
     let mut workspace = store.load(&args.name)?;
     let library = ctx.local_library()?;
     let items = if let Some(collection) = args.collection.as_deref() {
@@ -124,19 +107,17 @@ async fn import_items(
     };
     let added = store.add_items(&mut workspace, &items);
     store.save(&workspace)?;
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "added": added }), None)?;
-    } else {
-        println!("Imported {added} item(s).");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "added": added });
+    CommandOutput::new(ctx, payload, None, move |_| {
+        println!("Imported {added} item(s).")
+    })
 }
 
 async fn search_workspace(
     ctx: &AppContext,
     store: &WorkspaceStore,
     args: WorkspaceSearchArgs,
-) -> Result<()> {
+) -> Result<CommandOutput> {
     let workspace = store.load(&args.name)?;
     let allowed = workspace
         .items
@@ -153,19 +134,14 @@ async fn search_workspace(
         .into_iter()
         .filter(|item| allowed.contains(&item.key))
         .collect::<Vec<_>>();
-    if ctx.json {
-        print_enveloped(ctx, &filtered, None)?;
-    } else {
-        print_items(&filtered);
-    }
-    Ok(())
+    CommandOutput::new(ctx, filtered, None, |filtered| print_items(filtered))
 }
 
 async fn export_workspace(
     ctx: &AppContext,
     store: &WorkspaceStore,
     args: WorkspaceExportArgs,
-) -> Result<()> {
+) -> Result<CommandOutput> {
     let workspace = store.load(&args.name)?;
     let library = ctx.local_library()?;
     let mut items = Vec::with_capacity(workspace.items.len());
@@ -176,11 +152,10 @@ async fn export_workspace(
     }
     match args.format.as_str() {
         "json" => {
-            if ctx.json {
-                print_enveloped(ctx, &items, None)?;
-            } else {
-                print_json(&items)?;
-            }
+            // JSON mode wraps the items in the envelope; the plain-text pipeline
+            // (no `--json`) still emits the bare pretty-printed array unchanged.
+            let rendered = to_pretty_json(&items)?;
+            CommandOutput::new(ctx, items, None, move |_| println!("{rendered}"))
         }
         "bibtex" => {
             let mut exports = Vec::new();
@@ -189,29 +164,32 @@ async fn export_workspace(
                     exports.push(export);
                 }
             }
-            println!("{}", exports.join("\n\n"));
+            let content = exports.join("\n\n");
+            let payload = serde_json::json!({ "format": "bibtex", "content": content });
+            CommandOutput::new(ctx, payload, None, move |_| println!("{content}"))
         }
         _ => {
-            println!("# Workspace {}", workspace.name);
+            let mut content = format!("# Workspace {}", workspace.name);
             if !workspace.description.is_empty() {
-                println!("\n{}", workspace.description);
+                content.push_str(&format!("\n\n{}", workspace.description));
             }
             for item in items {
-                println!("\n## {} ({})", item.title, item.key);
+                content.push_str(&format!("\n\n## {} ({})", item.title, item.key));
                 if let Some(abstract_note) = item.abstract_note.as_deref() {
-                    println!("{abstract_note}");
+                    content.push_str(&format!("\n{abstract_note}"));
                 }
             }
+            let payload = serde_json::json!({ "format": "markdown", "content": content });
+            CommandOutput::new(ctx, payload, None, move |_| println!("{content}"))
         }
     }
-    Ok(())
 }
 
 async fn index_workspace(
     ctx: &AppContext,
     store: &WorkspaceStore,
     args: crate::cli::WorkspaceIndexArgs,
-) -> Result<()> {
+) -> Result<CommandOutput> {
     let workspace = store.load(&args.name)?;
     let library = ctx.local_library()?;
     let rag = WorkspaceRagStore::open(store, &args.name)?;
@@ -234,23 +212,16 @@ async fn index_workspace(
         let embeddings = embedding_client.embed(&texts).await?;
         rag.apply_pending_embeddings(pending, embeddings)?;
     }
-    if ctx.json {
-        print_enveloped(
-            ctx,
-            serde_json::json!({ "indexed": true, "items": stats.items, "chunks": stats.chunks }),
-            None,
-        )?;
-    } else {
-        println!("Workspace indexed.");
-    }
-    Ok(())
+    let payload =
+        serde_json::json!({ "indexed": true, "items": stats.items, "chunks": stats.chunks });
+    CommandOutput::new(ctx, payload, None, |_| println!("Workspace indexed."))
 }
 
 async fn query_workspace(
     ctx: &AppContext,
     store: &WorkspaceStore,
     args: WorkspaceQueryArgs,
-) -> Result<()> {
+) -> Result<CommandOutput> {
     let workspace = store.load(&args.name)?;
     let rag = WorkspaceRagStore::open(store, &args.name)?;
     let mode: HybridMode = args.mode.into();
@@ -266,10 +237,50 @@ async fn query_workspace(
         embedding.as_deref(),
         args.limit,
     )?;
-    if ctx.json {
-        print_enveloped(ctx, &chunks, None)?;
-    } else {
-        print_query_chunks(&chunks);
+    CommandOutput::new(ctx, chunks, None, |chunks| print_query_chunks(chunks))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use super::*;
+    use zot_core::{AppConfig, LibraryScope};
+    use zot_remote::HttpRuntime;
+
+    fn ctx(json: bool) -> AppContext {
+        AppContext {
+            json,
+            profile: Some("default".to_string()),
+            scope: LibraryScope::User,
+            config: AppConfig::default(),
+            http: Arc::new(HttpRuntime::default()),
+        }
     }
-    Ok(())
+
+    #[test]
+    fn export_bibtex_json_envelope_exposes_format_and_content() {
+        // Mirrors the `--json` payload the bibtex export arm emits.
+        let payload = serde_json::json!({
+            "format": "bibtex",
+            "content": "@article{key, title={Sample}}",
+        });
+        let out = CommandOutput::new(&ctx(true), payload, None, |_| unreachable!())
+            .expect("build output");
+        let json = out.as_json().expect("json payload");
+        assert!(json.contains("\"ok\": true"));
+        assert!(json.contains("\"format\": \"bibtex\""));
+        assert!(json.contains("\"content\""));
+    }
+
+    #[test]
+    fn export_markdown_human_mode_has_no_json_payload() {
+        // In the default (non-json) mode the markdown export renders bare text,
+        // so `as_json()` must be absent.
+        let content = "# Workspace Demo".to_string();
+        let payload = serde_json::json!({ "format": "markdown", "content": content });
+        let out = CommandOutput::new(&ctx(false), payload, None, move |_| println!("{content}"))
+            .expect("build output");
+        assert_eq!(out.as_json(), None);
+    }
 }

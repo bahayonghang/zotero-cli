@@ -39,8 +39,8 @@ When `--json` is set, errors print as:
 }
 ```
 
-The success side always goes through `print_enveloped`, which includes
-`meta.api_version == 1`.
+The success side always goes through `CommandOutput::new` (see `output.rs`),
+which includes `meta.api_version == 1`.
 
 ## Code Example
 

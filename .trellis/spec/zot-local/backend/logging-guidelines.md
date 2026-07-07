@@ -7,7 +7,7 @@ instead.
 ## Output Boundary
 
 - Human output belongs in `zot-cli/src/format.rs` and command handlers.
-- JSON output belongs in `zot-cli` via `print_enveloped`.
+- JSON output belongs in `zot-cli` via `CommandOutput` (`zot-cli/src/output.rs`).
 - Local status should be represented as serializable data, for example
   `SemanticIndexStatus` and `PdfiumAvailability`.
 

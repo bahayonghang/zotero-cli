@@ -9,8 +9,10 @@ stability, and safety around writes matter more than clever abstractions.
   `cli.rs::parses_new_library_and_item_command_surfaces`.
 - Keep global flags (`--json`, `--profile`, `--library`) on the root `Cli`.
   `--library` only accepts `user` or `group:<id>` through `parse_library_scope`.
-- Use `print_enveloped` for JSON success payloads. It adds `count`, `total`,
-  active profile, and `api_version`.
+- Return `CommandOutput` from handlers for JSON success payloads.
+  `CommandOutput::new` assembles the envelope, adding `count`, `total`,
+  active profile, and `api_version`. Do not branch on `ctx.json` in command
+  modules — the decision lives once inside `CommandOutput::new`.
 - Preserve human output helpers in `format.rs` for table/text output rather
   than open-coding repeated printing in command modules.
 - Offload blocking PDF backend calls through `util::run_pdf`.
@@ -32,16 +34,16 @@ stability, and safety around writes matter more than clever abstractions.
 
 ## Code Example
 
-Keep JSON envelope metadata stable:
+Handlers return a `CommandOutput`; the json branch inside `CommandOutput::new`
+assembles stable envelope metadata (`count`, `total`, active profile,
+`api_version`) and the dispatch layer emits it:
 
 ```rust
-let meta = EnvelopeMeta {
-    count: seed.count,
-    total: seed.total,
-    profile: ctx.profile.clone(),
-    api_version: Some(ENVELOPE_API_VERSION),
-};
-print_json(&CliEnvelope::ok_with_meta(data, meta))
+let seed = Some(EnvelopeMetaSeed {
+    count: Some(items.len()),
+    total: Some(total),
+});
+CommandOutput::new(ctx, items, seed, |items| print_items(items))
 ```
 
 ## Safety Rules

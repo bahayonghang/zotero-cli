@@ -2,8 +2,9 @@ use anyhow::Result;
 
 use crate::cli::McpCommand;
 use crate::context::AppContext;
+use crate::output::CommandOutput;
 
-pub(crate) async fn handle(_ctx: &AppContext, command: McpCommand) -> Result<()> {
+pub(crate) async fn handle(_ctx: &AppContext, command: McpCommand) -> Result<CommandOutput> {
     match command {
         McpCommand::Serve => Err(zot_core::ZotError::Unsupported {
             code: "mcp-not-implemented".to_string(),
