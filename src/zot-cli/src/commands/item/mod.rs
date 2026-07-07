@@ -12,29 +12,20 @@ use crate::cli::ItemCommand;
 use crate::context::AppContext;
 use crate::output::CommandOutput;
 
-/// Migration-era adapter for item subcommands that still return `Result<()>`
-/// and print their own output. Removed once every arm returns `CommandOutput`.
-async fn legacy<F>(fut: F) -> Result<CommandOutput>
-where
-    F: std::future::Future<Output = Result<()>>,
-{
-    fut.await.map(|()| CommandOutput::silent())
-}
-
 pub(crate) async fn handle(ctx: &AppContext, command: ItemCommand) -> Result<CommandOutput> {
     match command {
-        ItemCommand::Get(args) => legacy(read::handle_get(ctx, args)).await,
-        ItemCommand::Related(args) => legacy(read::handle_related(ctx, args)).await,
-        ItemCommand::Open(args) => legacy(read::handle_open(ctx, args)).await,
-        ItemCommand::Pdf(args) => legacy(read::handle_pdf(ctx, args)).await,
-        ItemCommand::Fulltext(args) => legacy(read::handle_pdf(ctx, args)).await,
-        ItemCommand::Children(args) => legacy(read::handle_children(ctx, args)).await,
-        ItemCommand::Download(args) => legacy(read::handle_download(ctx, args)).await,
-        ItemCommand::Deleted(args) => legacy(read::handle_deleted(ctx, args)).await,
-        ItemCommand::Versions(args) => legacy(read::handle_versions(ctx, args)).await,
-        ItemCommand::Outline(args) => legacy(read::handle_outline(ctx, &args.key)).await,
-        ItemCommand::Export(args) => legacy(read::handle_export(ctx, args)).await,
-        ItemCommand::Cite(args) => legacy(read::handle_cite(ctx, args)).await,
+        ItemCommand::Get(args) => read::handle_get(ctx, args).await,
+        ItemCommand::Related(args) => read::handle_related(ctx, args).await,
+        ItemCommand::Open(args) => read::handle_open(ctx, args).await,
+        ItemCommand::Pdf(args) => read::handle_pdf(ctx, args).await,
+        ItemCommand::Fulltext(args) => read::handle_pdf(ctx, args).await,
+        ItemCommand::Children(args) => read::handle_children(ctx, args).await,
+        ItemCommand::Download(args) => read::handle_download(ctx, args).await,
+        ItemCommand::Deleted(args) => read::handle_deleted(ctx, args).await,
+        ItemCommand::Versions(args) => read::handle_versions(ctx, args).await,
+        ItemCommand::Outline(args) => read::handle_outline(ctx, &args.key).await,
+        ItemCommand::Export(args) => read::handle_export(ctx, args).await,
+        ItemCommand::Cite(args) => read::handle_cite(ctx, args).await,
         ItemCommand::Create(args) => write::handle_create(ctx, args).await,
         ItemCommand::AddDoi(args) => write::handle_add_doi(ctx, args).await,
         ItemCommand::AddUrl(args) => write::handle_add_url(ctx, args).await,

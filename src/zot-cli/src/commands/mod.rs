@@ -31,7 +31,7 @@ pub(crate) async fn dispatch(ctx: &AppContext, command: Commands) -> Result<()> 
         Commands::Config { command } => config::handle(ctx, command).await?,
         Commands::Library { command } => legacy(library::handle(ctx, command)).await?,
         Commands::Item { command } => item::handle(ctx, command).await?,
-        Commands::Collection { command } => legacy(collection::handle(ctx, command)).await?,
+        Commands::Collection { command } => collection::handle(ctx, command).await?,
         Commands::Graph(args) => graph::handle(ctx, args).await?,
         Commands::Workspace { command } => legacy(workspace::handle(ctx, command)).await?,
         Commands::Sync { command } => sync::handle(ctx, command).await?,

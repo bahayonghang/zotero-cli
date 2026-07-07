@@ -8,10 +8,11 @@ use crate::cli::{
     ItemOpenArgs, ItemPdfArgs, ItemRelatedArgs, ItemVersionsArgs,
 };
 use crate::context::AppContext;
-use crate::format::{print_enveloped, print_item, print_items};
+use crate::format::{print_item, print_items};
+use crate::output::CommandOutput;
 use crate::util::{open_target, parse_page_range, print_outline_entries, run_pdf};
 
-pub(crate) async fn handle_get(ctx: &AppContext, args: ItemKeyArgs) -> Result<()> {
+pub(crate) async fn handle_get(ctx: &AppContext, args: ItemKeyArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let item = library
         .get_item(&args.key)?
@@ -22,31 +23,26 @@ pub(crate) async fn handle_get(ctx: &AppContext, args: ItemKeyArgs) -> Result<()
         })?;
     let notes = library.get_notes(&args.key)?;
     let attachments = library.get_attachments(&args.key)?;
-    if ctx.json {
-        let payload = serde_json::json!({
-            "item": item,
-            "notes": notes,
-            "attachments": attachments,
-        });
-        print_enveloped(ctx, payload, None)?;
-    } else {
-        print_item(&item, &notes, &attachments);
-    }
-    Ok(())
+    let payload = serde_json::json!({
+        "item": item,
+        "notes": notes,
+        "attachments": attachments,
+    });
+    CommandOutput::new(ctx, payload, None, move |_| {
+        print_item(&item, &notes, &attachments)
+    })
 }
 
-pub(crate) async fn handle_related(ctx: &AppContext, args: ItemRelatedArgs) -> Result<()> {
+pub(crate) async fn handle_related(
+    ctx: &AppContext,
+    args: ItemRelatedArgs,
+) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let items = library.get_related_items(&args.key, args.limit)?;
-    if ctx.json {
-        print_enveloped(ctx, &items, None)?;
-    } else {
-        print_items(&items);
-    }
-    Ok(())
+    CommandOutput::new(ctx, items, None, |items| print_items(items))
 }
 
-pub(crate) async fn handle_open(ctx: &AppContext, args: ItemOpenArgs) -> Result<()> {
+pub(crate) async fn handle_open(ctx: &AppContext, args: ItemOpenArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let item = library
         .get_item(&args.key)?
@@ -79,15 +75,11 @@ pub(crate) async fn handle_open(ctx: &AppContext, args: ItemOpenArgs) -> Result<
         library.pdf_path(&attachment).display().to_string()
     };
     open_target(&target)?;
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "opened": target }), None)?;
-    } else {
-        println!("Opened {target}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "opened": target });
+    CommandOutput::new(ctx, payload, None, move |_| println!("Opened {target}"))
 }
 
-pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<()> {
+pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let attachment =
         library
@@ -105,17 +97,14 @@ pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<()
             let pdf_path = pdf_path.clone();
             run_pdf(move || backend.extract_annotations(&pdf_path)).await?
         };
-        if ctx.json {
-            print_enveloped(ctx, &annotations, None)?;
-        } else {
+        return CommandOutput::new(ctx, annotations, None, |annotations| {
             for annotation in annotations {
                 println!(
                     "[p.{}] {} {}",
                     annotation.page, annotation.annotation_type, annotation.content
                 );
             }
-        }
-        return Ok(());
+        });
     }
     let page_range = parse_page_range(args.pages.as_deref())?;
     let text = if page_range.is_none() {
@@ -133,30 +122,29 @@ pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<()
         let pdf_path = pdf_path.clone();
         run_pdf(move || backend.extract_text(&pdf_path, page_range)).await?
     };
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "text": text }), None)?;
-    } else {
-        println!("{text}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "text": text });
+    CommandOutput::new(ctx, payload, None, move |_| println!("{text}"))
 }
 
-pub(crate) async fn handle_children(ctx: &AppContext, args: ItemChildrenArgs) -> Result<()> {
+pub(crate) async fn handle_children(
+    ctx: &AppContext,
+    args: ItemChildrenArgs,
+) -> Result<CommandOutput> {
     let children = ctx.local_library()?.get_items_children(&args.keys)?;
-    if ctx.json {
-        print_enveloped(ctx, &children, None)?;
-    } else {
+    CommandOutput::new(ctx, children, None, |children| {
         for (key, values) in children {
             println!("{key}");
             for value in values {
                 println!("  - {} [{}]", value.key(), value.kind_label());
             }
         }
-    }
-    Ok(())
+    })
 }
 
-pub(crate) async fn handle_download(ctx: &AppContext, args: ItemDownloadArgs) -> Result<()> {
+pub(crate) async fn handle_download(
+    ctx: &AppContext,
+    args: ItemDownloadArgs,
+) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let attachment = library.get_attachment_by_key(&args.key)?.ok_or_else(|| {
         zot_core::ZotError::InvalidInput {
@@ -187,46 +175,40 @@ pub(crate) async fn handle_download(ctx: &AppContext, args: ItemDownloadArgs) ->
         path: destination.clone(),
         source,
     })?;
-    if ctx.json {
-        print_enveloped(
-            ctx,
-            serde_json::json!({
-                "attachment_key": args.key,
-                "path": zot_core::canonicalize_or_original(&destination),
-            }),
-            None,
-        )?;
-    } else {
-        println!("{}", destination.display());
-    }
-    Ok(())
+    let payload = serde_json::json!({
+        "attachment_key": args.key,
+        "path": zot_core::canonicalize_or_original(&destination),
+    });
+    CommandOutput::new(ctx, payload, None, move |_| {
+        println!("{}", destination.display())
+    })
 }
 
-pub(crate) async fn handle_deleted(ctx: &AppContext, args: ItemDeletedArgs) -> Result<()> {
+pub(crate) async fn handle_deleted(
+    ctx: &AppContext,
+    args: ItemDeletedArgs,
+) -> Result<CommandOutput> {
     let items = ctx.local_library()?.get_trash_items(args.limit)?;
-    if ctx.json {
-        print_enveloped(ctx, &items, None)?;
-    } else {
-        print_items(&items);
-    }
-    Ok(())
+    CommandOutput::new(ctx, items, None, |items| print_items(items))
 }
 
-pub(crate) async fn handle_versions(ctx: &AppContext, args: ItemVersionsArgs) -> Result<()> {
+pub(crate) async fn handle_versions(
+    ctx: &AppContext,
+    args: ItemVersionsArgs,
+) -> Result<CommandOutput> {
     let versions = ctx.remote()?.list_item_versions(args.since).await?;
-    if ctx.json {
-        print_enveloped(ctx, &versions, None)?;
-    } else if versions.is_empty() {
-        println!("No item versions found.");
-    } else {
-        for (key, version) in versions {
-            println!("{key} {version}");
+    CommandOutput::new(ctx, versions, None, |versions| {
+        if versions.is_empty() {
+            println!("No item versions found.");
+        } else {
+            for (key, version) in versions {
+                println!("{key} {version}");
+            }
         }
-    }
-    Ok(())
+    })
 }
 
-pub(crate) async fn handle_outline(ctx: &AppContext, key: &str) -> Result<()> {
+pub(crate) async fn handle_outline(ctx: &AppContext, key: &str) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let attachment =
         library
@@ -239,17 +221,16 @@ pub(crate) async fn handle_outline(ctx: &AppContext, key: &str) -> Result<()> {
     let backend = PdfiumBackend;
     let pdf_path = library.pdf_path(&attachment);
     let entries = run_pdf(move || backend.extract_outline(&pdf_path)).await?;
-    if ctx.json {
-        print_enveloped(ctx, &entries, None)?;
-    } else if entries.is_empty() {
-        println!("This PDF does not contain a table of contents/outline.");
-    } else {
-        print_outline_entries(&entries);
-    }
-    Ok(())
+    CommandOutput::new(ctx, entries, None, |entries| {
+        if entries.is_empty() {
+            println!("This PDF does not contain a table of contents/outline.");
+        } else {
+            print_outline_entries(entries);
+        }
+    })
 }
 
-pub(crate) async fn handle_export(ctx: &AppContext, args: ItemExportArgs) -> Result<()> {
+pub(crate) async fn handle_export(ctx: &AppContext, args: ItemExportArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let export = library
         .export_citation(&args.key, &args.format)?
@@ -258,19 +239,11 @@ pub(crate) async fn handle_export(ctx: &AppContext, args: ItemExportArgs) -> Res
             message: format!("Item '{}' not found", args.key),
             hint: None,
         })?;
-    if ctx.json {
-        print_enveloped(
-            ctx,
-            serde_json::json!({ "format": args.format, "content": export }),
-            None,
-        )?;
-    } else {
-        println!("{export}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "format": args.format, "content": export });
+    CommandOutput::new(ctx, payload, None, move |_| println!("{export}"))
 }
 
-pub(crate) async fn handle_cite(ctx: &AppContext, args: ItemCiteArgs) -> Result<()> {
+pub(crate) async fn handle_cite(ctx: &AppContext, args: ItemCiteArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let item = library
         .get_item(&args.key)?
@@ -280,12 +253,8 @@ pub(crate) async fn handle_cite(ctx: &AppContext, args: ItemCiteArgs) -> Result<
             hint: None,
         })?;
     let citation = zot_local::format_citation(&item, args.style.into());
-    if ctx.json {
-        print_enveloped(ctx, serde_json::json!({ "citation": citation }), None)?;
-    } else {
-        println!("{citation}");
-    }
-    Ok(())
+    let payload = serde_json::json!({ "citation": citation });
+    CommandOutput::new(ctx, payload, None, move |_| println!("{citation}"))
 }
 
 fn resolve_download_path(output: Option<PathBuf>, filename: &str) -> zot_core::ZotResult<PathBuf> {
