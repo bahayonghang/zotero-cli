@@ -5,10 +5,10 @@ use zot_remote::{SemanticScholarClient, extract_preprint_info};
 
 use crate::cli::SyncCommand;
 use crate::context::AppContext;
-use crate::format::print_enveloped;
+use crate::output::CommandOutput;
 use crate::util::update_status_to_json;
 
-pub(crate) async fn handle(ctx: &AppContext, command: SyncCommand) -> Result<()> {
+pub(crate) async fn handle(ctx: &AppContext, command: SyncCommand) -> Result<CommandOutput> {
     match command {
         SyncCommand::UpdateStatus(args) => {
             let library = ctx.local_library()?;
@@ -55,14 +55,14 @@ pub(crate) async fn handle(ctx: &AppContext, command: SyncCommand) -> Result<()>
                 .into_iter()
                 .map(|(key, status)| update_status_to_json(key, status))
                 .collect::<Vec<_>>();
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else {
-                for entry in payload {
-                    println!("{}", serde_json::to_string_pretty(&entry)?);
+            CommandOutput::new(ctx, payload, None, |entries| {
+                for entry in entries {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(entry).expect("serialize status entry")
+                    );
                 }
-            }
+            })
         }
     }
-    Ok(())
 }

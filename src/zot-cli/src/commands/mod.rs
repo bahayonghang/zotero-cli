@@ -27,14 +27,14 @@ where
 
 pub(crate) async fn dispatch(ctx: &AppContext, command: Commands) -> Result<()> {
     let output = match command {
-        Commands::Doctor => legacy(doctor::handle(ctx)).await?,
+        Commands::Doctor => doctor::handle(ctx).await?,
         Commands::Config { command } => legacy(config::handle(ctx, command)).await?,
         Commands::Library { command } => legacy(library::handle(ctx, command)).await?,
-        Commands::Item { command } => legacy(item::handle(ctx, command)).await?,
+        Commands::Item { command } => item::handle(ctx, command).await?,
         Commands::Collection { command } => legacy(collection::handle(ctx, command)).await?,
         Commands::Graph(args) => graph::handle(ctx, args).await?,
         Commands::Workspace { command } => legacy(workspace::handle(ctx, command)).await?,
-        Commands::Sync { command } => legacy(sync::handle(ctx, command)).await?,
+        Commands::Sync { command } => sync::handle(ctx, command).await?,
         Commands::Mcp { command } => legacy(mcp::handle(ctx, command)).await?,
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "zot", &mut std::io::stdout());

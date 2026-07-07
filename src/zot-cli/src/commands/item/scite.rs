@@ -5,25 +5,27 @@ use zot_remote::{SciteClient, normalize_doi};
 
 use crate::cli::ItemSciteCommand;
 use crate::context::AppContext;
-use crate::format::print_enveloped;
+use crate::output::CommandOutput;
 
-pub(crate) async fn handle(ctx: &AppContext, command: ItemSciteCommand) -> Result<()> {
+pub(crate) async fn handle(ctx: &AppContext, command: ItemSciteCommand) -> Result<CommandOutput> {
     match command {
         ItemSciteCommand::Report(args) => {
             let report = report(ctx, args.item_key.as_deref(), args.doi.as_deref()).await?;
-            if ctx.json {
-                print_enveloped(ctx, &report, None)?;
-            } else {
-                println!("{}", serde_json::to_string_pretty(&report)?);
-            }
+            CommandOutput::new(ctx, report, None, |report| {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(report).expect("serialize scite report")
+                );
+            })
         }
         ItemSciteCommand::Search(args) => {
             let reports = search(ctx, &args.query, args.limit).await?;
-            if ctx.json {
-                print_enveloped(ctx, &reports, None)?;
-            } else {
-                println!("{}", serde_json::to_string_pretty(&reports)?);
-            }
+            CommandOutput::new(ctx, reports, None, |reports| {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(reports).expect("serialize scite reports")
+                );
+            })
         }
         ItemSciteCommand::Retractions(args) => {
             let reports = retractions(
@@ -33,16 +35,18 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemSciteCommand) -> Resul
                 args.limit,
             )
             .await?;
-            if ctx.json {
-                print_enveloped(ctx, &reports, None)?;
-            } else if reports.is_empty() {
-                println!("No editorial notices found.");
-            } else {
-                println!("{}", serde_json::to_string_pretty(&reports)?);
-            }
+            CommandOutput::new(ctx, reports, None, |reports| {
+                if reports.is_empty() {
+                    println!("No editorial notices found.");
+                } else {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(reports).expect("serialize retractions")
+                    );
+                }
+            })
         }
     }
-    Ok(())
 }
 
 async fn report(

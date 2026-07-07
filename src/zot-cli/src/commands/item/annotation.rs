@@ -3,44 +3,47 @@ use zot_local::{PdfBackend, PdfiumBackend};
 
 use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand};
 use crate::context::AppContext;
-use crate::format::print_enveloped;
+use crate::output::CommandOutput;
 use crate::util::run_pdf;
 
-pub(crate) async fn handle(ctx: &AppContext, command: ItemAnnotationCommand) -> Result<()> {
+pub(crate) async fn handle(
+    ctx: &AppContext,
+    command: ItemAnnotationCommand,
+) -> Result<CommandOutput> {
     match command {
         ItemAnnotationCommand::List(args) => {
             let annotations = ctx
                 .local_library()?
                 .get_annotations(args.item_key.as_deref(), args.limit)?;
-            if ctx.json {
-                print_enveloped(ctx, &annotations, None)?;
-            } else if annotations.is_empty() {
-                println!("No annotations found.");
-            } else {
-                for annotation in annotations {
-                    println!(
-                        "{} [{}] {}",
-                        annotation.key, annotation.annotation_type, annotation.text
-                    );
+            CommandOutput::new(ctx, annotations, None, |annotations| {
+                if annotations.is_empty() {
+                    println!("No annotations found.");
+                } else {
+                    for annotation in annotations {
+                        println!(
+                            "{} [{}] {}",
+                            annotation.key, annotation.annotation_type, annotation.text
+                        );
+                    }
                 }
-            }
+            })
         }
         ItemAnnotationCommand::Search(args) => {
             let annotations = ctx
                 .local_library()?
                 .search_annotations(&args.query, args.limit)?;
-            if ctx.json {
-                print_enveloped(ctx, &annotations, None)?;
-            } else if annotations.is_empty() {
-                println!("No annotations found.");
-            } else {
-                for annotation in annotations {
-                    println!(
-                        "{} [{}] {}",
-                        annotation.key, annotation.annotation_type, annotation.text
-                    );
+            CommandOutput::new(ctx, annotations, None, |annotations| {
+                if annotations.is_empty() {
+                    println!("No annotations found.");
+                } else {
+                    for annotation in annotations {
+                        println!(
+                            "{} [{}] {}",
+                            annotation.key, annotation.annotation_type, annotation.text
+                        );
+                    }
                 }
-            }
+            })
         }
         ItemAnnotationCommand::Create(args) => {
             let payload = create_highlight_annotation(
@@ -53,22 +56,23 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemAnnotationCommand) -> 
                 args.occurrence,
             )
             .await?;
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else {
-                println!("{}", serde_json::to_string_pretty(&payload)?);
-            }
+            CommandOutput::new(ctx, payload, None, |payload| {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(payload).expect("serialize annotation")
+                );
+            })
         }
         ItemAnnotationCommand::CreateArea(args) => {
             let payload = create_area_annotation(ctx, &args).await?;
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else {
-                println!("{}", serde_json::to_string_pretty(&payload)?);
-            }
+            CommandOutput::new(ctx, payload, None, |payload| {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(payload).expect("serialize annotation")
+                );
+            })
         }
     }
-    Ok(())
 }
 
 async fn create_highlight_annotation(

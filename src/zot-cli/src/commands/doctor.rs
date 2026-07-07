@@ -5,7 +5,7 @@ use zot_remote::BetterBibTexClient;
 
 use crate::commands::library;
 use crate::context::AppContext;
-use crate::format::print_enveloped;
+use crate::output::CommandOutput;
 
 const DOCTOR_BANNER: &str = r#"       .-----------------------.
       /  .-----------------.  \
@@ -21,7 +21,7 @@ const DOCTOR_BANNER: &str = r#"       .-----------------------.
       \  '-----------------'  /
        '---------------------'"#;
 
-pub(crate) async fn handle(ctx: &AppContext) -> Result<()> {
+pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let data_dir = zot_core::get_data_dir(&ctx.config);
     let db_path = data_dir.join("zotero.sqlite");
     let pdf_backend = PdfiumBackend;
@@ -74,17 +74,13 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<()> {
         },
         "schema_version": schema_version,
     });
-    if ctx.json {
-        print_enveloped(ctx, payload, None)?;
-    } else {
+    let write_creds_label = write_credentials_label(&ctx.config);
+    CommandOutput::new(ctx, payload, None, move |_| {
         println!("{DOCTOR_BANNER}");
         println!("Config: {}", AppConfig::config_file().display());
         println!("Data dir: {}", data_dir.display());
         println!("Database exists: {}", db_path.exists());
-        println!(
-            "Write credentials: {}",
-            write_credentials_label(&ctx.config)
-        );
+        println!("Write credentials: {write_creds_label}");
         println!("PDF backend: {}", pdf_backend_label(&pdf_status));
         println!(
             "Better BibTeX: {}",
@@ -107,8 +103,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<()> {
         if let Some(version) = schema_version {
             println!("Schema version: {version}");
         }
-    }
-    Ok(())
+    })
 }
 
 fn write_credentials_payload(config: &AppConfig) -> serde_json::Value {

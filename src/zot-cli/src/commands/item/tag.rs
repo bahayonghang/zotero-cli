@@ -3,9 +3,9 @@ use zot_local::SearchOptions;
 
 use crate::cli::ItemTagCommand;
 use crate::context::AppContext;
-use crate::format::print_enveloped;
+use crate::output::CommandOutput;
 
-pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<()> {
+pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<CommandOutput> {
     match command {
         ItemTagCommand::List(args) => {
             let item = ctx.local_library()?.get_item(&args.key)?.ok_or_else(|| {
@@ -15,48 +15,32 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<
                     hint: None,
                 }
             })?;
-            if ctx.json {
-                print_enveloped(ctx, &item.tags, None)?;
-            } else {
-                for tag in item.tags {
+            CommandOutput::new(ctx, item.tags, None, |tags| {
+                for tag in tags {
                     println!("{tag}");
                 }
-            }
+            })
         }
         ItemTagCommand::Add(args) => {
             ctx.remote()?.add_tags(&args.key, &args.tags).await?;
-            if ctx.json {
-                print_enveloped(
-                    ctx,
-                    serde_json::json!({ "key": args.key, "added": args.tags }),
-                    None,
-                )?;
-            } else {
-                println!("Tags added.");
-            }
+            let payload = serde_json::json!({ "key": args.key, "added": args.tags });
+            CommandOutput::new(ctx, payload, None, |_| println!("Tags added."))
         }
         ItemTagCommand::Remove(args) => {
             ctx.remote()?.remove_tags(&args.key, &args.tags).await?;
-            if ctx.json {
-                print_enveloped(
-                    ctx,
-                    serde_json::json!({ "key": args.key, "removed": args.tags }),
-                    None,
-                )?;
-            } else {
-                println!("Tags removed.");
-            }
+            let payload = serde_json::json!({ "key": args.key, "removed": args.tags });
+            CommandOutput::new(ctx, payload, None, |_| println!("Tags removed."))
         }
         ItemTagCommand::Batch(args) => {
             let payload = batch_update_tags(ctx, args).await?;
-            if ctx.json {
-                print_enveloped(ctx, payload, None)?;
-            } else {
-                println!("{}", serde_json::to_string_pretty(&payload)?);
-            }
+            CommandOutput::new(ctx, payload, None, |payload| {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(payload).expect("serialize batch tags")
+                );
+            })
         }
     }
-    Ok(())
 }
 
 async fn batch_update_tags(
