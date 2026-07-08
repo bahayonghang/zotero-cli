@@ -1,6 +1,7 @@
 use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 
 use flate2::read::GzDecoder;
@@ -96,6 +97,52 @@ pub trait PdfBackend {
                 .trim_end_matches(&['.', ',', ';', ')', ']', '}', '"', '\''][..])
                 .to_string()
         }))
+    }
+}
+
+/// Forwarding impl so an `Arc<dyn PdfBackend + Send + Sync>` (as held by the
+/// CLI's `AppContext`) satisfies generic `B: PdfBackend` bounds. Every method
+/// forwards explicitly — including defaulted `extract_doi` — so a backend that
+/// overrides a default is never bypassed through the `Arc`.
+impl<T: PdfBackend + ?Sized> PdfBackend for Arc<T> {
+    fn availability_hint(&self) -> ZotResult<()> {
+        (**self).availability_hint()
+    }
+    fn extract_text(
+        &self,
+        pdf_path: &Path,
+        page_range: Option<(usize, usize)>,
+    ) -> ZotResult<String> {
+        (**self).extract_text(pdf_path, page_range)
+    }
+    fn extract_annotations(&self, pdf_path: &Path) -> ZotResult<Vec<AnnotationSnippet>> {
+        (**self).extract_annotations(pdf_path)
+    }
+    fn extract_outline(&self, pdf_path: &Path) -> ZotResult<Vec<PdfOutlineEntry>> {
+        (**self).extract_outline(pdf_path)
+    }
+    fn find_text_position(
+        &self,
+        pdf_path: &Path,
+        page: usize,
+        text: &str,
+        occurrence: usize,
+    ) -> ZotResult<Option<PdfMatchPosition>> {
+        (**self).find_text_position(pdf_path, page, text, occurrence)
+    }
+    fn build_area_position(
+        &self,
+        pdf_path: &Path,
+        page: usize,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+    ) -> ZotResult<PdfAreaPosition> {
+        (**self).build_area_position(pdf_path, page, x, y, width, height)
+    }
+    fn extract_doi(&self, pdf_path: &Path) -> ZotResult<Option<String>> {
+        (**self).extract_doi(pdf_path)
     }
 }
 
