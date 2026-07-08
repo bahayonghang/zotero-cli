@@ -195,41 +195,35 @@ async fn add_item_by_url(
     tags: &[String],
     attach_mode: AttachModeArg,
 ) -> Result<String> {
-    if let Some(doi) = normalize_doi(url) {
-        return add_item_by_doi(ctx, &doi, collections, tags, attach_mode).await;
-    }
-    let remote = ctx.remote()?;
-    if let Some(arxiv_id) = normalize_arxiv_id(url) {
-        let work = OaClient::new(ctx.http())
-            .fetch_arxiv_work(&arxiv_id)
-            .await?;
-        let key = remote
-            .create_item_from_value(build_arxiv_item_payload(&work, collections, tags))
-            .await?;
-        if !matches!(attach_mode, AttachModeArg::None) {
-            maybe_attach_pdf_url(
-                ctx.http(),
-                &remote,
-                &key,
-                &work.pdf_url,
-                &format!("arxiv_{}.pdf", arxiv_id.replace('/', "_")),
-                attach_mode,
-            )
-            .await?;
+    match plan_add_url(url) {
+        AddUrlPlan::Doi(doi) => add_item_by_doi(ctx, &doi, collections, tags, attach_mode).await,
+        AddUrlPlan::Arxiv(arxiv_id) => {
+            let remote = ctx.remote()?;
+            let work = OaClient::new(ctx.http())
+                .fetch_arxiv_work(&arxiv_id)
+                .await?;
+            let key = remote
+                .create_item_from_value(build_arxiv_item_payload(&work, collections, tags))
+                .await?;
+            if let Some(attachment) = arxiv_pdf_attachment(&work, &arxiv_id, attach_mode) {
+                maybe_attach_pdf_url(
+                    ctx.http(),
+                    &remote,
+                    &key,
+                    &attachment.url,
+                    &attachment.filename,
+                    attach_mode,
+                )
+                .await?;
+            }
+            Ok(key)
         }
-        return Ok(key);
+        AddUrlPlan::Webpage => ctx
+            .remote()?
+            .create_item_from_value(build_webpage_item_payload(url, collections, tags))
+            .await
+            .map_err(Into::into),
     }
-    remote
-        .create_item_from_value(serde_json::json!({
-            "itemType": "webpage",
-            "title": url,
-            "url": url,
-            "accessDate": "",
-            "collections": collections,
-            "tags": tags.iter().map(|tag| serde_json::json!({ "tag": tag })).collect::<Vec<_>>(),
-        }))
-        .await
-        .map_err(Into::into)
 }
 
 async fn add_item_from_file(
@@ -423,5 +417,192 @@ fn crossref_type_to_zotero(value: &str) -> &'static str {
         "dissertation" => "thesis",
         "posted-content" => "preprint",
         _ => "document",
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum AddUrlPlan {
+    Doi(String),
+    Arxiv(String),
+    Webpage,
+}
+
+/// Classify an add-by-url input into its target route. Pure: only normalizes
+/// the string, no I/O. The DOI and arXiv routes carry the normalized identifier
+/// the shell fetches metadata for; the webpage route builds its payload from the
+/// raw url.
+fn plan_add_url(url: &str) -> AddUrlPlan {
+    if let Some(doi) = normalize_doi(url) {
+        AddUrlPlan::Doi(doi)
+    } else if let Some(arxiv_id) = normalize_arxiv_id(url) {
+        AddUrlPlan::Arxiv(arxiv_id)
+    } else {
+        AddUrlPlan::Webpage
+    }
+}
+
+struct PdfAttachment {
+    url: String,
+    filename: String,
+}
+
+/// Decide whether an arXiv item should get a PDF attachment and under what
+/// filename. Pure: returns the download target without performing the download.
+fn arxiv_pdf_attachment(
+    work: &zot_remote::ArxivWork,
+    arxiv_id: &str,
+    attach_mode: AttachModeArg,
+) -> Option<PdfAttachment> {
+    if matches!(attach_mode, AttachModeArg::None) {
+        return None;
+    }
+    Some(PdfAttachment {
+        url: work.pdf_url.clone(),
+        filename: format!("arxiv_{}.pdf", arxiv_id.replace('/', "_")),
+    })
+}
+
+fn build_webpage_item_payload(
+    url: &str,
+    collections: &[String],
+    tags: &[String],
+) -> serde_json::Value {
+    serde_json::json!({
+        "itemType": "webpage",
+        "title": url,
+        "url": url,
+        "accessDate": "",
+        "collections": collections,
+        "tags": tags.iter().map(|tag| serde_json::json!({ "tag": tag })).collect::<Vec<_>>(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zot_remote::{ArxivWork, CrossRefWork};
+
+    fn sample_crossref() -> CrossRefWork {
+        CrossRefWork {
+            record_type: "journal-article".to_string(),
+            title: Some("Sample Title".to_string()),
+            creators: vec![CreatorName {
+                first_name: "Ashish".to_string(),
+                last_name: "Vaswani".to_string(),
+                creator_type: "author".to_string(),
+            }],
+            date: Some("2017-06-12".to_string()),
+            doi: "10.1000/test".to_string(),
+            url: Some("https://example.com/work".to_string()),
+            volume: Some("30".to_string()),
+            issue: Some("1".to_string()),
+            pages: Some("1-11".to_string()),
+            publisher: Some("ACM".to_string()),
+            issn: Some("1234-5678".to_string()),
+            publication_title: Some("NeurIPS".to_string()),
+            abstract_note: Some("Abstract text".to_string()),
+            relations: Vec::new(),
+            alternative_ids: Vec::new(),
+            links: Vec::new(),
+        }
+    }
+
+    fn sample_arxiv() -> ArxivWork {
+        ArxivWork {
+            arxiv_id: "2301.00774".to_string(),
+            title: "Sample Preprint".to_string(),
+            abstract_note: Some("Abstract text".to_string()),
+            date: Some("2023-01-02".to_string()),
+            creators: vec![CreatorName {
+                first_name: "Jane".to_string(),
+                last_name: "Doe".to_string(),
+                creator_type: "author".to_string(),
+            }],
+            abs_url: "https://arxiv.org/abs/2301.00774".to_string(),
+            pdf_url: "https://arxiv.org/pdf/2301.00774.pdf".to_string(),
+        }
+    }
+
+    #[test]
+    fn crossref_type_maps_known_and_falls_back_for_unknown() {
+        assert_eq!(crossref_type_to_zotero("journal-article"), "journalArticle");
+        assert_eq!(crossref_type_to_zotero("book-chapter"), "bookSection");
+        assert_eq!(crossref_type_to_zotero("posted-content"), "preprint");
+        assert_eq!(crossref_type_to_zotero("totally-unknown"), "document");
+    }
+
+    #[test]
+    fn crossref_payload_maps_fields() {
+        let work = sample_crossref();
+        let payload =
+            build_crossref_item_payload(&work, &["COLL1".to_string()], &["reading".to_string()]);
+        assert_eq!(payload["itemType"], "journalArticle");
+        assert_eq!(payload["title"], "Sample Title");
+        assert_eq!(payload["DOI"], "10.1000/test");
+        assert_eq!(payload["publicationTitle"], "NeurIPS");
+        assert_eq!(payload["collections"][0], "COLL1");
+        assert_eq!(payload["tags"][0]["tag"], "reading");
+        assert_eq!(payload["creators"][0]["lastName"], "Vaswani");
+    }
+
+    #[test]
+    fn crossref_payload_title_falls_back_to_doi() {
+        let mut work = sample_crossref();
+        work.title = None;
+        let payload = build_crossref_item_payload(&work, &[], &[]);
+        assert_eq!(payload["title"], "10.1000/test");
+    }
+
+    #[test]
+    fn arxiv_payload_uses_preprint_type_and_extra() {
+        let payload = build_arxiv_item_payload(&sample_arxiv(), &[], &[]);
+        assert_eq!(payload["itemType"], "preprint");
+        assert_eq!(payload["extra"], "arXiv:2301.00774");
+        assert_eq!(payload["url"], "https://arxiv.org/abs/2301.00774");
+    }
+
+    #[test]
+    fn webpage_payload_uses_url_for_title_and_url() {
+        let payload =
+            build_webpage_item_payload("https://example.com/page", &[], &["news".to_string()]);
+        assert_eq!(payload["itemType"], "webpage");
+        assert_eq!(payload["title"], "https://example.com/page");
+        assert_eq!(payload["url"], "https://example.com/page");
+        assert_eq!(payload["accessDate"], "");
+        assert_eq!(payload["tags"][0]["tag"], "news");
+    }
+
+    #[test]
+    fn plan_add_url_classifies_doi_arxiv_and_webpage() {
+        assert_eq!(
+            plan_add_url("10.1000/test"),
+            AddUrlPlan::Doi("10.1000/test".to_string())
+        );
+        assert_eq!(
+            plan_add_url("https://arxiv.org/abs/2301.00774v2"),
+            AddUrlPlan::Arxiv("2301.00774v2".to_string())
+        );
+        assert_eq!(
+            plan_add_url("https://example.com/page"),
+            AddUrlPlan::Webpage
+        );
+    }
+
+    #[test]
+    fn arxiv_pdf_attachment_skips_when_mode_is_none() {
+        assert!(arxiv_pdf_attachment(&sample_arxiv(), "2301.00774", AttachModeArg::None).is_none());
+    }
+
+    #[test]
+    fn arxiv_pdf_attachment_builds_target_and_sanitizes_filename() {
+        let work = sample_arxiv();
+        let versioned = arxiv_pdf_attachment(&work, "2301.00774v2", AttachModeArg::Auto)
+            .expect("attachment for versioned id");
+        assert_eq!(versioned.url, work.pdf_url);
+        assert_eq!(versioned.filename, "arxiv_2301.00774v2.pdf");
+
+        let legacy = arxiv_pdf_attachment(&work, "cond-mat/0102536", AttachModeArg::Auto)
+            .expect("attachment for legacy id");
+        assert_eq!(legacy.filename, "arxiv_cond-mat_0102536.pdf");
     }
 }
