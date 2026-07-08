@@ -6,6 +6,9 @@ pub mod scite;
 pub mod semantic_scholar;
 pub mod zotero;
 
+#[cfg(test)]
+mod test_support;
+
 pub use better_bibtex::{BetterBibTexClient, BetterBibTexSearchItem};
 pub use embedding::EmbeddingClient;
 pub use http::HttpRuntime;

@@ -19,6 +19,7 @@ pub struct ZoteroRemote {
     library_id: String,
     api_key: String,
     scope: LibraryScope,
+    base_url: String,
 }
 
 impl ZoteroRemote {
@@ -41,7 +42,24 @@ impl ZoteroRemote {
             library_id: library_id.into(),
             api_key: api_key.to_string(),
             scope,
+            base_url: std::env::var("ZOT_ZOTERO_API_BASE").unwrap_or_else(|_| API_BASE.to_string()),
         })
+    }
+
+    /// Construct a client pointed at an explicit base URL (fake server in
+    /// tests), bypassing the `ZOT_ZOTERO_API_BASE` env override so parallel
+    /// tests never race on process-global environment state.
+    #[cfg(test)]
+    fn with_base_url(
+        runtime: &HttpRuntime,
+        library_id: impl Into<String>,
+        api_key: &str,
+        scope: LibraryScope,
+        base_url: impl Into<String>,
+    ) -> ZotResult<Self> {
+        let mut remote = Self::new(runtime, library_id, api_key, scope)?;
+        remote.base_url = base_url.into();
+        Ok(remote)
     }
 
     fn http_request(&self, method: Method, url: impl reqwest::IntoUrl) -> reqwest::RequestBuilder {
@@ -597,7 +615,7 @@ impl ZoteroRemote {
             LibraryScope::User => format!("users/{}", self.library_id),
             LibraryScope::Group { .. } => format!("groups/{}", self.library_id),
         };
-        format!("{API_BASE}/{scope}/{path}")
+        format!("{}/{scope}/{path}", self.base_url)
     }
 
     async fn library_version(&self) -> ZotResult<i64> {
@@ -830,5 +848,126 @@ fn guess_content_type(filename: &str) -> &'static str {
         "text/plain"
     } else {
         "application/octet-stream"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use serde_json::json;
+    use zot_core::{LibraryScope, ZotError};
+
+    use super::ZoteroRemote;
+    use crate::http::HttpRuntime;
+    use crate::test_support::spawn_server;
+
+    fn client(base_url: String) -> ZoteroRemote {
+        ZoteroRemote::with_base_url(
+            &HttpRuntime::default(),
+            "12345",
+            "test-key",
+            LibraryScope::User,
+            base_url,
+        )
+        .expect("construct zotero remote")
+    }
+
+    #[tokio::test]
+    async fn update_item_fields_carries_version_precondition_and_succeeds() {
+        // GET returns the stored item at version 42; the follow-up PUT must
+        // carry `If-Unmodified-Since-Version: 42`, and a 204 maps to Ok(()).
+        let item =
+            r#"{"key":"ABCD1234","version":42,"data":{"itemType":"journalArticle","title":"Old"}}"#;
+        let (base_url, server) = spawn_server(vec![(200, item), (204, "")]);
+        let remote = client(base_url);
+
+        let fields = BTreeMap::from([("title".to_string(), "New".to_string())]);
+        let result = remote.update_item_fields("ABCD1234", &fields).await;
+
+        let captured = server.join().expect("server thread panicked");
+        assert!(result.is_ok(), "expected Ok, got {result:?}");
+        assert_eq!(captured.len(), 2);
+        assert_eq!(captured[1].method, "PUT");
+        assert_eq!(
+            captured[1].header("If-Unmodified-Since-Version"),
+            Some("42")
+        );
+    }
+
+    #[tokio::test]
+    async fn precondition_failure_maps_to_remote_412_with_conflict_hint() {
+        let (base_url, server) = spawn_server(vec![(412, "conflict")]);
+        let remote = client(base_url);
+
+        let payload = json!({"key":"ABCD1234","version":10,"itemType":"journalArticle"});
+        let result = remote.update_flat_item_value(&payload).await;
+        let _ = server.join().expect("server thread panicked");
+
+        match result {
+            Err(ZotError::Remote { status, hint, .. }) => {
+                assert_eq!(status, Some(412));
+                assert_eq!(
+                    hint.as_deref(),
+                    Some("Object changed remotely; re-fetch before retrying")
+                );
+            }
+            other => panic!("expected Remote 412, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn not_found_maps_to_remote_404_without_hint() {
+        let (base_url, server) = spawn_server(vec![(404, "missing")]);
+        let remote = client(base_url);
+
+        let payload = json!({"key":"ABCD1234","version":10,"itemType":"journalArticle"});
+        let result = remote.update_flat_item_value(&payload).await;
+        let _ = server.join().expect("server thread panicked");
+
+        match result {
+            Err(ZotError::Remote { status, hint, .. }) => {
+                assert_eq!(status, Some(404));
+                assert_eq!(hint, None);
+            }
+            other => panic!("expected Remote 404, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn server_error_maps_to_remote_500_without_hint() {
+        let (base_url, server) = spawn_server(vec![(500, "boom")]);
+        let remote = client(base_url);
+
+        let payload = json!({"key":"ABCD1234","version":10,"itemType":"journalArticle"});
+        let result = remote.update_flat_item_value(&payload).await;
+        let _ = server.join().expect("server thread panicked");
+
+        match result {
+            Err(ZotError::Remote { status, hint, .. }) => {
+                assert_eq!(status, Some(500));
+                assert_eq!(hint, None);
+            }
+            other => panic!("expected Remote 500, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn create_item_decodes_multi_write_response() {
+        let body = r#"{"successful":{"0":{"key":"NEWKEY12"}}}"#;
+        let (base_url, server) = spawn_server(vec![(200, body)]);
+        let remote = client(base_url);
+
+        let result = remote.create_item(Some("10.1234/example"), None).await;
+
+        let captured = server.join().expect("server thread panicked");
+        assert_eq!(captured.len(), 1);
+        assert_eq!(captured[0].method, "POST");
+        assert!(
+            captured[0].url.ends_with("/items"),
+            "unexpected create url: {}",
+            captured[0].url
+        );
+        assert_eq!(result.ok(), Some("NEWKEY12".to_string()));
     }
 }

@@ -82,6 +82,7 @@ pub fn extract_preprint_info(
 pub struct SemanticScholarClient {
     client: reqwest::Client,
     api_key: Option<String>,
+    base_url: String,
 }
 
 impl SemanticScholarClient {
@@ -101,7 +102,23 @@ impl SemanticScholarClient {
         Ok(Self {
             client: runtime.client_clone(),
             api_key,
+            base_url: std::env::var("ZOT_SEMANTIC_SCHOLAR_API_BASE")
+                .unwrap_or_else(|_| API_BASE.to_string()),
         })
+    }
+
+    /// Construct a client pointed at an explicit base URL (fake server in
+    /// tests), bypassing the `ZOT_SEMANTIC_SCHOLAR_API_BASE` env override so
+    /// parallel tests never race on process-global environment state.
+    #[cfg(test)]
+    fn with_base_url(
+        runtime: &HttpRuntime,
+        api_key: Option<&str>,
+        base_url: impl Into<String>,
+    ) -> ZotResult<Self> {
+        let mut client = Self::new(runtime, api_key)?;
+        client.base_url = base_url.into();
+        Ok(client)
     }
 
     pub async fn check_publication(
@@ -109,8 +126,8 @@ impl SemanticScholarClient {
         info: &PreprintInfo,
     ) -> ZotResult<Option<PublicationStatus>> {
         let url = format!(
-            "{API_BASE}/paper/{}?fields=externalIds,journal,venue,publicationDate,title,publicationVenue",
-            info.api_id
+            "{}/paper/{}?fields=externalIds,journal,venue,publicationDate,title,publicationVenue",
+            self.base_url, info.api_id
         );
         let mut request = self.client.get(url);
         if let Some(api_key) = self.api_key.as_deref() {
@@ -192,7 +209,9 @@ struct PublicationVenue {
 
 #[cfg(test)]
 mod tests {
-    use super::extract_preprint_info;
+    use super::{PreprintInfo, SemanticScholarClient, extract_preprint_info};
+    use crate::http::HttpRuntime;
+    use crate::test_support::spawn_server;
 
     #[test]
     fn extracts_arxiv_and_biorxiv() {
@@ -200,5 +219,34 @@ mod tests {
         assert!(arxiv.is_some());
         let biorxiv = extract_preprint_info(None, Some("10.1101/2024.01.02.123456v2"), None);
         assert!(biorxiv.is_some());
+    }
+
+    #[tokio::test]
+    async fn check_publication_reports_published_paper_via_injected_base_url() {
+        // A non-preprint venue plus a formal (non-arXiv/bioRxiv) DOI resolves to
+        // "published"; the client is aimed at the fake server via with_base_url.
+        let body = r#"{"title":"Attention Is All You Need","venue":"NeurIPS","externalIds":{"DOI":"10.5555/formal"},"publicationDate":"2017-12-01","journal":{"name":"NeurIPS"}}"#;
+        let (base_url, server) = spawn_server(vec![(200, body)]);
+        let client = SemanticScholarClient::with_base_url(&HttpRuntime::default(), None, base_url)
+            .expect("construct ss client");
+
+        let info = PreprintInfo {
+            preprint_id: "1706.03762".to_string(),
+            source: "arxiv".to_string(),
+            api_id: "arXiv:1706.03762".to_string(),
+        };
+        let result = client.check_publication(&info).await;
+
+        let captured = server.join().expect("server thread panicked");
+        assert_eq!(captured.len(), 1);
+        assert_eq!(captured[0].method, "GET");
+        match result {
+            Ok(Some(status)) => {
+                assert!(status.is_published);
+                assert_eq!(status.title, "Attention Is All You Need");
+                assert_eq!(status.doi.as_deref(), Some("10.5555/formal"));
+            }
+            other => panic!("expected Ok(Some(published)), got {other:?}"),
+        }
     }
 }

@@ -14,13 +14,15 @@ src/zot-remote/src/
 ├── oa.rs                  # CrossRef, arXiv, Unpaywall, PMC, OA PDF resolution
 ├── scite.rs               # Scite reports and batch endpoints
 ├── semantic_scholar.rs    # Preprint publication-status checks
+├── test_support.rs        # Test-only loopback fake HTTP server (cfg(test))
 └── zotero.rs              # Zotero Web API writes, saved searches, attachments
 ```
 
 ## Module Ownership
 
 - `http.rs` builds the shared `reqwest::Client` with connect/request timeouts
-  and the `zot-cli/<version>` user agent.
+  and the `zot-cli/<version>` user agent, and owns the shared response layer
+  (`remote_err`, `http_hint`, `ensure_status`, `read_json`, `ensure_empty`).
 - `zotero.rs` owns Zotero Web API endpoints, API-key headers, version
   preconditions, write tokens, attachment upload authorization/register flow,
   saved searches, and flat editable object updates.

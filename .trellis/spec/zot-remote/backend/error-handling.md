@@ -16,10 +16,10 @@
 
 ## Response Handling
 
-- Zotero API helpers centralize response handling in `ensure_empty` and
-  `ensure_json`.
-- Most service modules have a small `remote_err(code)` helper that preserves
-  the operation code and optional HTTP status from `reqwest::Error`.
+- All clients share the response layer in `http.rs`: `remote_err(code)` maps
+  `reqwest::Error` while preserving the operation code and optional HTTP
+  status; `ensure_status`, `read_json`, and `ensure_empty` map non-success
+  statuses and JSON decode failures. Do not redefine these per client.
 - Non-critical lookups may return `Ok(None)` on remote miss. Examples:
   Scite single report calls return `Ok(None)` when both tally and paper are
   absent; Semantic Scholar publication checks return `Ok(None)` for 404.
@@ -39,7 +39,7 @@ return Err(ZotError::Remote {
 
 ## Hints
 
-`zotero.rs::http_hint` currently maps:
+`http.rs::http_hint` (shared by all clients) currently maps:
 
 - `403` to API key write-access guidance.
 - `412` to "Object changed remotely; re-fetch before retrying".

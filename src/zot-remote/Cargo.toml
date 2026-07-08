@@ -21,3 +21,6 @@ tokio.workspace = true
 urlencoding.workspace = true
 uuid.workspace = true
 zot-core.workspace = true
+
+[dev-dependencies]
+tiny_http.workspace = true

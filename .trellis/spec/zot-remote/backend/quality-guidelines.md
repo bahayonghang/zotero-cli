@@ -16,15 +16,26 @@ over broad live-network tests.
   chunks of 500.
 - Preserve output count/order for embedding batches. `EmbeddingClient::embed`
   extends batches serially and validates the final vector count.
-- Keep service base URL env overrides only where tests or local substitutes
-  already use them, such as `ZOT_SCITE_API_BASE`, `ZOT_CROSSREF_API_BASE`,
-  `ZOT_UNPAYWALL_API_BASE`, `ZOT_PMC_API_BASE`, and
-  `ZOT_SEMANTIC_SCHOLAR_GRAPH_BASE`.
+- Map responses through the shared `http.rs` layer (`remote_err`, `http_hint`,
+  `ensure_status`, `read_json`, `ensure_empty`) instead of redefining error
+  mapping per client. Intentional divergences: soft-fail lookups that return
+  `Ok(None)` on non-success, and the attachment upload's exact-201 check.
+- Every client's base URL is overridable via env for tests and local
+  substitutes, with production defaults unchanged: `ZOT_BBT_URL`/`ZOT_BBT_PORT`,
+  `ZOT_SCITE_API_BASE`, `ZOT_CROSSREF_API_BASE`, `ZOT_UNPAYWALL_API_BASE`,
+  `ZOT_PMC_API_BASE`, `ZOT_SEMANTIC_SCHOLAR_GRAPH_BASE` (OA PDF endpoint),
+  `ZOT_SEMANTIC_SCHOLAR_API_BASE`, and `ZOT_ZOTERO_API_BASE`; the embedding
+  endpoint comes from `EmbeddingConfig`.
 
 ## Testing Requirements
 
 - Add unit tests for normalization and pure merge logic, as seen in
   `oa.rs`, `embedding.rs`, `scite.rs`, and `semantic_scholar.rs`.
+- For request shape and response mapping, drive clients against the loopback
+  fake server (`test_support::spawn_server`) through their `#[cfg(test)]`
+  `with_base_url` constructors. It binds `127.0.0.1:0`, scripts responses in
+  memory, and captures requests for header/method assertions — this is the
+  recognized local adapter; never hit a live service in tests.
 - For batching changes, test chunk counts and total coverage rather than
   relying on live services. Existing tests cover 200 embedding inputs and 600
   Scite DOIs.
