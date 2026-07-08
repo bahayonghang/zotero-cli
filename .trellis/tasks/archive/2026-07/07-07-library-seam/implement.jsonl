@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/zot-cli/backend/database-guidelines.md", "reason": "seam 语义约束:context-mediated access 不变,本任务只收窄消费者依赖;W4 需在此补「窄 trait 消费」小节"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "错误码稳定契约(collection-not-found / item-not-found 等)——trait 化与 handler 内层化不得改变错误 payload 字节"}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "zot-cli 侧质量 gate 与测试约定,W3 handler 测试需遵循"}
+{"file": ".trellis/spec/zot-local/backend/database-guidelines.md", "reason": "zot-local 侧 SQL 所有权约定:trait 只做接口收窄,不搬 SQL、不拆 db.rs 实现"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "复用既有 seam 模式:RagLibrary(rag_engine.rs:26)与 workspace_rag FakeLibrary 是本任务的范本,勿另造平行结构"}
