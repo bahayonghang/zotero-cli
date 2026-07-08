@@ -25,12 +25,11 @@ async fn handle_init(ctx: &AppContext, args: ConfigInitArgs) -> Result<CommandOu
     let target_profile = args.target_profile.clone();
     let default_data_dir = detect_default_data_dir(&config);
 
-    if let Some(profile_name) = target_profile.as_deref() {
-        let profile = config.profile.entry(profile_name.to_string()).or_default();
-        apply_profile_init(profile, &args, default_data_dir);
-    } else {
-        apply_root_init(&mut config, &args, default_data_dir);
-    }
+    apply_init(
+        &mut config_target(&mut config, target_profile.as_deref()),
+        &args,
+        default_data_dir,
+    )?;
 
     if args.make_default {
         config.set_default_profile(target_profile.as_deref());
@@ -93,12 +92,11 @@ async fn handle_show(ctx: &AppContext) -> Result<CommandOutput> {
 async fn handle_set(ctx: &AppContext, args: ConfigSetArgs) -> Result<CommandOutput> {
     let mut config = AppConfig::load_raw()?;
     let target_profile = args.target_profile.clone();
-    if let Some(profile_name) = target_profile.as_deref() {
-        let profile = config.profile.entry(profile_name.to_string()).or_default();
-        apply_profile_setting(profile, &args.key, &args.value)?;
-    } else {
-        apply_root_setting(&mut config, &args.key, &args.value)?;
-    }
+    apply_setting(
+        &mut config_target(&mut config, target_profile.as_deref()),
+        &args.key,
+        &args.value,
+    )?;
 
     let path = canonicalize_or_original(&config.save()?);
     let payload = config_change_payload(&config, path, target_profile, "updated");
@@ -161,87 +159,87 @@ async fn handle_profiles_use(
     })
 }
 
-fn apply_root_init(config: &mut AppConfig, args: &ConfigInitArgs, default_data_dir: String) {
-    if config.zotero.data_dir.is_empty() {
-        config.zotero.data_dir = default_data_dir;
-    }
-    if let Some(value) = args.data_dir.as_deref() {
-        config.zotero.data_dir = value.to_string();
-    }
-    if let Some(value) = args.library_id.as_deref() {
-        config.zotero.library_id = value.to_string();
-    }
-    if let Some(value) = args.api_key.as_deref() {
-        config.zotero.api_key = value.to_string();
-    }
-    if let Some(value) = args.semantic_scholar_api_key.as_deref() {
-        config.zotero.semantic_scholar_api_key = value.to_string();
-    }
-    if let Some(value) = args.embedding_url.as_deref() {
-        config.embedding.url = value.to_string();
-    }
-    if let Some(value) = args.embedding_key.as_deref() {
-        config.embedding.api_key = value.to_string();
-    }
-    if let Some(value) = args.embedding_model.as_deref() {
-        config.embedding.model = value.to_string();
+/// Mutable write target for config commands: the root tables or one named profile.
+enum ConfigTarget<'a> {
+    Root(&'a mut AppConfig),
+    Profile(&'a mut ProfileConfig),
+}
+
+/// Field slot a config key resolves to on a given target.
+enum SettingSlot<'a> {
+    Text(&'a mut String),
+    Limit(&'a mut usize),
+}
+
+fn config_target<'a>(config: &'a mut AppConfig, profile_name: Option<&str>) -> ConfigTarget<'a> {
+    match profile_name {
+        Some(name) => ConfigTarget::Profile(config.profile.entry(name.to_string()).or_default()),
+        None => ConfigTarget::Root(config),
     }
 }
 
-fn apply_profile_init(
-    profile: &mut ProfileConfig,
-    args: &ConfigInitArgs,
-    default_data_dir: String,
-) {
-    if profile.data_dir.is_empty() {
-        profile.data_dir = default_data_dir;
-    }
-    if let Some(value) = args.data_dir.as_deref() {
-        profile.data_dir = value.to_string();
-    }
-    if let Some(value) = args.library_id.as_deref() {
-        profile.library_id = value.to_string();
-    }
-    if let Some(value) = args.api_key.as_deref() {
-        profile.api_key = value.to_string();
-    }
-    if let Some(value) = args.semantic_scholar_api_key.as_deref() {
-        profile.semantic_scholar_api_key = value.to_string();
-    }
-}
-
-fn apply_root_setting(config: &mut AppConfig, key: &ConfigKeyArg, value: &str) -> Result<()> {
-    match key {
-        ConfigKeyArg::DataDir => config.zotero.data_dir = value.to_string(),
-        ConfigKeyArg::LibraryId => config.zotero.library_id = value.to_string(),
-        ConfigKeyArg::ApiKey => config.zotero.api_key = value.to_string(),
-        ConfigKeyArg::SemanticScholarApiKey => {
-            config.zotero.semantic_scholar_api_key = value.to_string()
-        }
-        ConfigKeyArg::EmbeddingUrl => config.embedding.url = value.to_string(),
-        ConfigKeyArg::EmbeddingKey => config.embedding.api_key = value.to_string(),
-        ConfigKeyArg::EmbeddingModel => config.embedding.model = value.to_string(),
-        ConfigKeyArg::OutputFormat => config.output.default_format = value.to_string(),
-        ConfigKeyArg::OutputLimit => config.output.limit = parse_limit(value)?,
-        ConfigKeyArg::ExportStyle => config.export.default_style = value.to_string(),
-    }
-    Ok(())
-}
-
-fn apply_profile_setting(
-    profile: &mut ProfileConfig,
+/// Single source of truth for where every config key lives on each target.
+/// Adding a new `ConfigKeyArg` variant only requires one new arm here — the
+/// exhaustive match refuses to compile until the variant is mapped. A `None`
+/// profile arm marks the key as root-only; `apply_setting` turns that into
+/// the rejection error.
+fn setting_slot<'a>(
+    target: &'a mut ConfigTarget<'_>,
     key: &ConfigKeyArg,
-    value: &str,
-) -> Result<()> {
+) -> Option<SettingSlot<'a>> {
+    use SettingSlot::{Limit, Text};
     match key {
-        ConfigKeyArg::DataDir => profile.data_dir = value.to_string(),
-        ConfigKeyArg::LibraryId => profile.library_id = value.to_string(),
-        ConfigKeyArg::ApiKey => profile.api_key = value.to_string(),
-        ConfigKeyArg::SemanticScholarApiKey => profile.semantic_scholar_api_key = value.to_string(),
-        ConfigKeyArg::OutputFormat => profile.output.default_format = value.to_string(),
-        ConfigKeyArg::OutputLimit => profile.output.limit = parse_limit(value)?,
-        ConfigKeyArg::ExportStyle => profile.export.default_style = value.to_string(),
-        ConfigKeyArg::EmbeddingUrl | ConfigKeyArg::EmbeddingKey | ConfigKeyArg::EmbeddingModel => {
+        ConfigKeyArg::DataDir => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.zotero.data_dir)),
+            ConfigTarget::Profile(profile) => Some(Text(&mut profile.data_dir)),
+        },
+        ConfigKeyArg::LibraryId => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.zotero.library_id)),
+            ConfigTarget::Profile(profile) => Some(Text(&mut profile.library_id)),
+        },
+        ConfigKeyArg::ApiKey => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.zotero.api_key)),
+            ConfigTarget::Profile(profile) => Some(Text(&mut profile.api_key)),
+        },
+        ConfigKeyArg::SemanticScholarApiKey => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.zotero.semantic_scholar_api_key)),
+            ConfigTarget::Profile(profile) => Some(Text(&mut profile.semantic_scholar_api_key)),
+        },
+        ConfigKeyArg::EmbeddingUrl => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.embedding.url)),
+            ConfigTarget::Profile(_) => None,
+        },
+        ConfigKeyArg::EmbeddingKey => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.embedding.api_key)),
+            ConfigTarget::Profile(_) => None,
+        },
+        ConfigKeyArg::EmbeddingModel => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.embedding.model)),
+            ConfigTarget::Profile(_) => None,
+        },
+        ConfigKeyArg::OutputFormat => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.output.default_format)),
+            ConfigTarget::Profile(profile) => Some(Text(&mut profile.output.default_format)),
+        },
+        ConfigKeyArg::OutputLimit => match target {
+            ConfigTarget::Root(config) => Some(Limit(&mut config.output.limit)),
+            ConfigTarget::Profile(profile) => Some(Limit(&mut profile.output.limit)),
+        },
+        ConfigKeyArg::ExportStyle => match target {
+            ConfigTarget::Root(config) => Some(Text(&mut config.export.default_style)),
+            ConfigTarget::Profile(profile) => Some(Text(&mut profile.export.default_style)),
+        },
+    }
+}
+
+/// Applies one key/value to the target. Root-only keys are rejected for
+/// profile targets; this is the single rejection rule shared by `config init`
+/// and `config set`.
+fn apply_setting(target: &mut ConfigTarget<'_>, key: &ConfigKeyArg, value: &str) -> Result<()> {
+    match setting_slot(target, key) {
+        Some(SettingSlot::Text(slot)) => *slot = value.to_string(),
+        Some(SettingSlot::Limit(slot)) => *slot = parse_limit(value)?,
+        None => {
             return Err(zot_core::ZotError::InvalidInput {
                 code: "config-key".to_string(),
                 message: format!(
@@ -256,6 +254,49 @@ fn apply_profile_setting(
         }
     }
     Ok(())
+}
+
+/// Applies `config init` flags through the same `apply_setting` path.
+fn apply_init(
+    target: &mut ConfigTarget<'_>,
+    args: &ConfigInitArgs,
+    default_data_dir: String,
+) -> Result<()> {
+    if let Some(SettingSlot::Text(data_dir)) = setting_slot(target, &ConfigKeyArg::DataDir)
+        && data_dir.is_empty()
+    {
+        *data_dir = default_data_dir;
+    }
+
+    for (key, value) in provided_init_settings(args) {
+        // `config init` keeps its historical behavior of silently ignoring
+        // root-only keys on profile targets; `config set` rejects them.
+        if setting_slot(target, &key).is_some() {
+            apply_setting(target, &key, value)?;
+        }
+    }
+    Ok(())
+}
+
+fn provided_init_settings(args: &ConfigInitArgs) -> Vec<(ConfigKeyArg, &str)> {
+    [
+        (ConfigKeyArg::DataDir, args.data_dir.as_deref()),
+        (ConfigKeyArg::LibraryId, args.library_id.as_deref()),
+        (ConfigKeyArg::ApiKey, args.api_key.as_deref()),
+        (
+            ConfigKeyArg::SemanticScholarApiKey,
+            args.semantic_scholar_api_key.as_deref(),
+        ),
+        (ConfigKeyArg::EmbeddingUrl, args.embedding_url.as_deref()),
+        (ConfigKeyArg::EmbeddingKey, args.embedding_key.as_deref()),
+        (
+            ConfigKeyArg::EmbeddingModel,
+            args.embedding_model.as_deref(),
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(key, value)| value.map(|value| (key, value)))
+    .collect()
 }
 
 fn parse_limit(value: &str) -> Result<usize> {
@@ -367,15 +408,33 @@ impl ConfigKeyArgExt for ConfigKeyArg {
 mod tests {
     use super::*;
 
+    fn init_args() -> ConfigInitArgs {
+        ConfigInitArgs {
+            target_profile: None,
+            make_default: false,
+            data_dir: None,
+            library_id: None,
+            api_key: None,
+            semantic_scholar_api_key: None,
+            embedding_url: None,
+            embedding_key: None,
+            embedding_model: None,
+        }
+    }
+
     #[test]
     fn updates_profile_specific_settings() {
         let mut profile = ProfileConfig::default();
-        apply_profile_setting(&mut profile, &ConfigKeyArg::LibraryId, "42")
-            .expect("set library id");
+        apply_setting(
+            &mut ConfigTarget::Profile(&mut profile),
+            &ConfigKeyArg::LibraryId,
+            "42",
+        )
+        .expect("set library id");
         assert_eq!(profile.library_id, "42");
 
-        let err = apply_profile_setting(
-            &mut profile,
+        let err = apply_setting(
+            &mut ConfigTarget::Profile(&mut profile),
             &ConfigKeyArg::EmbeddingUrl,
             "https://example.com",
         )
@@ -385,6 +444,147 @@ mod tests {
             zot_core::ZotError::InvalidInput { code, .. } => assert_eq!(code, "config-key"),
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn applies_same_key_through_root_and_profile_targets() {
+        let mut config = AppConfig::default();
+        apply_setting(
+            &mut ConfigTarget::Root(&mut config),
+            &ConfigKeyArg::LibraryId,
+            "42",
+        )
+        .expect("root library id");
+        apply_setting(
+            &mut ConfigTarget::Root(&mut config),
+            &ConfigKeyArg::OutputLimit,
+            "25",
+        )
+        .expect("root output limit");
+        assert_eq!(config.zotero.library_id, "42");
+        assert_eq!(config.output.limit, 25);
+
+        let mut profile = ProfileConfig::default();
+        apply_setting(
+            &mut ConfigTarget::Profile(&mut profile),
+            &ConfigKeyArg::LibraryId,
+            "42",
+        )
+        .expect("profile library id");
+        apply_setting(
+            &mut ConfigTarget::Profile(&mut profile),
+            &ConfigKeyArg::OutputLimit,
+            "25",
+        )
+        .expect("profile output limit");
+        assert_eq!(profile.library_id, "42");
+        assert_eq!(profile.output.limit, 25);
+    }
+
+    #[test]
+    fn every_key_applies_at_root_and_root_only_keys_reject_profiles() {
+        use clap::ValueEnum;
+
+        for key in ConfigKeyArg::value_variants() {
+            let value = match key {
+                ConfigKeyArg::OutputLimit => "25",
+                _ => "value",
+            };
+
+            let mut config = AppConfig::default();
+            apply_setting(&mut ConfigTarget::Root(&mut config), key, value)
+                .expect("every key must apply at the root level");
+
+            let mut profile = ProfileConfig::default();
+            let result = apply_setting(&mut ConfigTarget::Profile(&mut profile), key, value);
+            match key {
+                ConfigKeyArg::EmbeddingUrl
+                | ConfigKeyArg::EmbeddingKey
+                | ConfigKeyArg::EmbeddingModel => {
+                    let err = result.expect_err("root-only keys must be rejected for profiles");
+                    let err = err.downcast_ref::<zot_core::ZotError>().expect("zot error");
+                    match err {
+                        zot_core::ZotError::InvalidInput {
+                            code,
+                            message,
+                            hint,
+                        } => {
+                            assert_eq!(code, "config-key");
+                            assert_eq!(
+                                message,
+                                &format!(
+                                    "Key '{}' is only supported at the root config level",
+                                    key.as_str()
+                                )
+                            );
+                            assert_eq!(
+                                hint.as_deref(),
+                                Some("Use 'zot config set <key> <value>' without --target-profile")
+                            );
+                        }
+                        other => panic!("unexpected error: {other:?}"),
+                    }
+                }
+                _ => {
+                    result.expect("shared keys must apply to profiles");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn init_reuses_apply_setting_and_skips_root_only_keys_for_profiles() {
+        let mut args = init_args();
+        args.library_id = Some("7".to_string());
+        args.embedding_url = Some("https://example.com".to_string());
+
+        let mut config = AppConfig::default();
+        apply_init(
+            &mut ConfigTarget::Root(&mut config),
+            &args,
+            "detected-dir".to_string(),
+        )
+        .expect("root init");
+        assert_eq!(config.zotero.data_dir, "detected-dir");
+        assert_eq!(config.zotero.library_id, "7");
+        assert_eq!(config.embedding.url, "https://example.com");
+
+        let mut profile = ProfileConfig::default();
+        apply_init(
+            &mut ConfigTarget::Profile(&mut profile),
+            &args,
+            "detected-dir".to_string(),
+        )
+        .expect("profile init ignores root-only keys");
+        assert_eq!(profile.data_dir, "detected-dir");
+        assert_eq!(profile.library_id, "7");
+    }
+
+    #[test]
+    fn init_keeps_explicit_and_existing_data_dir_over_detected_default() {
+        let mut args = init_args();
+        args.data_dir = Some("explicit-dir".to_string());
+
+        let mut config = AppConfig::default();
+        apply_init(
+            &mut ConfigTarget::Root(&mut config),
+            &args,
+            "detected-dir".to_string(),
+        )
+        .expect("root init");
+        assert_eq!(config.zotero.data_dir, "explicit-dir");
+
+        let mut profile = ProfileConfig {
+            data_dir: "existing-dir".to_string(),
+            ..ProfileConfig::default()
+        };
+        apply_init(
+            &mut ConfigTarget::Profile(&mut profile),
+            &init_args(),
+            "detected-dir".to_string(),
+        )
+        .expect("profile init");
+        assert_eq!(profile.data_dir, "existing-dir");
     }
 
     #[test]
