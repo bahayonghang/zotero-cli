@@ -20,14 +20,33 @@ const RELATED_WEIGHT: i64 = 100;
 const COMMUNITY_TOP_TAGS: usize = 3;
 const MAX_LABEL_ROUNDS: usize = 20;
 
-/// Per-pair accumulator collected from the inverted indexes before edges are
-/// materialised.
+/// Per-pair relatedness signals. Collected from the inverted indexes during
+/// graph assembly, and from signal-only SQL in
+/// [`crate::db::LocalLibrary::get_related_items`]. Counts are shared
+/// authors/tags/collections; `related` marks an explicit Zotero relation.
 #[derive(Default, Clone)]
-struct PairAccum {
-    coauthor: usize,
-    tag: usize,
-    collection: usize,
-    related: bool,
+pub(crate) struct PairAccum {
+    pub(crate) coauthor: usize,
+    pub(crate) tag: usize,
+    pub(crate) collection: usize,
+    pub(crate) related: bool,
+}
+
+/// Single source of truth for "how related are two items". Both `zot graph`
+/// (edge weights in [`assemble_graph`]) and `zot related` (ranking in
+/// `db.rs`) must delegate here so the two commands agree on relative order.
+/// Pure: weights are `RELATED_WEIGHT` (100) per explicit relation,
+/// `COAUTHOR_WEIGHT` (8) per shared author, `TAG_WEIGHT` (5) per shared tag,
+/// and `COLLECTION_WEIGHT` (1) per shared collection.
+pub(crate) fn score_pair(signals: &PairAccum) -> i64 {
+    let mut score = 0i64;
+    if signals.related {
+        score += RELATED_WEIGHT;
+    }
+    score += COAUTHOR_WEIGHT * signals.coauthor as i64;
+    score += TAG_WEIGHT * signals.tag as i64;
+    score += COLLECTION_WEIGHT * signals.collection as i64;
+    score
 }
 
 /// Build a [`KnowledgeGraph`] from loaded items and explicit relation key
@@ -93,27 +112,30 @@ pub(crate) fn assemble_graph(
         let Some(acc) = pairs.get(&(i, j)) else {
             continue;
         };
+        // `min_shared_tags` is a graph-only edge-emission gate, not part of
+        // the shared weight table: sub-threshold tag overlap is zeroed before
+        // scoring so it neither emits a Tag relation nor contributes weight.
+        let mut signals = acc.clone();
+        if signals.tag < opts.min_shared_tags {
+            signals.tag = 0;
+        }
         let mut relations: Vec<EdgeRelation> = Vec::new();
-        let mut weight: i64 = 0;
-        if acc.related {
+        if signals.related {
             relations.push(EdgeRelation::Related);
-            weight += RELATED_WEIGHT;
         }
-        if acc.coauthor > 0 {
+        if signals.coauthor > 0 {
             relations.push(EdgeRelation::Coauthor);
-            weight += COAUTHOR_WEIGHT * acc.coauthor as i64;
         }
-        if acc.tag >= opts.min_shared_tags && acc.tag > 0 {
+        if signals.tag > 0 {
             relations.push(EdgeRelation::Tag);
-            weight += TAG_WEIGHT * acc.tag as i64;
         }
-        if acc.collection > 0 {
+        if signals.collection > 0 {
             relations.push(EdgeRelation::Collection);
-            weight += COLLECTION_WEIGHT * acc.collection as i64;
         }
         if relations.is_empty() {
             continue;
         }
+        let weight = score_pair(&signals);
         degree[i] += 1;
         degree[j] += 1;
         weighted[i] += weight;
@@ -430,4 +452,60 @@ fn top_counts(values: impl Iterator<Item = String>, top_n: usize) -> Vec<TagSumm
     ranked.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.name.cmp(&b.name)));
     ranked.truncate(top_n);
     ranked
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PairAccum, score_pair};
+
+    #[test]
+    fn score_pair_is_the_single_weight_table() {
+        // Weight table shared by `zot graph` and `zot related`: explicit
+        // relation 100, coauthor 8 per shared author, tag 5 per shared tag,
+        // collection 1 per shared collection.
+        assert_eq!(
+            score_pair(&PairAccum {
+                related: true,
+                ..PairAccum::default()
+            }),
+            100
+        );
+        // Behavior change (07-07-related-scorer): the old `zot related` SQL
+        // scoring had no coauthor signal at all, so a coauthor-only pair
+        // scored 0. It now scores 8.
+        assert_eq!(
+            score_pair(&PairAccum {
+                coauthor: 1,
+                ..PairAccum::default()
+            }),
+            8
+        );
+        // Behavior change (07-07-related-scorer): the old `zot related` SQL
+        // used `HAVING cnt >= 2`, so a single shared tag scored 0. It now
+        // scores 5; graph-side noise control stays in
+        // `GraphOptions.min_shared_tags` as an edge-emission gate.
+        assert_eq!(
+            score_pair(&PairAccum {
+                tag: 1,
+                ..PairAccum::default()
+            }),
+            5
+        );
+        assert_eq!(
+            score_pair(&PairAccum {
+                collection: 1,
+                ..PairAccum::default()
+            }),
+            1
+        );
+        assert_eq!(
+            score_pair(&PairAccum {
+                related: true,
+                coauthor: 2,
+                tag: 3,
+                collection: 4,
+            }),
+            100 + 2 * 8 + 3 * 5 + 4
+        );
+    }
 }

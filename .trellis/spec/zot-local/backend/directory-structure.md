@@ -38,6 +38,23 @@ src/zot-local/tests/
   plus one `itemRelations` query — then hands loaded `Item`s to `graph.rs`,
   because `LocalLibrary`'s private fields are only reachable from `db.rs`. Keep
   DB access in `db.rs`; keep deterministic computation in `graph.rs`.
+- Pair relatedness has exactly one weight table: `graph.rs::score_pair` over
+  `PairAccum` signals (explicit relation 100, coauthor 8 per shared author,
+  tag 5 per shared tag, collection 1 per shared collection). Both
+  `assemble_graph` edge weights and `LocalLibrary::get_related_items` delegate
+  to it; `get_related_items` only fetches raw signals (explicit relation
+  pairs plus shared creator/tag/collection counts via `count_shared_ids`)
+  with no weights or thresholds in SQL. Signal fetch is scoped to primary
+  items — child `attachment`/`note`/`annotation` rows are excluded in
+  `count_shared_ids`, matching the graph's node universe, so unprintable
+  items never consume `limit` slots (candidate scoping, not a score rule).
+  Decisions recorded 2026-07-07
+  (task 07-07-related-scorer): the coauthor signal now counts toward
+  `zot related` (it was missing), and the old `HAVING cnt >= 2` tag threshold
+  is gone — a single shared tag scores 5. `GraphOptions.min_shared_tags`
+  stays a graph-only edge-emission gate applied before scoring, never a
+  weight rule; future noise filtering belongs in the scorer as an explicit
+  parameter, not in fetch SQL.
 - `pdf.rs` owns the `PdfBackend` trait, Pdfium loading/auto-download probing,
   text extraction, outline extraction, annotation geometry, and the PDF text
   cache database.

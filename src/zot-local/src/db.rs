@@ -15,6 +15,7 @@ use zot_core::{
 };
 
 use crate::citation::export_item;
+use crate::graph::{PairAccum, score_pair};
 
 const EXCLUDED_TYPE_NAMES: &[&str] = &["attachment", "note", "annotation"];
 
@@ -1151,12 +1152,16 @@ impl LocalLibrary {
         Ok(groups.into_iter().take(limit).collect())
     }
 
+    /// Rank items related to `key`. This method only fetches raw signals
+    /// (explicit relation pairs plus shared creator/tag/collection counts);
+    /// the weights and the ranking itself live in [`crate::graph::score_pair`]
+    /// so `zot related` and `zot graph` share one relatedness definition.
     pub fn get_related_items(&self, key: &str, limit: usize) -> ZotResult<Vec<Item>> {
         let parent_id = self.parent_item_id(key)?;
         let Some(parent_id) = parent_id else {
             return Ok(Vec::new());
         };
-        let mut scores: HashMap<i64, i64> = HashMap::new();
+        let mut signals: HashMap<i64, PairAccum> = HashMap::new();
 
         let mut stmt = self
             .conn
@@ -1173,65 +1178,49 @@ impl LocalLibrary {
             if !related_key.is_empty()
                 && let Some(item_id) = self.item_id_by_key(related_key)?
             {
-                *scores.entry(item_id).or_insert(0) += 100;
+                signals.entry(item_id).or_default().related = true;
             }
+        }
+
+        let my_creator_ids = self.get_item_creator_ids(parent_id)?;
+        for (item_id, count) in self.count_shared_ids(
+            "itemCreators",
+            "creatorID",
+            parent_id,
+            &my_creator_ids,
+            "related-coauthors",
+        )? {
+            signals.entry(item_id).or_default().coauthor = count;
         }
 
         let my_collections = self.get_item_collection_ids(parent_id)?;
-        if !my_collections.is_empty() {
-            let placeholders = repeat_placeholders(my_collections.len());
-            let sql = format!(
-                "SELECT itemID, COUNT(*) as cnt FROM collectionItems WHERE collectionID IN ({}) AND itemID != ?1 GROUP BY itemID",
-                placeholders
-            );
-            let mut params_vec = vec![rusqlite::types::Value::from(parent_id)];
-            params_vec.extend(
-                my_collections
-                    .iter()
-                    .copied()
-                    .map(rusqlite::types::Value::from),
-            );
-            let mut stmt = self
-                .conn
-                .prepare_cached(&sql)
-                .map_err(sql_err("related-collections"))?;
-            let rows = stmt
-                .query_map(params_from_iter(params_vec), |row| {
-                    Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
-                })
-                .map_err(sql_err("related-collections"))?;
-            for row in rows {
-                let (item_id, score) = row.map_err(sql_err("related-collections"))?;
-                *scores.entry(item_id).or_insert(0) += score;
-            }
+        for (item_id, count) in self.count_shared_ids(
+            "collectionItems",
+            "collectionID",
+            parent_id,
+            &my_collections,
+            "related-collections",
+        )? {
+            signals.entry(item_id).or_default().collection = count;
         }
 
+        // No `HAVING cnt >= 2` here any more: thresholds are scoring policy,
+        // and scoring is owned by `graph::score_pair` (a single shared tag now
+        // scores TAG_WEIGHT instead of being dropped at fetch time).
         let my_tag_ids = self.get_item_tag_ids(parent_id)?;
-        if !my_tag_ids.is_empty() {
-            let placeholders = repeat_placeholders(my_tag_ids.len());
-            let sql = format!(
-                "SELECT itemID, COUNT(*) as cnt FROM itemTags WHERE tagID IN ({}) AND itemID != ?1 GROUP BY itemID HAVING cnt >= 2",
-                placeholders
-            );
-            let mut params_vec = vec![rusqlite::types::Value::from(parent_id)];
-            params_vec.extend(my_tag_ids.iter().copied().map(rusqlite::types::Value::from));
-            let mut stmt = self
-                .conn
-                .prepare_cached(&sql)
-                .map_err(sql_err("related-tags"))?;
-            let rows = stmt
-                .query_map(params_from_iter(params_vec), |row| {
-                    Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
-                })
-                .map_err(sql_err("related-tags"))?;
-            for row in rows {
-                let (item_id, score) = row.map_err(sql_err("related-tags"))?;
-                *scores.entry(item_id).or_insert(0) += score * 5;
-            }
+        for (item_id, count) in
+            self.count_shared_ids("itemTags", "tagID", parent_id, &my_tag_ids, "related-tags")?
+        {
+            signals.entry(item_id).or_default().tag = count;
         }
 
-        let mut ordered = scores.into_iter().collect::<Vec<_>>();
-        ordered.sort_by_key(|(_, score)| Reverse(*score));
+        let mut ordered = signals
+            .into_iter()
+            .map(|(item_id, pair)| (item_id, score_pair(&pair)))
+            .collect::<Vec<_>>();
+        // Score desc, then itemID asc so equal-score candidates rank
+        // deterministically (HashMap iteration order is arbitrary).
+        ordered.sort_by_key(|&(item_id, score)| (Reverse(score), item_id));
         let item_ids = ordered
             .into_iter()
             .take(limit)
@@ -1525,6 +1514,70 @@ impl LocalLibrary {
             .map_err(sql_err("item-collection-ids"))?;
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(sql_err("item-collection-ids"))
+    }
+
+    fn get_item_creator_ids(&self, item_id: i64) -> ZotResult<Vec<i64>> {
+        let mut stmt = self
+            .conn
+            .prepare_cached("SELECT creatorID FROM itemCreators WHERE itemID = ?1")
+            .map_err(sql_err("item-creator-ids"))?;
+        let rows = stmt
+            .query_map(params![item_id], |row| row.get::<_, i64>(0))
+            .map_err(sql_err("item-creator-ids"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("item-creator-ids"))
+    }
+
+    /// Shared-signal counting for `get_related_items`: given the parent
+    /// item's own `ids` in `table`.`id_column` (its tagIDs, collectionIDs, or
+    /// creatorIDs), count per other primary item how many of those ids it
+    /// shares. `table` and `id_column` are code constants, never user input.
+    fn count_shared_ids(
+        &self,
+        table: &str,
+        id_column: &str,
+        parent_id: i64,
+        ids: &[i64],
+        label: &'static str,
+    ) -> ZotResult<Vec<(i64, usize)>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        // `?1` (parent) must precede the plain-`?` IN list: SQLite numbers a
+        // plain `?` as one-greater-than-the-largest index seen so far, so an
+        // `IN (?,...)`-first clause would make a trailing `?1` alias the
+        // first IN slot and the bind count would no longer match.
+        // `COUNT(DISTINCT ...)` mirrors graph.rs, where a creator credited
+        // twice on one item (e.g. author and editor) counts once.
+        // Child rows (attachment/note/annotation) are excluded up front:
+        // `get_items_batch` can never return them, so letting them into the
+        // candidate list would only burn `limit` slots — and the graph never
+        // scores them either, since its nodes exclude child types.
+        let sql = format!(
+            "SELECT ti.itemID, COUNT(DISTINCT ti.{id_column}) as cnt FROM {table} ti
+             JOIN items i ON ti.itemID = i.itemID
+             JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+             WHERE ti.itemID != ?1
+             AND it.typeName NOT IN ('attachment','note','annotation')
+             AND ti.{id_column} IN ({})
+             GROUP BY ti.itemID",
+            repeat_placeholders(ids.len())
+        );
+        let mut params_vec = vec![rusqlite::types::Value::from(parent_id)];
+        params_vec.extend(ids.iter().copied().map(rusqlite::types::Value::from));
+        let mut stmt = self.conn.prepare_cached(&sql).map_err(sql_err(label))?;
+        let rows = stmt
+            .query_map(params_from_iter(params_vec), |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(sql_err(label))?;
+        let mut counts = Vec::new();
+        for row in rows {
+            let (item_id, count) = row.map_err(sql_err(label))?;
+            // COUNT(...) is never negative; saturate defensively.
+            counts.push((item_id, usize::try_from(count).unwrap_or(0)));
+        }
+        Ok(counts)
     }
 
     fn collect_matching_item_ids_from_field_search(
@@ -2586,6 +2639,46 @@ Original Date: 2017');
 
             INSERT INTO itemRelations VALUES (1, 1, 'http://zotero.org/users/local/BERT002');
 
+            -- Related-scorer bench (unified `related`/`graph` scoring tests):
+            -- RELA013 is the probe; each partner shares exactly one signal
+            -- class with it so every pair lands on a distinct score.
+            INSERT INTO items VALUES (13, 2, '2023-01-01', '2023-01-01', '2023-01-01', 1, 'RELA013');
+            INSERT INTO itemDataValues VALUES (30, 'Bench Probe Paper');
+            INSERT INTO itemData VALUES (13, 4, 30);
+            INSERT INTO items VALUES (14, 2, '2023-01-02', '2023-01-02', '2023-01-02', 1, 'RELB014');
+            INSERT INTO itemDataValues VALUES (31, 'Bench Explicit Relation Partner');
+            INSERT INTO itemData VALUES (14, 4, 31);
+            INSERT INTO items VALUES (15, 2, '2023-01-03', '2023-01-03', '2023-01-03', 1, 'COAU015');
+            INSERT INTO itemDataValues VALUES (32, 'Bench Coauthor Partner');
+            INSERT INTO itemData VALUES (15, 4, 32);
+            INSERT INTO items VALUES (16, 2, '2023-01-04', '2023-01-04', '2023-01-04', 1, 'TAG1016');
+            INSERT INTO itemDataValues VALUES (33, 'Bench Single Tag Partner');
+            INSERT INTO itemData VALUES (16, 4, 33);
+            INSERT INTO items VALUES (17, 2, '2023-01-05', '2023-01-05', '2023-01-05', 1, 'TAG2017');
+            INSERT INTO itemDataValues VALUES (34, 'Bench Double Tag Partner');
+            INSERT INTO itemData VALUES (17, 4, 34);
+            INSERT INTO items VALUES (18, 2, '2023-01-06', '2023-01-06', '2023-01-06', 1, 'COLL018');
+            INSERT INTO itemDataValues VALUES (35, 'Bench Shelf Partner');
+            INSERT INTO itemData VALUES (18, 4, 35);
+
+            INSERT INTO creators VALUES (8, 'Grace', 'Hopper');
+            INSERT INTO itemCreators VALUES (13, 8, 1, 0);
+            INSERT INTO itemCreators VALUES (15, 8, 1, 0);
+
+            INSERT INTO tags VALUES (5, 'bench-shared-a');
+            INSERT INTO tags VALUES (6, 'bench-shared-b');
+            INSERT INTO itemTags VALUES (13, 5, 0);
+            INSERT INTO itemTags VALUES (13, 6, 0);
+            INSERT INTO itemTags VALUES (16, 5, 0);
+            INSERT INTO itemTags VALUES (17, 5, 0);
+            INSERT INTO itemTags VALUES (17, 6, 0);
+
+            INSERT INTO collections VALUES (5, 'Bench Shelf', NULL, 1, 'COLBEN05');
+            INSERT INTO collectionItems VALUES (5, 13, 0);
+            INSERT INTO collectionItems VALUES (5, 18, 0);
+
+            INSERT INTO itemRelations VALUES (13, 1, 'http://zotero.org/users/local/RELB014');
+
             INSERT INTO fulltextWords VALUES (1, 'transformer');
             INSERT INTO fulltextWords VALUES (2, 'attention');
             INSERT INTO fulltextWords VALUES (3, 'mechanism');
@@ -2679,6 +2772,118 @@ Original Date: 2017');
             .build_knowledge_graph(&opts)
             .expect("rebuild knowledge graph");
         assert_eq!(graph, again);
+    }
+
+    #[test]
+    fn related_items_rank_by_unified_scorer_signals() {
+        let fixture = rich_fixture_library();
+        let related = fixture
+            .lib
+            .get_related_items("RELA013", 10)
+            .expect("related items");
+        let keys: Vec<&str> = related.iter().map(|item| item.key.as_str()).collect();
+        // Unified `graph::score_pair` ordering: explicit relation 100 >
+        // two shared tags 10 > one shared author 8 > one shared tag 5 >
+        // one shared collection 1.
+        //
+        // Behavior changes vs the old SQL-inline scoring (07-07-related-scorer):
+        // - COAU015 is new here: `related` previously had no coauthor signal.
+        // - TAG1016 is new here: `HAVING cnt >= 2` previously dropped
+        //   single-shared-tag pairs at fetch time.
+        assert_eq!(
+            keys,
+            vec!["RELB014", "TAG2017", "COAU015", "TAG1016", "COLL018"]
+        );
+
+        // `limit` still truncates after ranking.
+        let top2 = fixture
+            .lib
+            .get_related_items("RELA013", 2)
+            .expect("related items with limit");
+        let top2_keys: Vec<&str> = top2.iter().map(|item| item.key.as_str()).collect();
+        assert_eq!(top2_keys, vec!["RELB014", "TAG2017"]);
+
+        // Equal scores tie-break by itemID ascending for deterministic
+        // output: DEEP003 (item 3) and SCAL006 (item 6) both score 1
+        // (one shared collection) relative to ATTN001.
+        let attn = fixture
+            .lib
+            .get_related_items("ATTN001", 10)
+            .expect("related items for ATTN001");
+        let attn_keys: Vec<&str> = attn.iter().map(|item| item.key.as_str()).collect();
+        assert_eq!(attn_keys.first(), Some(&"BERT002"));
+        let deep = attn_keys
+            .iter()
+            .position(|key| *key == "DEEP003")
+            .expect("DEEP003 in related");
+        let scal = attn_keys
+            .iter()
+            .position(|key| *key == "SCAL006")
+            .expect("SCAL006 in related");
+        assert!(deep < scal, "equal scores must tie-break by itemID");
+
+        // Child items can share signals (NOTE004 carries the 'attention' tag,
+        // like ATTN001) but are excluded at fetch: `get_items_batch` could
+        // never print them, so they must not consume `limit` slots either.
+        // Without the fetch-side type filter this would return only
+        // ["BERT002"] — the note would occupy the second slot and then be
+        // dropped at load time.
+        let attn_top2 = fixture
+            .lib
+            .get_related_items("ATTN001", 2)
+            .expect("related items for ATTN001 with limit");
+        let attn_top2_keys: Vec<&str> = attn_top2.iter().map(|item| item.key.as_str()).collect();
+        assert_eq!(attn_top2_keys, vec!["BERT002", "DEEP003"]);
+    }
+
+    #[test]
+    fn related_and_graph_rank_the_same_pairs_consistently() {
+        let fixture = rich_fixture_library();
+        // `min_shared_tags` is a graph-only edge-emission gate; set it to 1 so
+        // the graph exposes exactly the signal set `related` scores.
+        let opts = zot_core::GraphOptions {
+            min_shared_tags: 1,
+            ..zot_core::GraphOptions::default()
+        };
+        let graph = fixture
+            .lib
+            .build_knowledge_graph(&opts)
+            .expect("knowledge graph");
+        let mut neighbors: Vec<(i64, String)> = graph
+            .edges
+            .iter()
+            .filter_map(|edge| {
+                if edge.source == "RELA013" {
+                    Some((edge.weight, edge.target.clone()))
+                } else if edge.target == "RELA013" {
+                    Some((edge.weight, edge.source.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        neighbors.sort_by_key(|&(weight, _)| std::cmp::Reverse(weight));
+        // Edge weights come from the same `graph::score_pair` weight table
+        // that ranks `zot related`.
+        assert_eq!(
+            neighbors,
+            vec![
+                (100, "RELB014".to_string()),
+                (10, "TAG2017".to_string()),
+                (8, "COAU015".to_string()),
+                (5, "TAG1016".to_string()),
+                (1, "COLL018".to_string()),
+            ]
+        );
+
+        let related = fixture
+            .lib
+            .get_related_items("RELA013", 10)
+            .expect("related items");
+        let related_keys: Vec<&str> = related.iter().map(|item| item.key.as_str()).collect();
+        let graph_order: Vec<&str> = neighbors.iter().map(|(_, key)| key.as_str()).collect();
+        // Acceptance core: both commands rank the same pairs identically.
+        assert_eq!(related_keys, graph_order);
     }
 
     #[test]

@@ -55,10 +55,22 @@ std::iter::repeat_n("?", count).collect::<Vec<_>>().join(",")
 
 Pair this with `params_from_iter`, as `db.rs` and `workspace.rs` do.
 
+When one query mixes a generated `IN (?,...)` list with a fixed parameter,
+put the fixed parameter first as `?1` and the `IN` list after it. SQLite
+numbers a plain `?` as one-greater-than-the-largest index seen so far, so an
+`IN (?,?)`-first clause followed by `?1` makes `?1` alias the first `IN`
+slot; the statement then expects one fewer bind than supplied and rusqlite
+fails with `InvalidParameterCount`. This was a live bug in
+`get_related_items` (any item with collections or tags errored) until
+2026-07-07; `count_shared_ids` in `db.rs` shows the correct ordering — the
+fixed `?1` is bound first and the generated `IN (...)` list comes last.
+
 ## Avoid
 
 - Never write to Zotero's `zotero.sqlite` directly.
 - Do not let `%`, `_`, or `\` behave as wildcards for user search text.
+- Do not place a numbered `?N` after a generated plain-`?` `IN` list in the
+  same statement; the indexes collide (see Code Example above).
 - Do not call `RagIndex::open` from status paths when the desired behavior is
   "report missing index without creating it"; use `SemanticStore::status_at`.
 - Do not truncate large inputs silently. `docs/agents/limits.md` documents
