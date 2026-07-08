@@ -108,15 +108,3 @@ channel:
 #
 # codex:
 #   dispatch_mode: inline  # or "sub-agent" to dispatch trellis-* sub-agents
-
-# Auto-detected monorepo packages
-packages:
-  zot-core:
-    path: src/zot-core
-  zot-local:
-    path: src/zot-local
-  zot-remote:
-    path: src/zot-remote
-  zot-cli:
-    path: src/zot-cli
-default_package: zot-core
