@@ -1,20 +1,37 @@
+use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
 use zot_core::{AppConfig, LibraryScope};
-use zot_local::LocalLibrary;
+use zot_local::{LocalLibrary, PdfBackend, PdfiumBackend};
 use zot_remote::{HttpRuntime, ZoteroRemote};
 
 use crate::cli::Cli;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct AppContext {
     pub(crate) json: bool,
     pub(crate) profile: Option<String>,
     pub(crate) scope: LibraryScope,
     pub(crate) config: AppConfig,
     pub(crate) http: Arc<HttpRuntime>,
+    /// PDF engine for command-side extraction; tests inject fakes here.
+    /// `doctor` keeps its own concrete `PdfiumBackend` because it reports
+    /// Pdfium-specific diagnostics (`status()` is not on the trait).
+    pub(crate) pdf: Arc<dyn PdfBackend + Send + Sync>,
+}
+
+impl fmt::Debug for AppContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AppContext")
+            .field("json", &self.json)
+            .field("profile", &self.profile)
+            .field("scope", &self.scope)
+            .field("config", &self.config)
+            .field("http", &self.http)
+            .finish_non_exhaustive()
+    }
 }
 
 impl AppContext {
@@ -28,11 +45,16 @@ impl AppContext {
             scope,
             config,
             http,
+            pdf: Arc::new(PdfiumBackend),
         })
     }
 
     pub(crate) fn http(&self) -> &HttpRuntime {
         &self.http
+    }
+
+    pub(crate) fn pdf_backend(&self) -> Arc<dyn PdfBackend + Send + Sync> {
+        Arc::clone(&self.pdf)
     }
 
     pub(crate) fn local_library(&self) -> zot_core::ZotResult<LocalLibrary> {
@@ -71,5 +93,13 @@ impl AppContext {
         AppConfig::config_dir()
             .join("indexes")
             .join(format!("{scope}.idx.sqlite"))
+    }
+
+    /// Markdown cache for library-wide PDF text extraction, colocated here
+    /// with [`Self::library_index_path`] so sidecar paths have one owner.
+    pub(crate) fn library_md_cache_path(&self) -> PathBuf {
+        AppConfig::config_dir()
+            .join("cache")
+            .join("library_md_cache.sqlite")
     }
 }

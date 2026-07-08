@@ -2,8 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 use zot_local::{
-    HybridMode, PdfiumBackend, SearchOptions, WorkspaceRagStore, WorkspaceReindexOpts,
-    WorkspaceStore,
+    HybridMode, SearchOptions, WorkspaceRagStore, WorkspaceReindexOpts, WorkspaceStore,
 };
 use zot_remote::EmbeddingClient;
 
@@ -193,7 +192,7 @@ async fn index_workspace(
     let workspace = store.load(&args.name)?;
     let library = ctx.local_library()?;
     let rag = WorkspaceRagStore::open(store, &args.name)?;
-    let backend = PdfiumBackend;
+    let backend = ctx.pdf_backend();
     let embedding_client = EmbeddingClient::new(ctx.http(), ctx.config.embedding.clone());
     let opts = WorkspaceReindexOpts {
         fulltext: !args.no_fulltext,
@@ -246,6 +245,7 @@ mod tests {
 
     use super::*;
     use zot_core::{AppConfig, LibraryScope};
+    use zot_local::PdfiumBackend;
     use zot_remote::HttpRuntime;
 
     fn ctx(json: bool) -> AppContext {
@@ -255,6 +255,7 @@ mod tests {
             scope: LibraryScope::User,
             config: AppConfig::default(),
             http: Arc::new(HttpRuntime::default()),
+            pdf: Arc::new(PdfiumBackend),
         }
     }
 

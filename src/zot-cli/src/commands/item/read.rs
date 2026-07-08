@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use zot_local::{PdfBackend, PdfCache, PdfiumBackend};
+use zot_local::{PdfBackend, PdfCache};
 
 use crate::cli::{
     ItemChildrenArgs, ItemCiteArgs, ItemDeletedArgs, ItemDownloadArgs, ItemExportArgs, ItemKeyArgs,
@@ -68,7 +68,7 @@ pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<Co
     let library = ctx.local_library()?;
     let attachment = require_item_pdf(&library, &args.key)?;
     let pdf_path = library.pdf_path(&attachment);
-    let backend = PdfiumBackend;
+    let backend = ctx.pdf_backend();
     let cache = PdfCache::new(None)?;
     if args.annotations {
         let annotations = {
@@ -189,7 +189,7 @@ pub(crate) async fn handle_versions(
 pub(crate) async fn handle_outline(ctx: &AppContext, key: &str) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
     let attachment = require_item_pdf(&library, key)?;
-    let backend = PdfiumBackend;
+    let backend = ctx.pdf_backend();
     let pdf_path = library.pdf_path(&attachment);
     let entries = run_pdf(move || backend.extract_outline(&pdf_path)).await?;
     CommandOutput::new(ctx, entries, None, |entries| {

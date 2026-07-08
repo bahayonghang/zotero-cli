@@ -1,5 +1,5 @@
 use anyhow::Result;
-use zot_local::{PdfBackend, PdfiumBackend};
+use zot_local::PdfBackend;
 
 use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand};
 use crate::context::AppContext;
@@ -87,7 +87,7 @@ async fn create_highlight_annotation(
     let library = ctx.local_library()?;
     let attachment = require_pdf_attachment(&library, attachment_key)?;
     let pdf_path = library.pdf_path(&attachment);
-    let backend = PdfiumBackend;
+    let backend = ctx.pdf_backend();
     let position = {
         let text_owned = text.to_string();
         run_pdf(move || backend.find_text_position(&pdf_path, page, &text_owned, occurrence))
@@ -138,7 +138,7 @@ async fn create_area_annotation(
     let library = ctx.local_library()?;
     let attachment = require_pdf_attachment(&library, &args.attachment_key)?;
     let pdf_path = library.pdf_path(&attachment);
-    let backend = PdfiumBackend;
+    let backend = ctx.pdf_backend();
     let page = args.page;
     let x = args.x;
     let y = args.y;

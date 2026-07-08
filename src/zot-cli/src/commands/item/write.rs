@@ -3,7 +3,7 @@ use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
-use zot_local::{PdfBackend, PdfiumBackend};
+use zot_local::PdfBackend;
 use zot_remote::oa::CreatorName;
 use zot_remote::{HttpRuntime, OaClient, ZoteroRemote, normalize_arxiv_id, normalize_doi};
 
@@ -231,7 +231,7 @@ async fn add_item_from_file(
     collections: &[String],
     tags: &[String],
 ) -> Result<String> {
-    let backend = PdfiumBackend;
+    let backend = ctx.pdf_backend();
     let resolved_doi = if let Some(doi) = doi_override {
         Some(require_valid_doi(doi)?)
     } else if file

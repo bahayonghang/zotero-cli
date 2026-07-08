@@ -8,6 +8,18 @@ use crate::format::{to_pretty_json, EnvelopeMetaSeed, ENVELOPE_API_VERSION};
 /// json-vs-human decision and envelope meta assembly happen.
 pub(crate) struct CommandOutput(Payload);
 
+/// Manual impl because the human variant holds a render closure; tests need
+/// `Debug` for `Result::expect_err` on handler return values.
+impl std::fmt::Debug for CommandOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            Payload::Json(text) => f.debug_tuple("CommandOutput::Json").field(text).finish(),
+            Payload::Human(_) => f.write_str("CommandOutput::Human(..)"),
+            Payload::Silent => f.write_str("CommandOutput::Silent"),
+        }
+    }
+}
+
 enum Payload {
     /// Fully rendered pretty JSON envelope (constructed only when `ctx.json`).
     Json(String),
@@ -80,6 +92,7 @@ mod tests {
     use std::sync::Arc;
 
     use zot_core::{AppConfig, LibraryScope};
+    use zot_local::PdfiumBackend;
     use zot_remote::HttpRuntime;
 
     use super::*;
@@ -91,6 +104,7 @@ mod tests {
             scope: LibraryScope::User,
             config: AppConfig::default(),
             http: Arc::new(HttpRuntime::new().expect("http runtime")),
+            pdf: Arc::new(PdfiumBackend),
         }
     }
 

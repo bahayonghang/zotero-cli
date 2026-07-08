@@ -1,9 +1,7 @@
 use anyhow::Result;
 use chrono::Utc;
 use zot_core::{Item, SavedSearchCondition, SemanticHit, SemanticIndexStatus};
-use zot_local::{
-    HybridMode, LocalLibrary, PdfiumBackend, ReindexOpts, SearchOptions, SemanticStore,
-};
+use zot_local::{HybridMode, LocalLibrary, ReindexOpts, SearchOptions, SemanticStore};
 use zot_remote::{BetterBibTexClient, EmbeddingClient};
 
 use crate::cli::{
@@ -287,18 +285,11 @@ async fn semantic_index(
     args: LibrarySemanticIndexArgs,
 ) -> Result<serde_json::Value> {
     let library = ctx.local_library()?;
-    let store = SemanticStore::open(
-        ctx.library_index_path(),
-        Some(
-            zot_core::AppConfig::config_dir()
-                .join("cache")
-                .join("library_md_cache.sqlite"),
-        ),
-    )?;
+    let store = SemanticStore::open(ctx.library_index_path(), Some(ctx.library_md_cache_path()))?;
     if args.force_rebuild {
         store.clear()?;
     }
-    let backend = PdfiumBackend;
+    let backend = ctx.pdf_backend();
     let embedding_client = EmbeddingClient::new(ctx.http(), ctx.config.embedding.clone());
     let limit = effective_semantic_index_limit(args.limit);
     let items = load_semantic_index_items(&library, args.collection.as_deref(), limit)?;
@@ -422,6 +413,7 @@ mod tests {
     use crate::context::AppContext;
     use crate::output::CommandOutput;
     use zot_core::{AppConfig, LibraryScope};
+    use zot_local::PdfiumBackend;
     use zot_remote::HttpRuntime;
 
     fn json_ctx() -> AppContext {
@@ -431,6 +423,7 @@ mod tests {
             scope: LibraryScope::User,
             config: AppConfig::default(),
             http: Arc::new(HttpRuntime::default()),
+            pdf: Arc::new(PdfiumBackend),
         }
     }
 
@@ -501,6 +494,7 @@ mod tests {
             scope: LibraryScope::User,
             config: AppConfig::default(),
             http: Arc::new(HttpRuntime::default()),
+            pdf: Arc::new(PdfiumBackend),
         };
         let err = create_saved_search(
             &ctx,
