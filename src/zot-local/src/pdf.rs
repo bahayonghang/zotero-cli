@@ -707,7 +707,9 @@ fn download_pdfium_library(
 
 fn download_archive_bytes(url: &str) -> ZotResult<Vec<u8>> {
     let client = Client::builder()
-        .user_agent(concat!("zot/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(zot_core::net::CONNECT_TIMEOUT)
+        .timeout(zot_core::net::REQUEST_TIMEOUT)
+        .user_agent(zot_core::net::USER_AGENT)
         .redirect(reqwest::redirect::Policy::limited(5))
         .build()
         .map_err(|error| ZotError::Remote {
@@ -828,6 +830,20 @@ mod tests {
     use flate2::Compression;
     use flate2::write::GzEncoder;
     use tar::Builder;
+
+    #[test]
+    fn download_client_builds_with_shared_net_defaults() {
+        // 冒烟:引导下载 client 用 zot_core::net 共享常量(超时/UA 与主栈对齐)
+        // 能成功构建;不发起真实网络请求。
+        let client = Client::builder()
+            .connect_timeout(zot_core::net::CONNECT_TIMEOUT)
+            .timeout(zot_core::net::REQUEST_TIMEOUT)
+            .user_agent(zot_core::net::USER_AGENT)
+            .redirect(reqwest::redirect::Policy::limited(5))
+            .build();
+        assert!(client.is_ok());
+        assert!(zot_core::net::USER_AGENT.starts_with("zot-cli/"));
+    }
 
     #[test]
     fn resolves_download_targets_for_supported_platforms() {

@@ -57,7 +57,14 @@ src/zot-local/tests/
   parameter, not in fetch SQL.
 - `pdf.rs` owns the `PdfBackend` trait, Pdfium loading/auto-download probing,
   text extraction, outline extraction, annotation geometry, and the PDF text
-  cache database.
+  cache database. Its Pdfium bootstrap downloader keeps its own
+  `reqwest::blocking` stack — a deliberate boundary decision (2026-07-08,
+  task 07-07-pdf-http): zot-local must not depend on zot-remote, the download
+  is a one-shot first-run bootstrap, and blocking is appropriate in this sync
+  crate. Timeout and User-Agent come from `zot_core::net`
+  (`CONNECT_TIMEOUT`/`REQUEST_TIMEOUT`/`USER_AGENT`), shared with zot-remote's
+  `HttpRuntime`, so the two stacks cannot drift. Do not re-raise unifying the
+  stacks; do not hardcode timeouts or UA strings here.
 - `workspace.rs` owns durable workspace TOML files and the generic `RagIndex`
   schema used by both library and workspace search.
 - `semantic.rs` wraps library-wide indexing. It coordinates `LocalLibrary`,

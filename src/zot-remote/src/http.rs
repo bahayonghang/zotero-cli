@@ -9,15 +9,10 @@
 //! clones; per-request headers (e.g. Zotero's API key) are attached by the
 //! individual clients when they issue the request.
 
-use std::time::Duration;
-
 use reqwest::{Response, StatusCode};
 use serde::de::DeserializeOwned;
+use zot_core::net::{CONNECT_TIMEOUT, REQUEST_TIMEOUT, USER_AGENT};
 use zot_core::{ZotError, ZotResult};
-
-const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
-const USER_AGENT: &str = concat!("zot-cli/", env!("CARGO_PKG_VERSION"));
 
 /// Shared HTTP runtime. Cloning yields a new handle backed by the same
 /// connection pool (see `reqwest::Client::clone`).
@@ -31,8 +26,8 @@ impl HttpRuntime {
     /// request timeout, identifying User-Agent.
     pub fn new() -> ZotResult<Self> {
         let client = reqwest::Client::builder()
-            .connect_timeout(DEFAULT_CONNECT_TIMEOUT)
-            .timeout(DEFAULT_REQUEST_TIMEOUT)
+            .connect_timeout(CONNECT_TIMEOUT)
+            .timeout(REQUEST_TIMEOUT)
             .user_agent(USER_AGENT)
             .build()
             .map_err(|err| ZotError::Remote {

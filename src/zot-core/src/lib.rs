@@ -2,6 +2,7 @@ pub mod config;
 pub mod envelope;
 pub mod error;
 pub mod model;
+pub mod net;
 
 pub use config::{
     AppConfig, EmbeddingConfig, LibraryScope, canonicalize_or_original, detect_zotero_data_dir,
