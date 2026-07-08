@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use zot_core::{Item, SemanticHit, SemanticIndexStatus, ZotResult};
 
-use crate::LocalLibrary;
+use crate::library_traits::{CollectionContent, ItemReader};
 use crate::pdf::{PdfBackend, PdfCache};
 use crate::rag_engine::{self, PendingEmbedding, RagLibrary, ReindexStats};
 use crate::workspace::{HybridMode, RagIndex};
@@ -123,9 +123,9 @@ impl SemanticStore {
 
     /// Hybrid search over the index. `allowed_collection` narrows the result
     /// set to items that belong to that Zotero collection key.
-    pub fn search(
+    pub fn search<L: ItemReader + CollectionContent>(
         &self,
-        library: &LocalLibrary,
+        library: &L,
         query: &str,
         mode: HybridMode,
         query_embedding: Option<&[f32]>,
@@ -171,5 +171,237 @@ impl SemanticStore {
             }
         }
         Ok(deduped.into_values().collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use tempfile::tempdir;
+
+    use super::*;
+    use crate::db::{SearchOptions, SortField};
+    use crate::rag_engine::RagLibrary;
+    use zot_core::{Attachment, Creator, Item, SearchResult, TagSummary, ZotError};
+
+    /// Fake spanning the three narrow faces `SemanticStore` consumes:
+    /// `RagLibrary` for reindex, `ItemReader` + `CollectionContent` for search.
+    /// Methods a test must never reach return a `not-used` error.
+    struct FakeLibrary {
+        items: Vec<Item>,
+        collection_key: String,
+        collection_members: Vec<String>,
+    }
+
+    fn not_used<T>() -> ZotResult<T> {
+        Err(ZotError::InvalidInput {
+            code: "not-used".into(),
+            message: "not used by this test".into(),
+            hint: None,
+        })
+    }
+
+    impl RagLibrary for FakeLibrary {
+        fn get_item(&self, key: &str) -> ZotResult<Option<Item>> {
+            Ok(self.items.iter().find(|item| item.key == key).cloned())
+        }
+        fn get_pdf_attachment(&self, _key: &str) -> ZotResult<Option<Attachment>> {
+            Ok(None)
+        }
+        fn pdf_path(&self, _attachment: &Attachment) -> PathBuf {
+            PathBuf::new()
+        }
+    }
+
+    impl ItemReader for FakeLibrary {
+        fn get_item(&self, key: &str) -> ZotResult<Option<Item>> {
+            Ok(self.items.iter().find(|item| item.key == key).cloned())
+        }
+        fn list_items(
+            &self,
+            _collection: Option<&str>,
+            _limit: usize,
+            _offset: usize,
+        ) -> ZotResult<Vec<Item>> {
+            not_used()
+        }
+        fn search(&self, _options: SearchOptions) -> ZotResult<SearchResult> {
+            not_used()
+        }
+        fn get_recent_items(
+            &self,
+            _since: &str,
+            _sort: SortField,
+            _limit: usize,
+        ) -> ZotResult<Vec<Item>> {
+            not_used()
+        }
+        fn get_recent_items_by_count(&self, _count: usize) -> ZotResult<Vec<Item>> {
+            not_used()
+        }
+    }
+
+    impl CollectionContent for FakeLibrary {
+        fn get_collection_items(&self, collection_key: &str) -> ZotResult<Vec<Item>> {
+            if collection_key != self.collection_key {
+                return Ok(Vec::new());
+            }
+            Ok(self
+                .items
+                .iter()
+                .filter(|item| self.collection_members.contains(&item.key))
+                .cloned()
+                .collect())
+        }
+        fn get_collection_item_count(&self, _collection_key: &str) -> ZotResult<usize> {
+            not_used()
+        }
+        fn get_collection_tags(&self, _collection_key: &str) -> ZotResult<Vec<TagSummary>> {
+            not_used()
+        }
+    }
+
+    /// Backend that must never be touched: every test below indexes metadata
+    /// only (`fulltext: false`).
+    struct UntouchedBackend;
+
+    impl PdfBackend for UntouchedBackend {
+        fn availability_hint(&self) -> ZotResult<()> {
+            not_used()
+        }
+        fn extract_text(
+            &self,
+            _pdf_path: &Path,
+            _page_range: Option<(usize, usize)>,
+        ) -> ZotResult<String> {
+            not_used()
+        }
+        fn extract_annotations(
+            &self,
+            _pdf_path: &Path,
+        ) -> ZotResult<Vec<zot_core::AnnotationSnippet>> {
+            not_used()
+        }
+        fn extract_outline(&self, _pdf_path: &Path) -> ZotResult<Vec<zot_core::PdfOutlineEntry>> {
+            not_used()
+        }
+        fn find_text_position(
+            &self,
+            _pdf_path: &Path,
+            _page: usize,
+            _text: &str,
+            _occurrence: usize,
+        ) -> ZotResult<Option<crate::pdf::PdfMatchPosition>> {
+            not_used()
+        }
+        fn build_area_position(
+            &self,
+            _pdf_path: &Path,
+            _page: usize,
+            _x: f32,
+            _y: f32,
+            _width: f32,
+            _height: f32,
+        ) -> ZotResult<crate::pdf::PdfAreaPosition> {
+            not_used()
+        }
+    }
+
+    fn sample_item(key: &str, title: &str, abstract_note: &str) -> Item {
+        Item {
+            key: key.into(),
+            item_type: "journalArticle".into(),
+            title: title.into(),
+            creators: vec![Creator {
+                first_name: "Ashish".into(),
+                last_name: "Vaswani".into(),
+                creator_type: "author".into(),
+            }],
+            abstract_note: Some(abstract_note.into()),
+            date: None,
+            url: None,
+            doi: None,
+            tags: vec![],
+            collections: vec![],
+            date_added: None,
+            date_modified: None,
+            extra: Default::default(),
+        }
+    }
+
+    fn fake_library() -> FakeLibrary {
+        FakeLibrary {
+            items: vec![
+                sample_item(
+                    "ATTN001",
+                    "Attention Is All You Need",
+                    "Transformer architecture",
+                ),
+                sample_item(
+                    "BERT002",
+                    "BERT Pretraining",
+                    "Transformer encoder pretraining",
+                ),
+            ],
+            collection_key: "COLL1".into(),
+            collection_members: vec!["BERT002".into()],
+        }
+    }
+
+    fn indexed_store(dir: &Path, library: &FakeLibrary) -> SemanticStore {
+        let store = SemanticStore::open(dir.join("idx.sqlite"), None).expect("open store");
+        let (stats, pending) = store
+            .reindex_chunks(
+                library,
+                &UntouchedBackend,
+                ReindexOpts {
+                    items: &library.items,
+                    fulltext: false,
+                    force_rebuild: false,
+                },
+            )
+            .expect("reindex via fakes");
+        assert_eq!(stats.items, 2);
+        assert_eq!(pending.len(), 2, "one metadata chunk per item");
+        store
+    }
+
+    #[test]
+    fn reindex_then_search_works_entirely_through_fakes() {
+        let dir = tempdir().expect("tempdir");
+        let library = fake_library();
+        let store = indexed_store(dir.path(), &library);
+        let hits = store
+            .search(&library, "attention", HybridMode::Bm25, None, None, 10)
+            .expect("search via fakes");
+        assert!(!hits.is_empty());
+        assert_eq!(hits[0].item.key, "ATTN001");
+        assert!(hits[0].matched_chunk.is_some());
+    }
+
+    #[test]
+    fn search_narrows_results_to_the_allowed_collection() {
+        let dir = tempdir().expect("tempdir");
+        let library = fake_library();
+        let store = indexed_store(dir.path(), &library);
+        // Both items match "transformer"; the collection filter must keep
+        // only the member resolved through `CollectionContent`.
+        let unfiltered = store
+            .search(&library, "transformer", HybridMode::Bm25, None, None, 10)
+            .expect("unfiltered search");
+        assert_eq!(unfiltered.len(), 2);
+        let filtered = store
+            .search(
+                &library,
+                "transformer",
+                HybridMode::Bm25,
+                None,
+                Some("COLL1"),
+                10,
+            )
+            .expect("filtered search");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].item.key, "BERT002");
     }
 }
