@@ -3,43 +3,24 @@
 //! The CLI used to orchestrate `LocalLibrary + RagIndex + PdfCache + PdfBackend +
 //! EmbeddingClient` directly. `SemanticStore` collapses that choreography behind
 //! a small, synchronous-except-for-embedding surface. Embeddings stay in the
-//! caller because they involve async network I/O.
+//! caller because they involve async network I/O. The shared reindex loop and
+//! embedding-dimension tracking live in [`crate::rag_engine`].
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use zot_core::{Item, SemanticHit, SemanticIndexStatus, ZotError, ZotResult};
+use zot_core::{Item, SemanticHit, SemanticIndexStatus, ZotResult};
 
-use crate::LocalLibrary;
 use crate::pdf::{PdfBackend, PdfCache};
-use crate::workspace::{
-    HybridMode, RagIndex, build_metadata_chunk, chunk_text, compute_term_frequencies, tokenize,
-};
-
-const CHUNK_MAX_TOKENS: usize = 500;
-const CHUNK_OVERLAP_TOKENS: usize = 50;
+use crate::rag_engine::{self, PendingEmbedding, RagLibrary, ReindexStats};
+use crate::workspace::{HybridMode, RagIndex};
+use crate::LocalLibrary;
 
 /// Options controlling the reindex pass.
 pub struct ReindexOpts<'a> {
     pub items: &'a [Item],
     pub fulltext: bool,
     pub force_rebuild: bool,
-}
-
-/// A chunk that has been persisted to the index but still needs an embedding
-/// vector written back via [`SemanticStore::apply_embeddings`].
-#[derive(Debug, Clone)]
-pub struct PendingEmbedding {
-    pub chunk_id: i64,
-    pub text: String,
-}
-
-/// Summary returned by [`SemanticStore::reindex_chunks`].
-#[derive(Debug, Clone, Default)]
-pub struct ReindexStats {
-    pub items: usize,
-    pub chunks: usize,
-    pub fulltext: bool,
 }
 
 /// Front door for the library's semantic index. Wraps the `RagIndex` together
@@ -108,120 +89,36 @@ impl SemanticStore {
     }
 
     /// Rebuild chunks + BM25 terms for the given items in a single transaction.
-    /// Returns the chunks that still need embeddings applied.
-    pub fn reindex_chunks<B: PdfBackend>(
+    /// Returns the chunks that still need embeddings applied; already-indexed
+    /// keys no longer present in the library are pruned.
+    pub fn reindex_chunks<L: RagLibrary, B: PdfBackend>(
         &self,
-        library: &LocalLibrary,
+        library: &L,
         backend: &B,
         opts: ReindexOpts<'_>,
     ) -> ZotResult<(ReindexStats, Vec<PendingEmbedding>)> {
-        let mut stats = ReindexStats {
-            items: opts.items.len(),
-            chunks: 0,
-            fulltext: opts.fulltext,
-        };
-        let mut pending = Vec::new();
-        self.index.with_write_tx(|| {
-            if !opts.force_rebuild {
-                for item in opts.items {
-                    self.index.remove_item_chunks(&item.key)?;
-                }
-                for key in self.index.indexed_keys()? {
-                    if library.get_item(&key)?.is_none() {
-                        self.index.remove_item_chunks(&key)?;
-                    }
-                }
-            }
-            for item in opts.items {
-                let metadata_chunk = build_metadata_chunk(item);
-                let chunk_id = self
-                    .index
-                    .insert_chunk(&item.key, "metadata", &metadata_chunk)?;
-                self.index.insert_terms(
-                    chunk_id,
-                    &compute_term_frequencies(&tokenize(&metadata_chunk)),
-                )?;
-                pending.push(PendingEmbedding {
-                    chunk_id,
-                    text: metadata_chunk,
-                });
-                stats.chunks += 1;
-
-                if opts.fulltext
-                    && let Some(attachment) = library.get_pdf_attachment(&item.key)?
-                {
-                    let pdf_path = library.pdf_path(&attachment);
-                    let text = self.pdf_text(backend, &pdf_path)?;
-                    for chunk in
-                        chunk_text(&text, &item.title, CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS)
-                    {
-                        let chunk_id = self.index.insert_chunk(&item.key, "pdf", &chunk)?;
-                        self.index
-                            .insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&chunk)))?;
-                        pending.push(PendingEmbedding {
-                            chunk_id,
-                            text: chunk,
-                        });
-                        stats.chunks += 1;
-                    }
-                }
-            }
-            Ok(())
-        })?;
-        Ok((stats, pending))
-    }
-
-    fn pdf_text<B: PdfBackend>(&self, backend: &B, pdf_path: &Path) -> ZotResult<String> {
-        if let Some(cache) = &self.md_cache {
-            if let Some(cached) = cache.get(pdf_path)? {
-                return Ok(cached);
-            }
-            let extracted = backend.extract_text(pdf_path, None)?;
-            cache.put(pdf_path, &extracted)?;
-            Ok(extracted)
-        } else {
-            backend.extract_text(pdf_path, None)
-        }
+        let keys: Vec<&str> = opts.items.iter().map(|item| item.key.as_str()).collect();
+        rag_engine::reindex(
+            &self.index,
+            library,
+            backend,
+            self.md_cache.as_ref(),
+            &keys,
+            rag_engine::RefreshPolicy::ReplaceRequested,
+            |key| Ok(library.get_item(key)?.is_none()),
+            opts.fulltext,
+            opts.force_rebuild,
+        )
     }
 
     /// Write back embeddings for the pending chunks returned by
-    /// `reindex_chunks`. All writes happen inside one transaction.
-    pub fn apply_embeddings(&self, pairs: &[(i64, Vec<f32>)]) -> ZotResult<()> {
-        if pairs.is_empty() {
-            return Ok(());
-        }
-        self.index.with_write_tx(|| {
-            for (chunk_id, embedding) in pairs {
-                self.index.set_embedding(*chunk_id, embedding)?;
-            }
-            Ok(())
-        })
-    }
-
-    /// Convenience wrapper for callers that have paired pending chunks with
-    /// the matching embeddings in order.
+    /// `reindex_chunks`, recording the batch dimension for query-time checks.
     pub fn apply_pending_embeddings(
         &self,
         pending: Vec<PendingEmbedding>,
         embeddings: Vec<Vec<f32>>,
     ) -> ZotResult<()> {
-        if pending.len() != embeddings.len() {
-            return Err(ZotError::InvalidInput {
-                code: "embedding-count-mismatch".to_string(),
-                message: format!(
-                    "Embedding count {} does not match pending chunks {}",
-                    embeddings.len(),
-                    pending.len()
-                ),
-                hint: None,
-            });
-        }
-        let pairs: Vec<(i64, Vec<f32>)> = pending
-            .into_iter()
-            .map(|p| p.chunk_id)
-            .zip(embeddings)
-            .collect();
-        self.apply_embeddings(&pairs)
+        rag_engine::apply_pending_embeddings(&self.index, pending, embeddings)
     }
 
     /// Hybrid search over the index. `allowed_collection` narrows the result
@@ -235,6 +132,8 @@ impl SemanticStore {
         allowed_collection: Option<&str>,
         limit: usize,
     ) -> ZotResult<Vec<SemanticHit>> {
+        rag_engine::validate_query_embedding(&self.index, mode, query_embedding)?;
+
         let allowed_keys: HashSet<String> = match allowed_collection {
             Some(collection) => library
                 .get_collection_items(collection)?

@@ -1,30 +1,11 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use zot_core::{Item, QueryChunk, Workspace, ZotError, ZotResult};
+use zot_core::{QueryChunk, Workspace, ZotResult};
 
-use crate::db::LocalLibrary;
 use crate::pdf::{PdfBackend, PdfCache};
-use crate::workspace::{
-    HybridMode, RagIndex, build_metadata_chunk, chunk_text, compute_term_frequencies, tokenize,
-};
-
-const CHUNK_MAX_TOKENS: usize = 500;
-const CHUNK_OVERLAP_TOKENS: usize = 50;
-const EMBEDDING_DIM_META: &str = "embedding.dim";
-
-#[derive(Debug, Clone)]
-pub struct PendingEmbedding {
-    pub chunk_id: i64,
-    pub text: String,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct WorkspaceReindexStats {
-    pub items: usize,
-    pub chunks: usize,
-    pub fulltext: bool,
-}
+use crate::rag_engine::{self, PendingEmbedding, RagLibrary, ReindexStats};
+use crate::workspace::{HybridMode, RagIndex};
 
 /// Options controlling [`WorkspaceRagStore::reindex_workspace`].
 ///
@@ -36,24 +17,6 @@ pub struct WorkspaceReindexStats {
 pub struct WorkspaceReindexOpts {
     pub fulltext: bool,
     pub force_rebuild: bool,
-}
-
-pub trait WorkspaceRagLibrary {
-    fn get_item(&self, key: &str) -> ZotResult<Option<Item>>;
-    fn get_pdf_attachment(&self, key: &str) -> ZotResult<Option<zot_core::Attachment>>;
-    fn pdf_path(&self, attachment: &zot_core::Attachment) -> PathBuf;
-}
-
-impl WorkspaceRagLibrary for LocalLibrary {
-    fn get_item(&self, key: &str) -> ZotResult<Option<Item>> {
-        self.get_item(key)
-    }
-    fn get_pdf_attachment(&self, key: &str) -> ZotResult<Option<zot_core::Attachment>> {
-        self.get_pdf_attachment(key)
-    }
-    fn pdf_path(&self, attachment: &zot_core::Attachment) -> PathBuf {
-        self.pdf_path(attachment)
-    }
 }
 
 pub struct WorkspaceRagStore {
@@ -84,23 +47,17 @@ impl WorkspaceRagStore {
         self.index.clear()
     }
 
-    pub fn reindex_workspace<L: WorkspaceRagLibrary, B: PdfBackend>(
+    pub fn reindex_workspace<L: RagLibrary, B: PdfBackend>(
         &self,
         library: &L,
         workspace: &Workspace,
         backend: &B,
         opts: WorkspaceReindexOpts,
-    ) -> ZotResult<(WorkspaceReindexStats, Vec<PendingEmbedding>)> {
+    ) -> ZotResult<(ReindexStats, Vec<PendingEmbedding>)> {
         let WorkspaceReindexOpts {
             fulltext,
             force_rebuild,
         } = opts;
-        let mut stats = WorkspaceReindexStats {
-            items: workspace.items.len(),
-            chunks: 0,
-            fulltext,
-        };
-        let mut pending = Vec::new();
         let md_cache = if fulltext {
             Some(PdfCache::new(Some(self.cache_path.clone()))?)
         } else {
@@ -111,63 +68,18 @@ impl WorkspaceRagStore {
             .iter()
             .map(|entry| entry.key.as_str())
             .collect();
-        self.index.with_write_tx(|| {
-            let to_process: Vec<&str> = if force_rebuild {
-                self.index.clear()?;
-                workspace.items.iter().map(|e| e.key.as_str()).collect()
-            } else {
-                let indexed: Vec<String> = self.index.indexed_keys()?;
-                for indexed_key in &indexed {
-                    if !workspace_keys.contains(indexed_key.as_str()) {
-                        self.index.remove_item_chunks(indexed_key)?;
-                    }
-                }
-                let indexed_set: HashSet<&str> = indexed.iter().map(String::as_str).collect();
-                workspace
-                    .items
-                    .iter()
-                    .map(|e| e.key.as_str())
-                    .filter(|key| !indexed_set.contains(key))
-                    .collect()
-            };
-            for key in to_process {
-                if let Some(item) = library.get_item(key)? {
-                    let metadata_chunk = build_metadata_chunk(&item);
-                    let chunk_id =
-                        self.index
-                            .insert_chunk(&item.key, "metadata", &metadata_chunk)?;
-                    self.index.insert_terms(
-                        chunk_id,
-                        &compute_term_frequencies(&tokenize(&metadata_chunk)),
-                    )?;
-                    pending.push(PendingEmbedding {
-                        chunk_id,
-                        text: metadata_chunk,
-                    });
-                    stats.chunks += 1;
-                    if fulltext && let Some(attachment) = library.get_pdf_attachment(&item.key)? {
-                        let pdf_path = library.pdf_path(&attachment);
-                        let text = self.pdf_text(backend, md_cache.as_ref(), &pdf_path)?;
-                        for chunk in
-                            chunk_text(&text, &item.title, CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS)
-                        {
-                            let chunk_id = self.index.insert_chunk(&item.key, "pdf", &chunk)?;
-                            self.index.insert_terms(
-                                chunk_id,
-                                &compute_term_frequencies(&tokenize(&chunk)),
-                            )?;
-                            pending.push(PendingEmbedding {
-                                chunk_id,
-                                text: chunk,
-                            });
-                            stats.chunks += 1;
-                        }
-                    }
-                }
-            }
-            Ok(())
-        })?;
-        Ok((stats, pending))
+        let requested: Vec<&str> = workspace.items.iter().map(|e| e.key.as_str()).collect();
+        rag_engine::reindex(
+            &self.index,
+            library,
+            backend,
+            md_cache.as_ref(),
+            &requested,
+            rag_engine::RefreshPolicy::SkipIndexed,
+            |key| Ok(!workspace_keys.contains(key)),
+            fulltext,
+            force_rebuild,
+        )
     }
 
     pub fn apply_pending_embeddings(
@@ -175,36 +87,7 @@ impl WorkspaceRagStore {
         pending: Vec<PendingEmbedding>,
         embeddings: Vec<Vec<f32>>,
     ) -> ZotResult<()> {
-        if pending.len() != embeddings.len() {
-            return Err(ZotError::InvalidInput {
-                code: "embedding-count-mismatch".into(),
-                message: format!(
-                    "Embedding count {} does not match pending chunks {}",
-                    embeddings.len(),
-                    pending.len()
-                ),
-                hint: None,
-            });
-        }
-        let embedding_dim = embeddings.first().map(Vec::len);
-        if let Some(dim) = embedding_dim
-            && embeddings.iter().any(|embedding| embedding.len() != dim)
-        {
-            return Err(ZotError::InvalidInput {
-                code: "embedding-dimension-mismatch".into(),
-                message: "Embeddings in one writeback batch must have the same dimension".into(),
-                hint: None,
-            });
-        }
-        self.index.with_write_tx(|| {
-            for (p, e) in pending.into_iter().zip(embeddings) {
-                self.index.set_embedding(p.chunk_id, &e)?;
-            }
-            if let Some(dim) = embedding_dim {
-                self.index.set_meta(EMBEDDING_DIM_META, &dim.to_string())?;
-            }
-            Ok(())
-        })
+        rag_engine::apply_pending_embeddings(&self.index, pending, embeddings)
     }
 
     pub fn query(
@@ -214,7 +97,7 @@ impl WorkspaceRagStore {
         embedding: Option<&[f32]>,
         limit: usize,
     ) -> ZotResult<Vec<QueryChunk>> {
-        self.validate_query_embedding(mode, embedding)?;
+        rag_engine::validate_query_embedding(&self.index, mode, embedding)?;
         self.index.query(question, mode, embedding, limit)
     }
 
@@ -234,59 +117,9 @@ impl WorkspaceRagStore {
         if allowed_keys.is_empty() {
             return Ok(Vec::new());
         }
-        self.validate_query_embedding(mode, embedding)?;
+        rag_engine::validate_query_embedding(&self.index, mode, embedding)?;
         self.index
             .query_allowed(question, mode, embedding, &allowed_keys, limit)
-    }
-
-    fn validate_query_embedding(
-        &self,
-        mode: HybridMode,
-        embedding: Option<&[f32]>,
-    ) -> ZotResult<()> {
-        if !matches!(mode, HybridMode::Semantic | HybridMode::Hybrid) {
-            return Ok(());
-        }
-        let Some(embedding) = embedding else {
-            return Ok(());
-        };
-        let Some(expected) = self
-            .index
-            .get_meta(EMBEDDING_DIM_META)?
-            .and_then(|raw| raw.parse::<usize>().ok())
-        else {
-            return Ok(());
-        };
-        if embedding.len() == expected {
-            return Ok(());
-        }
-        Err(ZotError::InvalidInput {
-            code: "embedding-dimension-mismatch".into(),
-            message: format!(
-                "Query embedding dimension {} does not match workspace index dimension {}",
-                embedding.len(),
-                expected
-            ),
-            hint: Some("Reindex the workspace with the active embedding model.".into()),
-        })
-    }
-
-    fn pdf_text<B: PdfBackend>(
-        &self,
-        backend: &B,
-        cache: Option<&PdfCache>,
-        pdf_path: &Path,
-    ) -> ZotResult<String> {
-        if let Some(cache) = cache {
-            if let Some(cached) = cache.get(pdf_path)? {
-                return Ok(cached);
-            }
-            let extracted = backend.extract_text(pdf_path, None)?;
-            cache.put(pdf_path, &extracted)?;
-            Ok(extracted)
-        } else {
-            backend.extract_text(pdf_path, None)
-        }
     }
 }
 
@@ -297,7 +130,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
-    use zot_core::{Attachment, Creator, Item, Workspace, WorkspaceItem};
+    use zot_core::{Attachment, Creator, Item, Workspace, WorkspaceItem, ZotError};
 
     struct FakeLibrary {
         items: Vec<Item>,
@@ -305,7 +138,7 @@ mod tests {
         pdf_path: PathBuf,
     }
 
-    impl WorkspaceRagLibrary for FakeLibrary {
+    impl RagLibrary for FakeLibrary {
         fn get_item(&self, key: &str) -> ZotResult<Option<Item>> {
             Ok(self.items.iter().find(|item| item.key == key).cloned())
         }
@@ -556,11 +389,10 @@ mod tests {
         assert_eq!(stats.items, 1);
         assert_eq!(stats.chunks, 0);
         assert!(pending.is_empty());
-        assert!(
-            rag.query("missing", HybridMode::Bm25, None, 10)
-                .unwrap()
-                .is_empty()
-        );
+        assert!(rag
+            .query("missing", HybridMode::Bm25, None, 10)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
