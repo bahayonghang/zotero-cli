@@ -1,6 +1,7 @@
 use anyhow::Result;
-use zot_core::{EmbeddingConfig, PdfOutlineEntry, ZotError, ZotResult};
-use zot_remote::{EmbeddingClient, HttpRuntime, PublicationStatus};
+use zot_core::{Attachment, EmbeddingConfig, Item, PdfOutlineEntry, ZotError, ZotResult};
+use zot_local::LocalLibrary;
+use zot_remote::{EmbeddingClient, HttpRuntime, PublicationStatus, normalize_doi};
 
 pub(crate) async fn run_pdf<F, R>(f: F) -> ZotResult<R>
 where
@@ -104,6 +105,82 @@ pub(crate) fn parse_json_input(input: &str, label: &str) -> ZotResult<serde_json
     })
 }
 
+/// Resolve an item by key via the local library, mapping a missing row to the
+/// stable `item-not-found` CLI error.
+pub(crate) fn require_item(library: &LocalLibrary, key: &str) -> ZotResult<Item> {
+    library.get_item(key)?.ok_or_else(|| item_not_found(key))
+}
+
+/// Resolve the PDF attachment belonging to an item, mapping absence to the
+/// stable `item-no-pdf` CLI error.
+pub(crate) fn require_item_pdf(library: &LocalLibrary, key: &str) -> ZotResult<Attachment> {
+    library
+        .get_pdf_attachment(key)?
+        .ok_or_else(|| item_no_pdf(key))
+}
+
+/// Resolve an attachment by its own key and require it to be a PDF, mapping
+/// failures to the stable `attachment-not-found` / `attachment-not-pdf` CLI
+/// errors.
+pub(crate) fn require_pdf_attachment(library: &LocalLibrary, key: &str) -> ZotResult<Attachment> {
+    let attachment = library
+        .get_attachment_by_key(key)?
+        .ok_or_else(|| attachment_not_found(key))?;
+    if attachment.content_type != "application/pdf" {
+        return Err(attachment_not_pdf(key));
+    }
+    Ok(attachment)
+}
+
+/// Normalize a DOI, mapping rejected values to the stable `invalid-doi` CLI
+/// error.
+pub(crate) fn require_valid_doi(doi: &str) -> ZotResult<String> {
+    normalize_doi(doi).ok_or_else(|| invalid_doi(doi))
+}
+
+/// Stable `item-not-found` error for lookups that resolve items indirectly
+/// (e.g. `export_citation` returning `None`); direct `get_item` callers should
+/// use [`require_item`].
+pub(crate) fn item_not_found(key: &str) -> ZotError {
+    ZotError::InvalidInput {
+        code: "item-not-found".to_string(),
+        message: format!("Item '{key}' not found"),
+        hint: None,
+    }
+}
+
+fn item_no_pdf(key: &str) -> ZotError {
+    ZotError::InvalidInput {
+        code: "item-no-pdf".to_string(),
+        message: format!("Item '{key}' has no PDF attachment"),
+        hint: None,
+    }
+}
+
+fn attachment_not_found(key: &str) -> ZotError {
+    ZotError::InvalidInput {
+        code: "attachment-not-found".to_string(),
+        message: format!("Attachment '{key}' not found"),
+        hint: None,
+    }
+}
+
+fn attachment_not_pdf(key: &str) -> ZotError {
+    ZotError::InvalidInput {
+        code: "attachment-not-pdf".to_string(),
+        message: format!("Attachment '{key}' is not a PDF attachment"),
+        hint: None,
+    }
+}
+
+fn invalid_doi(doi: &str) -> ZotError {
+    ZotError::InvalidInput {
+        code: "invalid-doi".to_string(),
+        message: format!("'{doi}' does not appear to be a valid DOI"),
+        hint: None,
+    }
+}
+
 fn parse_page_bound(value: &str, raw: &str) -> ZotResult<usize> {
     value.parse::<usize>().map_err(|_| invalid_page_range(raw))
 }
@@ -122,7 +199,7 @@ mod tests {
 
     use zot_core::ZotError;
 
-    use super::{parse_page_range, run_pdf};
+    use super::{parse_page_range, require_valid_doi, run_pdf};
 
     #[tokio::test(flavor = "current_thread")]
     async fn run_pdf_offloads_blocking_work_to_a_separate_thread() {
@@ -158,6 +235,58 @@ mod tests {
             .expect("zot error should be preserved");
         match err {
             ZotError::InvalidInput { code, .. } => assert_eq!(code, "page-range"),
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn named_error_constructors_keep_stable_payloads() {
+        // These strings are part of the CLI JSON error contract; the helper
+        // consolidation must not change a single byte of code/message/hint.
+        let cases = [
+            (
+                super::item_not_found("ABC123"),
+                "item-not-found",
+                "Item 'ABC123' not found",
+            ),
+            (
+                super::item_no_pdf("ABC123"),
+                "item-no-pdf",
+                "Item 'ABC123' has no PDF attachment",
+            ),
+            (
+                super::attachment_not_found("ATCH005"),
+                "attachment-not-found",
+                "Attachment 'ATCH005' not found",
+            ),
+            (
+                super::attachment_not_pdf("ATCH005"),
+                "attachment-not-pdf",
+                "Attachment 'ATCH005' is not a PDF attachment",
+            ),
+            (
+                super::invalid_doi("not-a-doi"),
+                "invalid-doi",
+                "'not-a-doi' does not appear to be a valid DOI",
+            ),
+        ];
+        for (err, code, message) in cases {
+            let payload = err.payload();
+            assert_eq!(payload.code, code);
+            assert_eq!(payload.message, message);
+            assert_eq!(payload.hint, None);
+        }
+    }
+
+    #[test]
+    fn require_valid_doi_normalizes_or_rejects() {
+        assert_eq!(
+            require_valid_doi("https://doi.org/10.1000/test").expect("valid doi"),
+            "10.1000/test"
+        );
+        let err = require_valid_doi("not a doi").expect_err("invalid doi should fail");
+        match err {
+            ZotError::InvalidInput { code, .. } => assert_eq!(code, "invalid-doi"),
             other => panic!("unexpected error: {other:?}"),
         }
     }

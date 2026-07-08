@@ -10,17 +10,14 @@ use crate::cli::{
 use crate::context::AppContext;
 use crate::format::{print_item, print_items};
 use crate::output::CommandOutput;
-use crate::util::{open_target, parse_page_range, print_outline_entries, run_pdf};
+use crate::util::{
+    item_not_found, open_target, parse_page_range, print_outline_entries, require_item,
+    require_item_pdf, run_pdf,
+};
 
 pub(crate) async fn handle_get(ctx: &AppContext, args: ItemKeyArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
-    let item = library
-        .get_item(&args.key)?
-        .ok_or_else(|| zot_core::ZotError::InvalidInput {
-            code: "item-not-found".to_string(),
-            message: format!("Item '{}' not found", args.key),
-            hint: None,
-        })?;
+    let item = require_item(&library, &args.key)?;
     let notes = library.get_notes(&args.key)?;
     let attachments = library.get_attachments(&args.key)?;
     let payload = serde_json::json!({
@@ -44,13 +41,7 @@ pub(crate) async fn handle_related(
 
 pub(crate) async fn handle_open(ctx: &AppContext, args: ItemOpenArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
-    let item = library
-        .get_item(&args.key)?
-        .ok_or_else(|| zot_core::ZotError::InvalidInput {
-            code: "item-not-found".to_string(),
-            message: format!("Item '{}' not found", args.key),
-            hint: None,
-        })?;
+    let item = require_item(&library, &args.key)?;
     let target = if args.url {
         item.url
             .clone()
@@ -65,13 +56,7 @@ pub(crate) async fn handle_open(ctx: &AppContext, args: ItemOpenArgs) -> Result<
                 hint: None,
             })?
     } else {
-        let attachment = library.get_pdf_attachment(&args.key)?.ok_or_else(|| {
-            zot_core::ZotError::InvalidInput {
-                code: "item-no-pdf".to_string(),
-                message: format!("Item '{}' has no PDF attachment", args.key),
-                hint: None,
-            }
-        })?;
+        let attachment = require_item_pdf(&library, &args.key)?;
         library.pdf_path(&attachment).display().to_string()
     };
     open_target(&target)?;
@@ -81,14 +66,7 @@ pub(crate) async fn handle_open(ctx: &AppContext, args: ItemOpenArgs) -> Result<
 
 pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
-    let attachment =
-        library
-            .get_pdf_attachment(&args.key)?
-            .ok_or_else(|| zot_core::ZotError::InvalidInput {
-                code: "item-no-pdf".to_string(),
-                message: format!("Item '{}' has no PDF attachment", args.key),
-                hint: None,
-            })?;
+    let attachment = require_item_pdf(&library, &args.key)?;
     let pdf_path = library.pdf_path(&attachment);
     let backend = PdfiumBackend;
     let cache = PdfCache::new(None)?;
@@ -210,14 +188,7 @@ pub(crate) async fn handle_versions(
 
 pub(crate) async fn handle_outline(ctx: &AppContext, key: &str) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
-    let attachment =
-        library
-            .get_pdf_attachment(key)?
-            .ok_or_else(|| zot_core::ZotError::InvalidInput {
-                code: "item-no-pdf".to_string(),
-                message: format!("Item '{}' has no PDF attachment", key),
-                hint: None,
-            })?;
+    let attachment = require_item_pdf(&library, key)?;
     let backend = PdfiumBackend;
     let pdf_path = library.pdf_path(&attachment);
     let entries = run_pdf(move || backend.extract_outline(&pdf_path)).await?;
@@ -234,24 +205,14 @@ pub(crate) async fn handle_export(ctx: &AppContext, args: ItemExportArgs) -> Res
     let library = ctx.local_library()?;
     let export = library
         .export_citation(&args.key, &args.format)?
-        .ok_or_else(|| zot_core::ZotError::InvalidInput {
-            code: "item-not-found".to_string(),
-            message: format!("Item '{}' not found", args.key),
-            hint: None,
-        })?;
+        .ok_or_else(|| item_not_found(&args.key))?;
     let payload = serde_json::json!({ "format": args.format, "content": export });
     CommandOutput::new(ctx, payload, None, move |_| println!("{export}"))
 }
 
 pub(crate) async fn handle_cite(ctx: &AppContext, args: ItemCiteArgs) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
-    let item = library
-        .get_item(&args.key)?
-        .ok_or_else(|| zot_core::ZotError::InvalidInput {
-            code: "item-not-found".to_string(),
-            message: format!("Item '{}' not found", args.key),
-            hint: None,
-        })?;
+    let item = require_item(&library, &args.key)?;
     let citation = zot_local::format_citation(&item, args.style.into());
     let payload = serde_json::json!({ "citation": citation });
     CommandOutput::new(ctx, payload, None, move |_| println!("{citation}"))

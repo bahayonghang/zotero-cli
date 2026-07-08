@@ -4,7 +4,7 @@ use zot_local::{PdfBackend, PdfiumBackend};
 use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand};
 use crate::context::AppContext;
 use crate::output::CommandOutput;
-use crate::util::run_pdf;
+use crate::util::{require_pdf_attachment, run_pdf};
 
 pub(crate) async fn handle(
     ctx: &AppContext,
@@ -85,21 +85,7 @@ async fn create_highlight_annotation(
     occurrence: usize,
 ) -> Result<serde_json::Value> {
     let library = ctx.local_library()?;
-    let attachment = library
-        .get_attachment_by_key(attachment_key)?
-        .ok_or_else(|| zot_core::ZotError::InvalidInput {
-            code: "attachment-not-found".to_string(),
-            message: format!("Attachment '{}' not found", attachment_key),
-            hint: None,
-        })?;
-    if attachment.content_type != "application/pdf" {
-        return Err(zot_core::ZotError::InvalidInput {
-            code: "attachment-not-pdf".to_string(),
-            message: format!("Attachment '{}' is not a PDF attachment", attachment_key),
-            hint: None,
-        }
-        .into());
-    }
+    let attachment = require_pdf_attachment(&library, attachment_key)?;
     let pdf_path = library.pdf_path(&attachment);
     let backend = PdfiumBackend;
     let position = {
@@ -150,24 +136,7 @@ async fn create_area_annotation(
     args: &AnnotationCreateAreaArgs,
 ) -> Result<serde_json::Value> {
     let library = ctx.local_library()?;
-    let attachment = library
-        .get_attachment_by_key(&args.attachment_key)?
-        .ok_or_else(|| zot_core::ZotError::InvalidInput {
-            code: "attachment-not-found".to_string(),
-            message: format!("Attachment '{}' not found", args.attachment_key),
-            hint: None,
-        })?;
-    if attachment.content_type != "application/pdf" {
-        return Err(zot_core::ZotError::InvalidInput {
-            code: "attachment-not-pdf".to_string(),
-            message: format!(
-                "Attachment '{}' is not a PDF attachment",
-                args.attachment_key
-            ),
-            hint: None,
-        }
-        .into());
-    }
+    let attachment = require_pdf_attachment(&library, &args.attachment_key)?;
     let pdf_path = library.pdf_path(&attachment);
     let backend = PdfiumBackend;
     let page = args.page;

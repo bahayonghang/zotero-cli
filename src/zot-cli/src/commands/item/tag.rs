@@ -4,17 +4,12 @@ use zot_local::SearchOptions;
 use crate::cli::ItemTagCommand;
 use crate::context::AppContext;
 use crate::output::CommandOutput;
+use crate::util::require_item;
 
 pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<CommandOutput> {
     match command {
         ItemTagCommand::List(args) => {
-            let item = ctx.local_library()?.get_item(&args.key)?.ok_or_else(|| {
-                zot_core::ZotError::InvalidInput {
-                    code: "item-not-found".to_string(),
-                    message: format!("Item '{}' not found", args.key),
-                    hint: None,
-                }
-            })?;
+            let item = require_item(&ctx.local_library()?, &args.key)?;
             CommandOutput::new(ctx, item.tags, None, |tags| {
                 for tag in tags {
                     println!("{tag}");

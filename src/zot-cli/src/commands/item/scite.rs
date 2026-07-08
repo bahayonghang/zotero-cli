@@ -3,11 +3,12 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use zot_core::{Item, RetractionCheckResult, SciteItemReport};
 use zot_local::SearchOptions;
-use zot_remote::{SciteClient, normalize_doi};
+use zot_remote::SciteClient;
 
 use crate::cli::ItemSciteCommand;
 use crate::context::AppContext;
 use crate::output::CommandOutput;
+use crate::util::{require_item, require_valid_doi};
 
 pub(crate) async fn handle(ctx: &AppContext, command: ItemSciteCommand) -> Result<CommandOutput> {
     match command {
@@ -57,19 +58,9 @@ async fn report(
     doi: Option<&str>,
 ) -> Result<SciteItemReport> {
     let resolved_doi = if let Some(doi) = doi {
-        normalize_doi(doi).ok_or_else(|| zot_core::ZotError::InvalidInput {
-            code: "invalid-doi".to_string(),
-            message: format!("'{}' does not appear to be a valid DOI", doi),
-            hint: None,
-        })?
+        require_valid_doi(doi)?
     } else if let Some(item_key) = item_key {
-        let item = ctx.local_library()?.get_item(item_key)?.ok_or_else(|| {
-            zot_core::ZotError::InvalidInput {
-                code: "item-not-found".to_string(),
-                message: format!("Item '{}' not found", item_key),
-                hint: None,
-            }
-        })?;
+        let item = require_item(&ctx.local_library()?, item_key)?;
         item.doi.ok_or_else(|| zot_core::ZotError::InvalidInput {
             code: "item-no-doi".to_string(),
             message: format!("Item '{}' has no DOI", item_key),

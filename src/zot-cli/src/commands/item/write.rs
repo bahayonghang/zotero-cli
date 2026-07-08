@@ -14,7 +14,7 @@ use crate::cli::{
 };
 use crate::context::AppContext;
 use crate::output::CommandOutput;
-use crate::util::run_pdf;
+use crate::util::{require_valid_doi, run_pdf};
 
 pub(crate) async fn handle_create(ctx: &AppContext, args: ItemCreateArgs) -> Result<CommandOutput> {
     let key = if let Some(pdf) = args.pdf.as_deref() {
@@ -170,11 +170,7 @@ async fn add_item_by_doi(
     tags: &[String],
     attach_mode: AttachModeArg,
 ) -> Result<String> {
-    let doi = normalize_doi(doi).ok_or_else(|| zot_core::ZotError::InvalidInput {
-        code: "invalid-doi".to_string(),
-        message: format!("'{}' does not appear to be a valid DOI", doi),
-        hint: None,
-    })?;
+    let doi = require_valid_doi(doi)?;
     let oa = OaClient::new(ctx.http());
     let work = oa.fetch_crossref_work(&doi).await?;
     let remote = ctx.remote()?;
@@ -237,13 +233,7 @@ async fn add_item_from_file(
 ) -> Result<String> {
     let backend = PdfiumBackend;
     let resolved_doi = if let Some(doi) = doi_override {
-        Some(
-            normalize_doi(doi).ok_or_else(|| zot_core::ZotError::InvalidInput {
-                code: "invalid-doi".to_string(),
-                message: format!("'{}' does not appear to be a valid DOI", doi),
-                hint: None,
-            })?,
-        )
+        Some(require_valid_doi(doi)?)
     } else if file
         .extension()
         .and_then(|ext| ext.to_str())
