@@ -13,6 +13,7 @@ src/zot-local/src/
 ├── graph.rs          # Knowledge-graph assembly + analysis (pure, no SQLite)
 ├── lib.rs            # Public exports
 ├── pdf.rs            # PdfBackend, PdfiumBackend, PdfCache
+├── rag_engine.rs     # Shared reindex/embedding engine behind both RAG facades (private)
 ├── semantic.rs       # Library-level semantic index facade
 ├── workspace.rs      # WorkspaceStore and RagIndex primitives
 └── workspace_rag.rs  # Workspace-specific RAG facade
@@ -67,11 +68,24 @@ src/zot-local/tests/
   stacks; do not hardcode timeouts or UA strings here.
 - `workspace.rs` owns durable workspace TOML files and the generic `RagIndex`
   schema used by both library and workspace search.
-- `semantic.rs` wraps library-wide indexing. It coordinates `LocalLibrary`,
-  `RagIndex`, optional `PdfCache`, and pending embeddings but leaves async
-  embedding calls to the caller.
-- `workspace_rag.rs` wraps workspace-specific indexing and querying, including
-  `<workspace>.idx.sqlite` and `.md_cache.sqlite` sidecars.
+- `rag_engine.rs` owns the single indexing orchestration shared by both RAG
+  facades (decision 2026-07-07, task 07-07-rag-engine): the reindex loop
+  (item walk, PDF-text cache use, chunking, pending-embedding collection,
+  parameterized by a prune predicate and `RefreshPolicy`), embedding
+  writeback with batch dimension validation and the `embedding.dim` meta,
+  query-time `validate_query_embedding`, the shared
+  `PendingEmbedding`/`ReindexStats` types, the chunking constants, and the
+  `RagLibrary` trait plus its `LocalLibrary` impl. The module is private;
+  `lib.rs` re-exports only the types facade callers need. Do not re-grow
+  per-facade copies of this loop or of dimension tracking.
+- `semantic.rs` is the thin library-level facade. `SemanticStore` holds the
+  index path and optional `PdfCache`, delegates reindex/writeback/query
+  validation to `rag_engine` (pruning keys no longer present in the
+  library), and leaves async embedding calls to the caller.
+- `workspace_rag.rs` is the thin workspace facade. It owns the
+  `<workspace>.idx.sqlite` and `.md_cache.sqlite` sidecar paths and
+  delegates to `rag_engine`, pruning keys that left the workspace and
+  skipping already-indexed ones.
 
 ## Naming Conventions
 

@@ -1,6 +1,12 @@
+use std::path::PathBuf;
+
 use rusqlite::{Connection, params};
-use tempfile::tempdir;
-use zot_local::{HybridMode, RagIndex, compute_term_frequencies, tokenize};
+use tempfile::{TempDir, tempdir};
+use zot_core::{LibraryScope, ZotError};
+use zot_local::{
+    HybridMode, LocalLibrary, PendingEmbedding, RagIndex, SemanticStore, compute_term_frequencies,
+    tokenize,
+};
 
 fn insert_chunk_with_embedding(
     index: &RagIndex,
@@ -238,4 +244,119 @@ fn bm25_average_doc_len_is_cached_after_first_query() {
             .is_none(),
         "cache must be invalidated after remove_item_chunks"
     );
+}
+
+fn fixture_sqlite_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("zotero.sqlite")
+}
+
+fn open_fixture_library() -> (TempDir, LocalLibrary) {
+    let dir = tempdir().expect("tempdir");
+    std::fs::copy(fixture_sqlite_path(), dir.path().join("zotero.sqlite")).expect("copy fixture");
+    let library = LocalLibrary::open(dir.path(), LibraryScope::User).expect("open fixture");
+    (dir, library)
+}
+
+// SemanticStore-level regression tests for the embedding-dimension tracking that
+// moved into rag_engine (batch 1-2). Before the merge only the workspace store
+// validated dimensions; the semantic store now shares that behavior.
+
+#[test]
+fn semantic_apply_records_index_dimension() {
+    let dir = tempdir().expect("tempdir");
+    let index_path = dir.path().join("library.idx.sqlite");
+    let store = SemanticStore::open(&index_path, None).expect("open store");
+
+    store
+        .apply_pending_embeddings(
+            vec![PendingEmbedding {
+                chunk_id: 1,
+                text: "x".into(),
+            }],
+            vec![vec![1.0, 0.0, 0.0]],
+        )
+        .expect("apply dim-3 batch");
+
+    let reopened = RagIndex::open(&index_path).expect("reopen index");
+    assert_eq!(
+        reopened.get_meta("embedding.dim").expect("get meta"),
+        Some("3".to_string()),
+        "apply must record the batch embedding dimension for later validation"
+    );
+}
+
+#[test]
+fn semantic_search_rejects_query_embedding_dimension_mismatch() {
+    let (dir, library) = open_fixture_library();
+    let index_path = dir.path().join("library.idx.sqlite");
+    let store = SemanticStore::open(&index_path, None).expect("open store");
+    store
+        .apply_pending_embeddings(
+            vec![PendingEmbedding {
+                chunk_id: 1,
+                text: "x".into(),
+            }],
+            vec![vec![1.0, 0.0, 0.0]],
+        )
+        .expect("apply dim-3 batch");
+
+    let err = store
+        .search(
+            &library,
+            "attention",
+            HybridMode::Semantic,
+            Some(&[1.0, 0.0]),
+            None,
+            10,
+        )
+        .unwrap_err();
+    assert!(matches!(err, ZotError::InvalidInput { .. }));
+}
+
+#[test]
+fn semantic_search_without_recorded_dimension_is_allowed() {
+    let (dir, library) = open_fixture_library();
+    let index_path = dir.path().join("library.idx.sqlite");
+    let store = SemanticStore::open(&index_path, None).expect("open store");
+
+    // No apply has run, so the index carries no `embedding.dim` meta (the legacy
+    // / never-embedded case). Validation must skip rather than reject.
+    let hits = store
+        .search(
+            &library,
+            "attention",
+            HybridMode::Semantic,
+            Some(&[1.0, 0.0, 0.0, 0.0]),
+            None,
+            10,
+        )
+        .expect("search must skip validation when no dimension is recorded");
+    assert!(hits.is_empty());
+}
+
+#[test]
+fn semantic_apply_rejects_mixed_dimensions_in_batch() {
+    let dir = tempdir().expect("tempdir");
+    let index_path = dir.path().join("library.idx.sqlite");
+    let store = SemanticStore::open(&index_path, None).expect("open store");
+
+    let err = store
+        .apply_pending_embeddings(
+            vec![
+                PendingEmbedding {
+                    chunk_id: 1,
+                    text: "a".into(),
+                },
+                PendingEmbedding {
+                    chunk_id: 2,
+                    text: "b".into(),
+                },
+            ],
+            vec![vec![1.0, 0.0, 0.0], vec![1.0, 0.0]],
+        )
+        .unwrap_err();
+    assert!(matches!(err, ZotError::InvalidInput { .. }));
 }

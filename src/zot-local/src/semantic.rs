@@ -11,10 +11,10 @@ use std::path::{Path, PathBuf};
 
 use zot_core::{Item, SemanticHit, SemanticIndexStatus, ZotResult};
 
+use crate::LocalLibrary;
 use crate::pdf::{PdfBackend, PdfCache};
 use crate::rag_engine::{self, PendingEmbedding, RagLibrary, ReindexStats};
 use crate::workspace::{HybridMode, RagIndex};
-use crate::LocalLibrary;
 
 /// Options controlling the reindex pass.
 pub struct ReindexOpts<'a> {

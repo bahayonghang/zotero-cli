@@ -141,12 +141,11 @@ where
                 text: metadata_chunk,
             });
             stats.chunks += 1;
-            if fulltext
-                && let Some(attachment) = library.get_pdf_attachment(&item.key)?
-            {
+            if fulltext && let Some(attachment) = library.get_pdf_attachment(&item.key)? {
                 let pdf_path = library.pdf_path(&attachment);
                 let text = pdf_text(backend, md_cache, &pdf_path)?;
-                for chunk in chunk_text(&text, &item.title, CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS) {
+                for chunk in chunk_text(&text, &item.title, CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS)
+                {
                     let chunk_id = index.insert_chunk(&item.key, "pdf", &chunk)?;
                     index.insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&chunk)))?;
                     pending.push(PendingEmbedding {

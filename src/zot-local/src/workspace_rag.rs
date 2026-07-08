@@ -389,10 +389,11 @@ mod tests {
         assert_eq!(stats.items, 1);
         assert_eq!(stats.chunks, 0);
         assert!(pending.is_empty());
-        assert!(rag
-            .query("missing", HybridMode::Bm25, None, 10)
-            .unwrap()
-            .is_empty());
+        assert!(
+            rag.query("missing", HybridMode::Bm25, None, 10)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
