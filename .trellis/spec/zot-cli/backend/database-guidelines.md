@@ -9,7 +9,27 @@ delegates database or remote work to the owning crate.
 - Use `ctx.remote()?` for Zotero Web API writes through `zot-remote`.
 - Use workspace stores from `zot-local` for workspace TOML/index operations.
 - Use `ctx.library_index_path()` for the library-wide semantic index path.
+- Use `ctx.pdf_backend()` (`Arc<dyn PdfBackend>`) for PDF extraction; only
+  `AppContext::from_cli` and `doctor` construct `PdfiumBackend` directly
+  (doctor reports Pdfium-specific diagnostics via inherent `status()`).
 - Never open `zotero.sqlite` or sidecar SQLite directly from command modules.
+
+## Narrow Trait Consumption
+
+Read-side code should depend on the narrow per-data-domain traits from
+`zot-local` (`ItemReader`, `CollectionNav`, `CollectionContent`, `NoteReader`,
+`AttachmentSource`; engine side: `RagLibrary`) rather than concrete
+`LocalLibrary`. This does not move the access boundary — `ctx.local_library()?`
+stays the only production entry point — it makes the seam replaceable:
+
+- Split read arms into an inner `fn handle_read<L: Trait>(ctx, library: &L, cmd)`
+  and keep write arms (which go through `ctx.remote()`) in the outer `handle`.
+  Tests then drive the full output path with a fake library
+  (`collection.rs`, `item/note.rs` are the reference implementations).
+- Shared helpers take `&impl Trait` (`util::require_item` takes
+  `&impl ItemReader`, `require_pdf_attachment` takes `&impl AttachmentSource`).
+- New traits mirror `db.rs` inherent signatures exactly and live in
+  `zot-local/src/library_traits.rs`; do not move SQL there.
 
 ## Doctor Gate
 

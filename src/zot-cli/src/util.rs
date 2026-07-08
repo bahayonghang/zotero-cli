@@ -1,6 +1,6 @@
 use anyhow::Result;
 use zot_core::{Attachment, EmbeddingConfig, Item, PdfOutlineEntry, ZotError, ZotResult};
-use zot_local::LocalLibrary;
+use zot_local::{AttachmentSource, ItemReader};
 use zot_remote::{EmbeddingClient, HttpRuntime, PublicationStatus, normalize_doi};
 
 pub(crate) async fn run_pdf<F, R>(f: F) -> ZotResult<R>
@@ -107,13 +107,16 @@ pub(crate) fn parse_json_input(input: &str, label: &str) -> ZotResult<serde_json
 
 /// Resolve an item by key via the local library, mapping a missing row to the
 /// stable `item-not-found` CLI error.
-pub(crate) fn require_item(library: &LocalLibrary, key: &str) -> ZotResult<Item> {
+pub(crate) fn require_item(library: &impl ItemReader, key: &str) -> ZotResult<Item> {
     library.get_item(key)?.ok_or_else(|| item_not_found(key))
 }
 
 /// Resolve the PDF attachment belonging to an item, mapping absence to the
 /// stable `item-no-pdf` CLI error.
-pub(crate) fn require_item_pdf(library: &LocalLibrary, key: &str) -> ZotResult<Attachment> {
+pub(crate) fn require_item_pdf(
+    library: &impl AttachmentSource,
+    key: &str,
+) -> ZotResult<Attachment> {
     library
         .get_pdf_attachment(key)?
         .ok_or_else(|| item_no_pdf(key))
@@ -122,7 +125,10 @@ pub(crate) fn require_item_pdf(library: &LocalLibrary, key: &str) -> ZotResult<A
 /// Resolve an attachment by its own key and require it to be a PDF, mapping
 /// failures to the stable `attachment-not-found` / `attachment-not-pdf` CLI
 /// errors.
-pub(crate) fn require_pdf_attachment(library: &LocalLibrary, key: &str) -> ZotResult<Attachment> {
+pub(crate) fn require_pdf_attachment(
+    library: &impl AttachmentSource,
+    key: &str,
+) -> ZotResult<Attachment> {
     let attachment = library
         .get_attachment_by_key(key)?
         .ok_or_else(|| attachment_not_found(key))?;
