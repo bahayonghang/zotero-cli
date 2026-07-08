@@ -3,7 +3,7 @@ use regex::Regex;
 use serde::Deserialize;
 use zot_core::{ZotError, ZotResult};
 
-use crate::http::HttpRuntime;
+use crate::http::{HttpRuntime, ensure_status, remote_err};
 
 const CONTACT_EMAIL_ENV: &str = "ZOT_CONTACT_EMAIL";
 const DEFAULT_CONTACT_EMAIL: &str = "noreply@zot.local";
@@ -139,16 +139,7 @@ impl OaClient {
                 status: Some(404),
             });
         }
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let body = response.text().await.unwrap_or_default();
-            return Err(ZotError::Remote {
-                code: "crossref-http".to_string(),
-                message: format!("CrossRef request failed with status {status}: {body}"),
-                hint: None,
-                status: Some(status),
-            });
-        }
+        let response = ensure_status(response, "crossref-http").await?;
         let payload: CrossRefEnvelope =
             response.json().await.map_err(remote_err("crossref-json"))?;
         Ok(payload.message.into_work(doi))
@@ -163,14 +154,7 @@ impl OaClient {
             .send()
             .await
             .map_err(remote_err("arxiv-request"))?;
-        if !response.status().is_success() {
-            return Err(ZotError::Remote {
-                code: "arxiv-http".to_string(),
-                message: format!("arXiv request failed with status {}", response.status()),
-                hint: None,
-                status: Some(response.status().as_u16()),
-            });
-        }
+        let response = ensure_status(response, "arxiv-http").await?;
         let body = response.text().await.map_err(remote_err("arxiv-body"))?;
         parse_arxiv_atom(arxiv_id, &body)
     }
@@ -593,15 +577,6 @@ struct PmcPayload {
 #[derive(Debug, Deserialize)]
 struct PmcRecord {
     pmcid: Option<String>,
-}
-
-fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
-    move |err| ZotError::Remote {
-        code: code.to_string(),
-        message: err.to_string(),
-        hint: None,
-        status: err.status().map(|status| status.as_u16()),
-    }
 }
 
 #[cfg(test)]

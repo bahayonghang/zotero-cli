@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
 use serde::Deserialize;
-use zot_core::{EditorialNotice, SciteItemReport, SciteTally, ZotError, ZotResult};
+use zot_core::{EditorialNotice, SciteItemReport, SciteTally, ZotResult};
 
-use crate::http::HttpRuntime;
+use crate::http::{HttpRuntime, remote_err};
 
 const SCITE_BATCH_SIZE: usize = 500;
 
@@ -251,15 +251,6 @@ struct EditorialNoticePayload {
 struct PapersBatchPayload {
     #[serde(default)]
     papers: BTreeMap<String, PaperPayload>,
-}
-
-fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
-    move |err| ZotError::Remote {
-        code: code.to_string(),
-        message: err.to_string(),
-        hint: None,
-        status: err.status().map(|status| status.as_u16()),
-    }
 }
 
 #[cfg(test)]

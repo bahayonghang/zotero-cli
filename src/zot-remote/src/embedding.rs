@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde_json::json;
 use zot_core::{EmbeddingConfig, ZotError, ZotResult};
 
-use crate::http::HttpRuntime;
+use crate::http::{HttpRuntime, ensure_status, remote_err};
 
 const DEFAULT_EMBEDDING_BATCH_SIZE: usize = 64;
 const EMBEDDING_BATCH_SIZE_ENV: &str = "ZOT_EMBEDDING_BATCH_SIZE";
@@ -60,16 +60,7 @@ impl EmbeddingClient {
             .await
             .map_err(remote_err("embedding-request"))?;
 
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let body = response.text().await.unwrap_or_default();
-            return Err(ZotError::Remote {
-                code: "embedding-http".to_string(),
-                message: format!("Embedding API request failed with status {status}: {body}"),
-                hint: None,
-                status: Some(status),
-            });
-        }
+        let response = ensure_status(response, "embedding-http").await?;
 
         let payload: EmbeddingResponse = response
             .json()
@@ -102,15 +93,6 @@ struct EmbeddingResponse {
 #[derive(Debug, Deserialize)]
 struct EmbeddingItem {
     embedding: Vec<f32>,
-}
-
-fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
-    move |err| ZotError::Remote {
-        code: code.to_string(),
-        message: err.to_string(),
-        hint: None,
-        status: err.status().map(|status| status.as_u16()),
-    }
 }
 
 fn validate_embeddings(requested: usize, embeddings: Vec<Vec<f32>>) -> ZotResult<Vec<Vec<f32>>> {

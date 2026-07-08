@@ -3,7 +3,7 @@ use regex::Regex;
 use serde::Deserialize;
 use zot_core::{ZotError, ZotResult};
 
-use crate::http::HttpRuntime;
+use crate::http::{HttpRuntime, ensure_status, remote_err};
 
 const API_BASE: &str = "https://api.semanticscholar.org/graph/v1";
 static ARXIV_VERSION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"v\d+$").expect("valid regex"));
@@ -120,17 +120,7 @@ impl SemanticScholarClient {
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(None);
         }
-        if !response.status().is_success() {
-            return Err(ZotError::Remote {
-                code: "ss-http".to_string(),
-                message: format!(
-                    "Semantic Scholar request failed with status {}",
-                    response.status()
-                ),
-                hint: None,
-                status: Some(response.status().as_u16()),
-            });
-        }
+        let response = ensure_status(response, "ss-http").await?;
 
         let payload: SemanticScholarPaper = response.json().await.map_err(remote_err("ss-json"))?;
         let journal_name = payload
@@ -198,15 +188,6 @@ struct Journal {
 #[derive(Debug, Deserialize)]
 struct PublicationVenue {
     name: Option<String>,
-}
-
-fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
-    move |err| ZotError::Remote {
-        code: code.to_string(),
-        message: err.to_string(),
-        hint: None,
-        status: err.status().map(|status| status.as_u16()),
-    }
 }
 
 #[cfg(test)]

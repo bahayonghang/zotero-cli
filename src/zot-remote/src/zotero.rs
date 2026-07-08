@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 use zot_core::{LibraryScope, SavedSearch, SavedSearchCondition, ZotError, ZotResult};
 
-use crate::http::HttpRuntime;
+use crate::http::{HttpRuntime, ensure_empty, ensure_status, read_json, remote_err};
 
 const API_BASE: &str = "https://api.zotero.org";
 const ZOTERO_API_KEY_HEADER: &str = "zotero-api-key";
@@ -111,7 +111,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("update-item"))?;
-        self.ensure_empty(response, "update-item").await
+        ensure_empty(response, "update-item").await
     }
 
     pub async fn delete_item(&self, key: &str) -> ZotResult<()> {
@@ -124,7 +124,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("delete-item"))?;
-        self.ensure_empty(response, "delete-item").await
+        ensure_empty(response, "delete-item").await
     }
 
     pub async fn restore_item(&self, key: &str) -> ZotResult<()> {
@@ -137,7 +137,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("restore-item"))?;
-        self.ensure_empty(response, "restore-item").await
+        ensure_empty(response, "restore-item").await
     }
 
     pub async fn add_note(&self, parent_key: &str, content: &str) -> ZotResult<String> {
@@ -161,7 +161,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("update-note"))?;
-        self.ensure_empty(response, "update-note").await
+        ensure_empty(response, "update-note").await
     }
 
     pub async fn add_tags(&self, key: &str, tags: &[String]) -> ZotResult<()> {
@@ -199,7 +199,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("add-tags"))?;
-        self.ensure_empty(response, "add-tags").await
+        ensure_empty(response, "add-tags").await
     }
 
     pub async fn remove_tags(&self, key: &str, tags: &[String]) -> ZotResult<()> {
@@ -228,7 +228,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("remove-tags"))?;
-        self.ensure_empty(response, "remove-tags").await
+        ensure_empty(response, "remove-tags").await
     }
 
     pub async fn create_collection(
@@ -247,7 +247,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("create-collection"))?;
-        let body: MultiWriteResponse = self.ensure_json(response, "create-collection").await?;
+        let body: MultiWriteResponse = read_json(response, "create-collection").await?;
         body.successful
             .and_then(|successful| successful.get("0").and_then(|entry| entry.key.clone()))
             .ok_or_else(|| ZotError::Remote {
@@ -271,7 +271,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("rename-collection"))?;
-        self.ensure_empty(response, "rename-collection").await
+        ensure_empty(response, "rename-collection").await
     }
 
     pub async fn delete_collection(&self, key: &str) -> ZotResult<()> {
@@ -285,7 +285,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("delete-collection"))?;
-        self.ensure_empty(response, "delete-collection").await
+        ensure_empty(response, "delete-collection").await
     }
 
     pub async fn add_item_to_collection(
@@ -315,7 +315,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("add-item-to-collection"))?;
-        self.ensure_empty(response, "add-item-to-collection").await
+        ensure_empty(response, "add-item-to-collection").await
     }
 
     pub async fn remove_item_from_collection(
@@ -346,8 +346,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("remove-item-from-collection"))?;
-        self.ensure_empty(response, "remove-item-from-collection")
-            .await
+        ensure_empty(response, "remove-item-from-collection").await
     }
 
     pub async fn upload_attachment(&self, parent_key: &str, file_path: &Path) -> ZotResult<String> {
@@ -406,8 +405,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("attachment-register"))?;
-        self.ensure_empty(register_response, "attachment-register")
-            .await?;
+        ensure_empty(register_response, "attachment-register").await?;
         Ok(attachment_key)
     }
 
@@ -434,7 +432,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("list-saved-searches"))?;
-        let body: Vec<RawSavedSearch> = self.ensure_json(response, "list-saved-searches").await?;
+        let body: Vec<RawSavedSearch> = read_json(response, "list-saved-searches").await?;
         Ok(body.into_iter().map(Into::into).collect())
     }
 
@@ -465,7 +463,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("delete-saved-searches"))?;
-        self.ensure_empty(response, "delete-saved-searches").await
+        ensure_empty(response, "delete-saved-searches").await
     }
 
     pub async fn list_item_versions(&self, since: Option<i64>) -> ZotResult<BTreeMap<String, i64>> {
@@ -479,7 +477,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("list-item-versions"))?;
-        self.ensure_json(response, "list-item-versions").await
+        read_json(response, "list-item-versions").await
     }
 
     pub async fn delete_note(&self, note_key: &str) -> ZotResult<()> {
@@ -501,7 +499,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("list-children"))?;
-        self.ensure_json(response, "list-children").await
+        read_json(response, "list-children").await
     }
 
     pub async fn list_children_flat(&self, key: &str) -> ZotResult<Vec<Value>> {
@@ -510,7 +508,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("list-children"))?;
-        let children: Vec<EditableObject> = self.ensure_json(response, "list-children").await?;
+        let children: Vec<EditableObject> = read_json(response, "list-children").await?;
         Ok(children
             .into_iter()
             .map(EditableObject::into_flat_value)
@@ -545,7 +543,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("update-item-value"))?;
-        self.ensure_empty(response, "update-item-value").await
+        ensure_empty(response, "update-item-value").await
     }
 
     pub async fn set_deleted(&self, key: &str, deleted: bool) -> ZotResult<()> {
@@ -557,7 +555,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("set-deleted"))?;
-        self.ensure_empty(response, "set-deleted").await
+        ensure_empty(response, "set-deleted").await
     }
 
     async fn create_items(&self, payload: &Value, code: &str) -> ZotResult<Vec<String>> {
@@ -568,7 +566,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("create-items"))?;
-        let body: MultiWriteResponse = self.ensure_json(response, code).await?;
+        let body: MultiWriteResponse = read_json(response, code).await?;
         Ok(body
             .successful
             .unwrap_or_default()
@@ -585,7 +583,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("create-searches"))?;
-        let body: MultiWriteResponse = self.ensure_json(response, code).await?;
+        let body: MultiWriteResponse = read_json(response, code).await?;
         Ok(body
             .successful
             .unwrap_or_default()
@@ -608,16 +606,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("library-version"))?;
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(ZotError::Remote {
-                code: "library-version".to_string(),
-                message: format!("Request failed with status {}: {body}", status.as_u16()),
-                hint: http_hint(Some(status)),
-                status: Some(status.as_u16()),
-            });
-        }
+        let response = ensure_status(response, "library-version").await?;
         let version = response
             .headers()
             .get("Last-Modified-Version")
@@ -657,7 +646,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("create-attachment-item"))?;
-        let body: MultiWriteResponse = self.ensure_json(response, "create-attachment-item").await?;
+        let body: MultiWriteResponse = read_json(response, "create-attachment-item").await?;
         body.successful
             .and_then(|successful| successful.get("0").and_then(|entry| entry.key.clone()))
             .ok_or_else(|| ZotError::Remote {
@@ -711,8 +700,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("attachment-authorize"))?;
-        let auth: FileUploadAuthorization =
-            self.ensure_json(response, "attachment-authorize").await?;
+        let auth: FileUploadAuthorization = read_json(response, "attachment-authorize").await?;
         Ok((auth, bytes))
     }
 
@@ -722,7 +710,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("get-item"))?;
-        self.ensure_json(response, "get-item").await
+        read_json(response, "get-item").await
     }
 
     async fn get_collection_data(&self, key: &str) -> ZotResult<EditableObject> {
@@ -731,45 +719,7 @@ impl ZoteroRemote {
             .send()
             .await
             .map_err(remote_err("get-collection"))?;
-        self.ensure_json(response, "get-collection").await
-    }
-
-    async fn ensure_empty(&self, response: reqwest::Response, code: &str) -> ZotResult<()> {
-        if response.status().is_success() {
-            Ok(())
-        } else {
-            let status = response.status().as_u16();
-            let body = response.text().await.unwrap_or_default();
-            Err(ZotError::Remote {
-                code: code.to_string(),
-                message: format!("Request failed with status {status}: {body}"),
-                hint: http_hint(StatusCode::from_u16(status).ok()),
-                status: Some(status),
-            })
-        }
-    }
-
-    async fn ensure_json<T: for<'de> Deserialize<'de>>(
-        &self,
-        response: reqwest::Response,
-        code: &str,
-    ) -> ZotResult<T> {
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(ZotError::Remote {
-                code: code.to_string(),
-                message: format!("Request failed with status {}: {body}", status.as_u16()),
-                hint: http_hint(Some(status)),
-                status: Some(status.as_u16()),
-            });
-        }
-        response.json::<T>().await.map_err(|err| ZotError::Remote {
-            code: code.to_string(),
-            message: err.to_string(),
-            hint: http_hint(err.status()),
-            status: err.status().map(|status| status.as_u16()),
-        })
+        read_json(response, "get-collection").await
     }
 }
 
@@ -880,28 +830,5 @@ fn guess_content_type(filename: &str) -> &'static str {
         "text/plain"
     } else {
         "application/octet-stream"
-    }
-}
-
-fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
-    move |err| ZotError::Remote {
-        code: code.to_string(),
-        message: err.to_string(),
-        hint: http_hint(err.status()),
-        status: err.status().map(|status| status.as_u16()),
-    }
-}
-
-fn http_hint(status: Option<StatusCode>) -> Option<String> {
-    match status {
-        Some(StatusCode::FORBIDDEN) => Some("Check that the API key has write access".to_string()),
-        Some(StatusCode::PRECONDITION_FAILED) => {
-            Some("Object changed remotely; re-fetch before retrying".to_string())
-        }
-        Some(StatusCode::PRECONDITION_REQUIRED) => {
-            Some("Missing version or If-Match precondition".to_string())
-        }
-        Some(StatusCode::CONFLICT) => Some("The target library is locked".to_string()),
-        _ => None,
     }
 }

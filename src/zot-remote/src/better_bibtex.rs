@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde_json::json;
 use zot_core::{ZotError, ZotResult};
 
-use crate::http::HttpRuntime;
+use crate::http::{HttpRuntime, ensure_status, remote_err};
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct BetterBibTexSearchItem {
@@ -59,17 +59,7 @@ impl BetterBibTexClient {
             .send()
             .await
             .map_err(remote_err("bbt-search"))?;
-        if !response.status().is_success() {
-            return Err(ZotError::Remote {
-                code: "bbt-search-http".to_string(),
-                message: format!(
-                    "Better BibTeX search failed with status {}",
-                    response.status()
-                ),
-                hint: Some("Ensure Zotero is running with Better BibTeX installed".to_string()),
-                status: Some(response.status().as_u16()),
-            });
-        }
+        let response = ensure_status(response, "bbt-search-http").await?;
         let payload: JsonRpcResponse<Vec<BetterBibTexSearchItem>> = response
             .json()
             .await
@@ -95,13 +85,4 @@ struct JsonRpcResponse<T> {
 #[derive(Debug, Deserialize)]
 struct JsonRpcError {
     message: String,
-}
-
-fn remote_err(code: &'static str) -> impl Fn(reqwest::Error) -> ZotError {
-    move |err| ZotError::Remote {
-        code: code.to_string(),
-        message: err.to_string(),
-        hint: Some("Ensure Zotero is running with Better BibTeX installed".to_string()),
-        status: err.status().map(|status| status.as_u16()),
-    }
 }
