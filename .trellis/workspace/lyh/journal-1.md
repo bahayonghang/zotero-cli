@@ -144,3 +144,39 @@ Created the Zotero reference-grounded brainstorming skill with Markdown/HTML rep
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: library-seam 落地:窄 trait + AppContext 可替换,父任务 arch-deepening 收官
+
+**Date**: 2026-07-08
+**Task**: library-seam 落地:窄 trait + AppContext 可替换,父任务 arch-deepening 收官
+**Branch**: `main`
+
+### Summary
+
+D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLibrary,不另造 PdfSource)。五数据域窄 trait + Arc<dyn PdfBackend> 入 AppContext(生产构造 2 处),semantic search 与 collection/note 经 fake 测试,workspace 测试 129→140。父任务跨子任务 AC 全数核验(grep: if ctx.json=1/remote_err=1/PendingEmbedding=1/Pdfium 构造=2),真机冒烟 doctor/collection/related 通过,10/10 子任务归档。教训:commit-msg hook 现按 CJK 双列宽校验 72 列,subject 需更短;测试 expect_err 要求 CommandOutput 实现 Debug(已手写补上,后续 handler 测试直接可用)。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a05e48a` | (see git log) |
+| `1d11647` | (see git log) |
+| `6499878` | (see git log) |
+| `c0adb62` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
