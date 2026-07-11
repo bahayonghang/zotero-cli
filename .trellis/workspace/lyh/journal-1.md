@@ -281,3 +281,37 @@ D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: 完成本机写入 skill 与文档对齐
+
+**Date**: 2026-07-12
+**Task**: 完成本机写入 skill 与文档对齐
+**Branch**: `dev`
+
+### Summary
+
+更新 canonical zot skill 与 35 条路由评测，增加镜像漂移守卫，完成双语 desktop/Web 写入文档和 executable spec 对齐；iteration-2 安全断言 3/3，全部质量门通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8d3affa` | (see git log) |
+| `50f639e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
