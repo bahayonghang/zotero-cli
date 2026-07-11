@@ -26,10 +26,25 @@ docs:
   npm --prefix docs install
   npm --prefix docs run dev
 
-install:
-  cargo install --path src/zot-cli --locked --force
+install: install-local _install-skills
 
 install-local:
   cargo install --path src/zot-cli --locked --force
+
+[private]
+[script("python")]
+_install-skills:
+  import shutil
+  from pathlib import Path
+
+  source = Path("skills")
+  for target in (Path(".agents/skills"), Path(".claude/skills")):
+      target.mkdir(parents=True, exist_ok=True)
+      for skill in source.iterdir():
+          if skill.is_dir():
+              destination = target / skill.name
+              if destination.exists():
+                  shutil.rmtree(destination)
+              shutil.copytree(skill, destination)
 
 ci: fmt check clippy test
