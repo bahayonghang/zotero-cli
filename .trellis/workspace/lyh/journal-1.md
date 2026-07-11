@@ -215,3 +215,36 @@ D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: 完成 Zotero 本机桥接基础
+
+**Date**: 2026-07-11
+**Task**: 完成 Zotero 本机桥接基础
+**Branch**: `dev`
+
+### Summary
+
+实现并验证 Zot Bridge 插件、Rust desktop client、配对撤销、doctor 能力与真实 Zotero 9.0.6 smoke；补充协议规范并归档子任务。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `eedb83f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
