@@ -248,3 +248,36 @@ D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: 完成本机 merge 与 dedupe 闭环
+
+**Date**: 2026-07-11
+**Task**: 完成本机 merge 与 dedupe 闭环
+**Branch**: `dev`
+
+### Summary
+
+实现 desktop/web writer 边界、Zotero 原生 merge preview/apply、dedupe 低置信度门与幂等重试；修复同 profile XPI 重装后的连接持久化并验证 installed CLI。just xpi-check、just ci、diff/secret scan 通过；用户明确豁免隔离 profile 真实 merge smoke，未执行任何真实合并写入。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `52cdef8` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
