@@ -1,11 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::future::Future;
+use std::pin::Pin;
 
 use anyhow::Result;
 use serde_json::{Map, Value, json};
 use zot_core::{
-    MergeApplyResult, MergeFieldFill, MergeOperation, MergePreview, MergeSkippedField, ZotError,
+    LibraryScope, MergeApplyResult, MergeFieldFill, MergeOperation, MergePreview,
+    MergeSkippedField, WriteBackend, ZotError,
+};
+use zot_desktop::{
+    DesktopClient, DesktopMergeApplyResult, DesktopMergePreview, ensure_matching_instance_id,
 };
 use zot_remote::ZoteroRemote;
+
+use crate::context::AppContext;
 
 const NON_MERGEABLE_ITEM_TYPES: &[&str] = &["attachment", "note", "annotation"];
 // `relations` is structural too: it is merged by the dedicated per-predicate
@@ -31,8 +39,253 @@ pub(crate) struct MergeExecutionPlan {
     pub(crate) children_to_reparent: Vec<Value>,
 }
 
+type MergeFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + 'a>>;
+
+#[derive(Debug)]
+pub(crate) struct PreparedMerge {
+    pub(crate) preview: MergePreview,
+    plan: MergeWriterPlan,
+}
+
+#[derive(Debug)]
+enum MergeWriterPlan {
+    Web(Box<MergeExecutionPlan>),
+    Desktop { plan_token: SecretPlanToken },
+}
+
+struct SecretPlanToken(String);
+
+impl std::fmt::Debug for SecretPlanToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("(redacted)")
+    }
+}
+
+pub(crate) trait MergeWriter {
+    fn write_backend(&self) -> WriteBackend;
+
+    fn preview<'a>(
+        &'a self,
+        keeper_key: &'a str,
+        source_keys: &'a [String],
+    ) -> MergeFuture<'a, PreparedMerge>;
+
+    fn apply<'a>(
+        &'a self,
+        prepared: PreparedMerge,
+        operation_id: &'a str,
+    ) -> MergeFuture<'a, MergeApplyResult>;
+}
+
+pub(crate) struct WebMergeWriter {
+    remote: ZoteroRemote,
+}
+
+impl WebMergeWriter {
+    fn new(remote: ZoteroRemote) -> Self {
+        Self { remote }
+    }
+}
+
+impl MergeWriter for WebMergeWriter {
+    fn write_backend(&self) -> WriteBackend {
+        WriteBackend::Web
+    }
+
+    fn preview<'a>(
+        &'a self,
+        keeper_key: &'a str,
+        source_keys: &'a [String],
+    ) -> MergeFuture<'a, PreparedMerge> {
+        Box::pin(async move {
+            let keeper = self.remote.get_item_flat(keeper_key).await?;
+            let keeper_children = self.remote.list_children_flat(keeper_key).await?;
+            let mut sources = Vec::new();
+            let mut source_children = Vec::new();
+            for key in source_keys {
+                sources.push(self.remote.get_item_flat(key).await?);
+                source_children.extend(self.remote.list_children_flat(key).await?);
+            }
+            let source_uris = source_keys
+                .iter()
+                .map(|key| (key.clone(), self.remote.item_uri(key)))
+                .collect::<BTreeMap<_, _>>();
+            let plan = build_merge_execution_plan(
+                keeper,
+                sources,
+                keeper_children,
+                source_children,
+                &source_uris,
+            )?;
+            Ok(PreparedMerge {
+                preview: plan.preview.clone(),
+                plan: MergeWriterPlan::Web(Box::new(plan)),
+            })
+        })
+    }
+
+    fn apply<'a>(
+        &'a self,
+        prepared: PreparedMerge,
+        _operation_id: &'a str,
+    ) -> MergeFuture<'a, MergeApplyResult> {
+        Box::pin(async move {
+            let MergeWriterPlan::Web(plan) = prepared.plan else {
+                return Err(writer_plan_error(WriteBackend::Web));
+            };
+            self.remote
+                .update_flat_item_value(&plan.merged_keeper)
+                .await?;
+            for mut child in plan.children_to_reparent {
+                child["parentItem"] = Value::String(plan.preview.keeper_key.clone());
+                self.remote.update_flat_item_value(&child).await?;
+            }
+            for key in &plan.preview.source_keys {
+                self.remote.set_deleted(key, true).await?;
+            }
+            Ok(apply_result(&plan.preview))
+        })
+    }
+}
+
+pub(crate) struct DesktopMergeWriter {
+    client: DesktopClient,
+    token: String,
+    instance_id: String,
+    scope: LibraryScope,
+}
+
+impl DesktopMergeWriter {
+    fn new(client: DesktopClient, token: String, instance_id: String, scope: LibraryScope) -> Self {
+        Self {
+            client,
+            token,
+            instance_id,
+            scope,
+        }
+    }
+
+    async fn ensure_connection(&self) -> zot_core::ZotResult<()> {
+        let health = self.client.health().await?;
+        ensure_matching_instance_id(&self.instance_id, &health.instance_id)
+    }
+}
+
+impl MergeWriter for DesktopMergeWriter {
+    fn write_backend(&self) -> WriteBackend {
+        WriteBackend::Desktop
+    }
+
+    fn preview<'a>(
+        &'a self,
+        keeper_key: &'a str,
+        source_keys: &'a [String],
+    ) -> MergeFuture<'a, PreparedMerge> {
+        Box::pin(async move {
+            self.ensure_connection().await?;
+            let mut desktop = self
+                .client
+                .merge_preview(&self.token, &self.scope, keeper_key, source_keys)
+                .await?;
+            let plan_token = SecretPlanToken(desktop.take_plan_token());
+            let preview = desktop_preview(desktop);
+            Ok(PreparedMerge {
+                preview,
+                plan: MergeWriterPlan::Desktop { plan_token },
+            })
+        })
+    }
+
+    fn apply<'a>(
+        &'a self,
+        prepared: PreparedMerge,
+        operation_id: &'a str,
+    ) -> MergeFuture<'a, MergeApplyResult> {
+        Box::pin(async move {
+            self.ensure_connection().await?;
+            let MergeWriterPlan::Desktop { plan_token } = prepared.plan else {
+                return Err(writer_plan_error(WriteBackend::Desktop));
+            };
+            let result = self
+                .client
+                .merge_apply(&self.token, &plan_token.0, operation_id)
+                .await?;
+            Ok(desktop_apply_result(result))
+        })
+    }
+}
+
+fn desktop_preview(value: DesktopMergePreview) -> MergePreview {
+    MergePreview {
+        write_backend: WriteBackend::Desktop,
+        plan_id: Some(value.plan_id),
+        keeper_key: value.keeper_key,
+        source_keys: value.source_keys,
+        metadata_fields_to_fill: value.metadata_fields_to_fill,
+        skipped_incompatible_fields: value.skipped_incompatible_fields,
+        tags_to_add: value.tags_to_add,
+        collections_to_add: value.collections_to_add,
+        relations_to_add: value.relations_to_add,
+        children_to_reparent: value.children_to_reparent,
+        skipped_duplicate_attachments: value.skipped_duplicate_attachments,
+        confirm_required: value.confirm_required,
+    }
+}
+
+fn desktop_apply_result(value: DesktopMergeApplyResult) -> MergeApplyResult {
+    MergeApplyResult {
+        write_backend: WriteBackend::Desktop,
+        already_applied: value.already_applied,
+        keeper_key: value.keeper_key,
+        source_keys_trashed: value.source_keys_trashed,
+        metadata_fields_filled: value.metadata_fields_filled,
+        skipped_incompatible_fields: value.skipped_incompatible_fields,
+        tags_added: value.tags_added,
+        collections_added: value.collections_added,
+        relations_to_add: value.relations_to_add,
+        children_reparented: value.children_reparented,
+        skipped_duplicate_attachments: value.skipped_duplicate_attachments,
+    }
+}
+
+fn writer_plan_error(write_backend: WriteBackend) -> anyhow::Error {
+    ZotError::InvalidInput {
+        code: "merge-writer-plan".to_string(),
+        message: format!("Merge plan does not belong to the {write_backend:?} writer"),
+        hint: Some("Run the merge preview again with the selected backend".to_string()),
+    }
+    .into()
+}
+
+pub(crate) fn selected_merge_writer(ctx: &AppContext) -> Result<Box<dyn MergeWriter>> {
+    match ctx.write_backend() {
+        WriteBackend::Web => Ok(Box::new(WebMergeWriter::new(ctx.remote()?))),
+        WriteBackend::Desktop => {
+            let bridge = &ctx.config.zotero.desktop_bridge;
+            if !bridge.is_configured() {
+                return Err(ZotError::DesktopBridge {
+                    code: "bridge-unpaired".to_string(),
+                    message: "Desktop bridge is not paired for this profile".to_string(),
+                    hint: Some(
+                        "Show a pairing code in Zotero and run `zot bridge pair <code>`"
+                            .to_string(),
+                    ),
+                    status: None,
+                }
+                .into());
+            }
+            Ok(Box::new(DesktopMergeWriter::new(
+                ctx.desktop()?,
+                bridge.token.clone(),
+                bridge.instance_id.clone(),
+                ctx.scope.clone(),
+            )))
+        }
+    }
+}
+
 pub(crate) async fn merge_item_set(
-    remote: &ZoteroRemote,
+    writer: &dyn MergeWriter,
     keeper_key: &str,
     source_keys: &[String],
     confirm: bool,
@@ -46,42 +299,15 @@ pub(crate) async fn merge_item_set(
         .into());
     }
 
-    let keeper = remote.get_item_flat(keeper_key).await?;
-    let keeper_children = remote.list_children_flat(keeper_key).await?;
-    let mut sources = Vec::new();
-    let mut source_children = Vec::new();
-    for key in source_keys {
-        sources.push(remote.get_item_flat(key).await?);
-        source_children.extend(remote.list_children_flat(key).await?);
-    }
-    // Canonical `dc:replaces` URIs are resolved here (they depend on the
-    // remote's library scope) so the plan builder below stays IO-free.
-    let source_uris = source_keys
-        .iter()
-        .map(|key| (key.clone(), remote.item_uri(key)))
-        .collect::<BTreeMap<_, _>>();
-
-    let plan = build_merge_execution_plan(
-        keeper,
-        sources,
-        keeper_children,
-        source_children,
-        &source_uris,
-    )?;
+    let prepared = writer.preview(keeper_key, source_keys).await?;
+    debug_assert_eq!(prepared.preview.write_backend, writer.write_backend());
     if !confirm {
-        return Ok(preview_operation(plan.preview));
+        return Ok(preview_operation(prepared.preview));
     }
-
-    remote.update_flat_item_value(&plan.merged_keeper).await?;
-    for mut child in plan.children_to_reparent {
-        child["parentItem"] = Value::String(plan.preview.keeper_key.clone());
-        remote.update_flat_item_value(&child).await?;
-    }
-    for key in &plan.preview.source_keys {
-        remote.set_deleted(key, true).await?;
-    }
-
-    Ok(applied_operation(&plan.preview))
+    let operation_id = uuid::Uuid::new_v4().to_string();
+    Ok(MergeOperation::Applied(
+        writer.apply(prepared, &operation_id).await?,
+    ))
 }
 
 pub(crate) fn build_merge_execution_plan(
@@ -202,6 +428,8 @@ pub(crate) fn build_merge_execution_plan(
 
     Ok(MergeExecutionPlan {
         preview: MergePreview {
+            write_backend: WriteBackend::Web,
+            plan_id: None,
             keeper_key,
             source_keys,
             metadata_fields_to_fill,
@@ -222,8 +450,15 @@ pub(crate) fn preview_operation(preview: MergePreview) -> MergeOperation {
     MergeOperation::Preview(preview)
 }
 
+#[cfg(test)]
 pub(crate) fn applied_operation(preview: &MergePreview) -> MergeOperation {
-    MergeOperation::Applied(MergeApplyResult {
+    MergeOperation::Applied(apply_result(preview))
+}
+
+fn apply_result(preview: &MergePreview) -> MergeApplyResult {
+    MergeApplyResult {
+        write_backend: preview.write_backend,
+        already_applied: false,
         keeper_key: preview.keeper_key.clone(),
         source_keys_trashed: preview.source_keys.clone(),
         metadata_fields_filled: preview
@@ -237,7 +472,7 @@ pub(crate) fn applied_operation(preview: &MergePreview) -> MergeOperation {
         relations_to_add: preview.relations_to_add.clone(),
         children_reparented: preview.children_to_reparent,
         skipped_duplicate_attachments: preview.skipped_duplicate_attachments,
-    })
+    }
 }
 
 /// Union the `relations` maps of keeper and sources per predicate (values
@@ -434,18 +669,319 @@ fn attachment_signature(item: &Value) -> Option<(String, String, String, String)
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
     use std::collections::BTreeMap;
+    use std::sync::Arc;
 
     use serde_json::json;
+    use tiny_http::{Response, Server};
 
-    use super::{applied_operation, build_merge_execution_plan};
-    use zot_core::{MergeOperation, ZotError};
+    use super::{
+        MergeFuture, MergeWriter, PreparedMerge, WebMergeWriter, applied_operation,
+        build_merge_execution_plan, merge_item_set, selected_merge_writer,
+    };
+    use crate::context::AppContext;
+    use zot_core::{
+        AppConfig, LibraryScope, MergeApplyResult, MergeOperation, WriteBackend, ZotError,
+    };
+    use zot_local::PdfiumBackend;
+    use zot_remote::{HttpRuntime, ZoteroRemote};
 
     fn uri_map(entries: &[(&str, &str)]) -> BTreeMap<String, String> {
         entries
             .iter()
             .map(|(key, uri)| ((*key).to_string(), (*uri).to_string()))
             .collect()
+    }
+
+    struct WebRequest {
+        method: String,
+        path: String,
+        body: String,
+        precondition: Option<String>,
+    }
+
+    fn spawn_web_merge_server(
+        responses: Vec<(u16, String)>,
+    ) -> (String, std::thread::JoinHandle<Vec<WebRequest>>) {
+        let server = Server::http(("127.0.0.1", 0)).expect("bind web merge server");
+        let port = server.server_addr().to_ip().expect("server IP").port();
+        let base = format!("http://127.0.0.1:{port}");
+        let handle = std::thread::spawn(move || {
+            responses
+                .into_iter()
+                .map(|(status, body)| {
+                    let mut request = server.recv().expect("receive web merge request");
+                    let mut request_body = String::new();
+                    request
+                        .as_reader()
+                        .read_to_string(&mut request_body)
+                        .expect("read request body");
+                    let captured = WebRequest {
+                        method: request.method().as_str().to_string(),
+                        path: request.url().to_string(),
+                        body: request_body,
+                        precondition: request
+                            .headers()
+                            .iter()
+                            .find(|header| header.field.equiv("if-unmodified-since-version"))
+                            .map(|header| header.value.to_string()),
+                    };
+                    request
+                        .respond(Response::from_string(body).with_status_code(status))
+                        .expect("respond to web merge request");
+                    captured
+                })
+                .collect()
+        });
+        (base, handle)
+    }
+
+    #[tokio::test]
+    async fn web_writer_preserves_existing_request_sequence_and_payloads() {
+        let keeper = json!({
+            "key": "KEEP0001",
+            "version": 7,
+            "data": {
+                "itemType": "journalArticle",
+                "title": "Keeper",
+                "DOI": "",
+                "tags": [],
+                "collections": [],
+                "relations": {}
+            }
+        })
+        .to_string();
+        let source = json!({
+            "key": "DUPE0001",
+            "version": 8,
+            "data": {
+                "itemType": "preprint",
+                "title": "Source",
+                "DOI": "10.1000/test",
+                "tags": [],
+                "collections": [],
+                "relations": {}
+            }
+        })
+        .to_string();
+        let (base, handle) = spawn_web_merge_server(vec![
+            (200, keeper),
+            (200, "[]".to_string()),
+            (200, source.clone()),
+            (200, "[]".to_string()),
+            (204, String::new()),
+            (200, source),
+            (204, String::new()),
+        ]);
+        let remote = ZoteroRemote::with_base_url_for_tests(
+            &HttpRuntime::default(),
+            "123",
+            "api-key",
+            LibraryScope::User,
+            base,
+        )
+        .expect("web client");
+        let writer = WebMergeWriter::new(remote);
+
+        let operation = merge_item_set(&writer, "KEEP0001", &["DUPE0001".to_string()], true)
+            .await
+            .expect("web merge");
+        let MergeOperation::Applied(result) = operation else {
+            panic!("expected applied merge");
+        };
+        assert_eq!(result.write_backend, WriteBackend::Web);
+        assert_eq!(result.metadata_fields_filled, vec!["DOI"]);
+
+        let requests = handle.join().expect("join web merge server");
+        assert_eq!(
+            requests
+                .iter()
+                .map(|request| (request.method.as_str(), request.path.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("GET", "/users/123/items/KEEP0001"),
+                ("GET", "/users/123/items/KEEP0001/children"),
+                ("GET", "/users/123/items/DUPE0001"),
+                ("GET", "/users/123/items/DUPE0001/children"),
+                ("PUT", "/users/123/items/KEEP0001"),
+                ("GET", "/users/123/items/DUPE0001"),
+                ("PATCH", "/users/123/items/DUPE0001"),
+            ]
+        );
+        assert_eq!(requests[4].precondition.as_deref(), Some("7"));
+        let keeper_payload: serde_json::Value =
+            serde_json::from_str(&requests[4].body).expect("keeper payload");
+        assert_eq!(keeper_payload["DOI"], "10.1000/test");
+        assert_eq!(
+            keeper_payload["relations"]["dc:replaces"],
+            json!(["http://zotero.org/users/123/items/DUPE0001"])
+        );
+        assert_eq!(requests[6].precondition.as_deref(), Some("8"));
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&requests[6].body).expect("trash payload"),
+            json!({ "deleted": 1 })
+        );
+    }
+
+    struct FakeWriter {
+        preview_calls: RefCell<Vec<(String, Vec<String>)>>,
+        apply_calls: RefCell<Vec<String>>,
+    }
+
+    impl FakeWriter {
+        fn new() -> Self {
+            Self {
+                preview_calls: RefCell::new(Vec::new()),
+                apply_calls: RefCell::new(Vec::new()),
+            }
+        }
+    }
+
+    impl MergeWriter for FakeWriter {
+        fn write_backend(&self) -> WriteBackend {
+            WriteBackend::Web
+        }
+
+        fn preview<'a>(
+            &'a self,
+            keeper_key: &'a str,
+            source_keys: &'a [String],
+        ) -> MergeFuture<'a, PreparedMerge> {
+            Box::pin(async move {
+                self.preview_calls
+                    .borrow_mut()
+                    .push((keeper_key.to_string(), source_keys.to_vec()));
+                let keeper = json!({
+                    "key": keeper_key,
+                    "itemType": "journalArticle",
+                    "title": "Keeper",
+                    "tags": [],
+                    "collections": [],
+                    "relations": {},
+                });
+                let sources = source_keys
+                    .iter()
+                    .map(|key| {
+                        json!({
+                            "key": key,
+                            "itemType": "journalArticle",
+                            "title": "Source",
+                            "tags": [],
+                            "collections": [],
+                            "relations": {},
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                let uris = source_keys
+                    .iter()
+                    .map(|key| {
+                        (
+                            key.clone(),
+                            format!("http://zotero.org/users/1/items/{key}"),
+                        )
+                    })
+                    .collect();
+                let plan = build_merge_execution_plan(keeper, sources, vec![], vec![], &uris)?;
+                Ok(PreparedMerge {
+                    preview: plan.preview.clone(),
+                    plan: super::MergeWriterPlan::Web(Box::new(plan)),
+                })
+            })
+        }
+
+        fn apply<'a>(
+            &'a self,
+            prepared: PreparedMerge,
+            operation_id: &'a str,
+        ) -> MergeFuture<'a, MergeApplyResult> {
+            Box::pin(async move {
+                self.apply_calls.borrow_mut().push(operation_id.to_string());
+                Ok(super::apply_result(&prepared.preview))
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn writer_contract_validates_sources_and_separates_preview_from_apply() {
+        let writer = FakeWriter::new();
+        let empty = merge_item_set(&writer, "KEEP001", &[], false)
+            .await
+            .expect_err("empty source list");
+        assert_eq!(
+            empty
+                .downcast_ref::<ZotError>()
+                .expect("zot error")
+                .payload()
+                .code,
+            "item-merge"
+        );
+        assert!(writer.preview_calls.borrow().is_empty());
+
+        let sources = vec!["DUPE001".to_string(), "DUPE002".to_string()];
+        let preview = merge_item_set(&writer, "KEEP001", &sources, false)
+            .await
+            .expect("preview");
+        let MergeOperation::Preview(preview) = preview else {
+            panic!("expected preview");
+        };
+        assert_eq!(preview.write_backend, WriteBackend::Web);
+        assert_eq!(preview.source_keys, sources);
+        assert!(writer.apply_calls.borrow().is_empty());
+
+        let applied = merge_item_set(&writer, "KEEP001", &["DUPE003".to_string()], true)
+            .await
+            .expect("apply");
+        let MergeOperation::Applied(applied) = applied else {
+            panic!("expected apply");
+        };
+        assert_eq!(applied.write_backend, WriteBackend::Web);
+        assert_eq!(applied.source_keys_trashed, vec!["DUPE003"]);
+        assert_eq!(writer.apply_calls.borrow().len(), 1);
+    }
+
+    #[test]
+    fn desktop_selection_never_falls_back_to_web_credentials() {
+        let mut config = AppConfig::default();
+        config.zotero.write_backend = WriteBackend::Desktop;
+        config.zotero.desktop_bridge.token = "desktop-token".to_string();
+        config.zotero.api_key.clear();
+        config.zotero.library_id.clear();
+        let ctx = AppContext {
+            json: true,
+            profile: None,
+            scope: LibraryScope::User,
+            config,
+            http: Arc::new(HttpRuntime::default()),
+            pdf: Arc::new(PdfiumBackend),
+        };
+
+        let writer = selected_merge_writer(&ctx).expect("select desktop writer");
+        assert_eq!(writer.write_backend(), WriteBackend::Desktop);
+    }
+
+    #[test]
+    fn unpaired_desktop_errors_without_consulting_web_credentials() {
+        let mut config = AppConfig::default();
+        config.zotero.write_backend = WriteBackend::Desktop;
+        config.zotero.api_key.clear();
+        config.zotero.library_id.clear();
+        let ctx = AppContext {
+            json: true,
+            profile: None,
+            scope: LibraryScope::User,
+            config,
+            http: Arc::new(HttpRuntime::default()),
+            pdf: Arc::new(PdfiumBackend),
+        };
+
+        let err = match selected_merge_writer(&ctx) {
+            Ok(_) => panic!("unpaired desktop must not select a writer"),
+            Err(err) => err,
+        };
+        let payload = err.downcast_ref::<ZotError>().expect("zot error").payload();
+        assert_eq!(payload.code, "bridge-unpaired");
+        assert!(!payload.message.contains("API key"));
     }
 
     #[test]

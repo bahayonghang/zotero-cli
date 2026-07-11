@@ -7,7 +7,7 @@ use zot_local::PdfBackend;
 use zot_remote::oa::CreatorName;
 use zot_remote::{HttpRuntime, OaClient, ZoteroRemote, normalize_arxiv_id, normalize_doi};
 
-use super::merge::merge_item_set;
+use super::merge::{merge_item_set, selected_merge_writer};
 use crate::cli::{
     AddByDoiArgs, AddByUrlArgs, AddFromFileArgs, AttachModeArg, ItemAttachArgs, ItemCreateArgs,
     ItemKeyArgs, ItemMergeArgs, ItemUpdateArgs,
@@ -109,7 +109,8 @@ pub(crate) async fn handle_merge(ctx: &AppContext, args: ItemMergeArgs) -> Resul
         .into_iter()
         .filter(|key| key != keeper_key)
         .collect::<Vec<_>>();
-    let operation = merge_item_set(&ctx.remote()?, keeper_key, &source_keys, args.confirm).await?;
+    let writer = selected_merge_writer(ctx)?;
+    let operation = merge_item_set(writer.as_ref(), keeper_key, &source_keys, args.confirm).await?;
 
     CommandOutput::new(ctx, operation, None, |operation| {
         println!(

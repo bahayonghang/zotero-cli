@@ -13,12 +13,12 @@ use std::collections::BTreeSet;
 use anyhow::Result;
 use zot_core::{
     DedupeApplyReport, DedupeConfidence, DedupeGroupFailure, DedupeGroupPlan, DedupeItemRef,
-    DedupePlan, DuplicateGroup, Item, MergeApplyResult, MergeOperation, ZotError, ZotResult,
+    DedupePlan, DuplicateGroup, Item, MergeApplyResult, MergeOperation, WriteBackend, ZotError,
+    ZotResult,
 };
 use zot_local::AttachmentSource;
-use zot_remote::ZoteroRemote;
 
-use crate::commands::item::merge::merge_item_set;
+use crate::commands::item::merge::{MergeWriter, merge_item_set};
 
 /// Build the dry-run cleanup plan: pick a keeper per group ("published
 /// version first" policy) and mark low-confidence groups for review. Purely
@@ -30,6 +30,8 @@ use crate::commands::item::merge::merge_item_set;
 pub(crate) fn build_dedupe_plan(
     library: &impl AttachmentSource,
     groups: &[DuplicateGroup],
+    write_backend: WriteBackend,
+    include_low_confidence: bool,
 ) -> ZotResult<DedupePlan> {
     let mut plans = Vec::new();
     for group in merge_overlapping_groups(groups) {
@@ -66,6 +68,8 @@ pub(crate) fn build_dedupe_plan(
         });
     }
     Ok(DedupePlan {
+        write_backend,
+        include_low_confidence,
         total_groups: plans.len(),
         groups: plans,
         confirm_required: true,
@@ -158,9 +162,9 @@ pub(crate) trait GroupMerger {
 
 /// Production merger: one confirmed `merge_item_set` call per group over the
 /// Zotero Web API.
-pub(crate) struct RemoteGroupMerger<'a>(pub(crate) &'a ZoteroRemote);
+pub(crate) struct WriterGroupMerger<'a>(pub(crate) &'a dyn MergeWriter);
 
-impl GroupMerger for RemoteGroupMerger<'_> {
+impl GroupMerger for WriterGroupMerger<'_> {
     async fn merge_group(
         &self,
         keeper_key: &str,
@@ -190,7 +194,12 @@ pub(crate) async fn apply_dedupe_plan<M: GroupMerger>(
 ) -> DedupeApplyReport {
     let mut applied = Vec::new();
     let mut failed = Vec::new();
+    let mut skipped_low_confidence = Vec::new();
     for group in &plan.groups {
+        if group.confidence == DedupeConfidence::Low && !plan.include_low_confidence {
+            skipped_low_confidence.push(group.clone());
+            continue;
+        }
         let sources = group
             .absorb
             .iter()
@@ -206,11 +215,15 @@ pub(crate) async fn apply_dedupe_plan<M: GroupMerger>(
         }
     }
     DedupeApplyReport {
+        write_backend: plan.write_backend,
         total_groups: plan.groups.len(),
+        eligible_groups: plan.groups.len() - skipped_low_confidence.len(),
         applied_groups: applied.len(),
         failed_groups: failed.len(),
+        skipped_low_confidence_groups: skipped_low_confidence.len(),
         applied,
         failed,
+        skipped_low_confidence,
     }
 }
 
@@ -463,6 +476,13 @@ mod tests {
         }
     }
 
+    fn build_plan(
+        library: &impl AttachmentSource,
+        groups: &[DuplicateGroup],
+    ) -> ZotResult<DedupePlan> {
+        build_dedupe_plan(library, groups, WriteBackend::Web, false)
+    }
+
     /// Attachment counts per item key; the planner only calls
     /// `get_attachments`, the rest of the trait is inert.
     struct FakeAttachments(Vec<(&'static str, usize)>);
@@ -507,8 +527,8 @@ mod tests {
         // Passing the preprint first proves selection reorders the group.
         let prep = item("PREP0001", "preprint", "Attention Is All You Need");
         let conf = item("CONF0001", "conferencePaper", "Attention Is All You Need");
-        let plan = build_dedupe_plan(&no_attachments(), &[group("title", vec![prep, conf])])
-            .expect("build plan");
+        let plan =
+            build_plan(&no_attachments(), &[group("title", vec![prep, conf])]).expect("build plan");
 
         let group = &plan.groups[0];
         assert_eq!(group.keeper.key, "CONF0001");
@@ -523,8 +543,8 @@ mod tests {
         rich.doi = Some("10.1000/x".to_string());
         rich.date = Some("2021-05-01".to_string());
         let poor = item("POOR0001", "journalArticle", "Same Title");
-        let plan = build_dedupe_plan(&no_attachments(), &[group("title", vec![poor, rich])])
-            .expect("build plan");
+        let plan =
+            build_plan(&no_attachments(), &[group("title", vec![poor, rich])]).expect("build plan");
 
         let group = &plan.groups[0];
         assert_eq!(group.keeper.key, "RICH0001");
@@ -539,8 +559,8 @@ mod tests {
         let with_pdf = item("PDFS0001", "journalArticle", "Same Title");
         let without = item("NONE0001", "journalArticle", "Same Title");
         let library = FakeAttachments(vec![("PDFS0001", 2), ("NONE0001", 0)]);
-        let plan = build_dedupe_plan(&library, &[group("title", vec![without, with_pdf])])
-            .expect("build plan");
+        let plan =
+            build_plan(&library, &[group("title", vec![without, with_pdf])]).expect("build plan");
 
         let group = &plan.groups[0];
         assert_eq!(group.keeper.key, "PDFS0001");
@@ -556,8 +576,8 @@ mod tests {
         old.date_added = Some("2020-01-05 09:00:00".to_string());
         let mut new = item("NEWR0001", "journalArticle", "Same Title");
         new.date_added = Some("2022-03-01 09:00:00".to_string());
-        let plan = build_dedupe_plan(&no_attachments(), &[group("title", vec![new, old])])
-            .expect("build plan");
+        let plan =
+            build_plan(&no_attachments(), &[group("title", vec![new, old])]).expect("build plan");
 
         let group = &plan.groups[0];
         assert_eq!(group.keeper.key, "OLDR0001");
@@ -574,7 +594,7 @@ mod tests {
         first.date_added = Some("2024-01-01 00:00:00".to_string());
         let mut second = item("BBBB0002", "journalArticle", "Same Title");
         second.date_added = Some("2024-01-01 00:00:00".to_string());
-        let plan = build_dedupe_plan(&no_attachments(), &[group("title", vec![second, first])])
+        let plan = build_plan(&no_attachments(), &[group("title", vec![second, first])])
             .expect("build plan");
 
         let group = &plan.groups[0];
@@ -597,7 +617,7 @@ mod tests {
         let preprint = item("PREP0001", "preprint", "Same Paper");
         let document = item("DOCU0001", "document", "Same Paper");
 
-        let plan = build_dedupe_plan(
+        let plan = build_plan(
             &no_attachments(),
             &[
                 group("doi", vec![article.clone(), preprint.clone()]),
@@ -627,7 +647,7 @@ mod tests {
         let article = item("ARTC0001", "journalArticle", "Same Paper");
         let preprint = item("PREP0001", "preprint", "Same Paper");
 
-        let plan = build_dedupe_plan(
+        let plan = build_plan(
             &no_attachments(),
             &[
                 group("doi", vec![article.clone(), preprint.clone()]),
@@ -655,7 +675,7 @@ mod tests {
         let document = item("DOCU0001", "document", "Same Paper");
         let report = item("REPT0001", "report", "Same Paper");
 
-        let plan = build_dedupe_plan(
+        let plan = build_plan(
             &no_attachments(),
             &[
                 group("doi", vec![article.clone(), preprint.clone()]),
@@ -733,7 +753,7 @@ mod tests {
         let mut doi_b = item("DOIB0002", "journalArticle", "Another Paper");
         doi_b.doi = Some("10.1000/y".to_string());
 
-        let plan = build_dedupe_plan(
+        let plan = build_plan(
             &no_attachments(),
             &[
                 group("title", vec![prep, conf]),
@@ -743,6 +763,8 @@ mod tests {
         .expect("build plan");
         let json = serde_json::to_value(&plan).expect("serialize plan");
 
+        assert_eq!(json["write_backend"], "web");
+        assert_eq!(json["include_low_confidence"], false);
         assert_eq!(json["total_groups"], 2);
         assert_eq!(json["confirm_required"], true);
         let low = &json["groups"][0];
@@ -766,8 +788,8 @@ mod tests {
     fn dedupe_plan_envelope_carries_plan_fields() {
         let conf = item("CONF0001", "conferencePaper", "Attention Is All You Need");
         let prep = item("PREP0001", "preprint", "Attention Is All You Need");
-        let plan = build_dedupe_plan(&no_attachments(), &[group("title", vec![prep, conf])])
-            .expect("build plan");
+        let plan =
+            build_plan(&no_attachments(), &[group("title", vec![prep, conf])]).expect("build plan");
 
         let out =
             CommandOutput::new(&json_ctx(), plan, None, |_| unreachable!()).expect("build output");
@@ -801,6 +823,8 @@ mod tests {
                 .into());
             }
             Ok(MergeApplyResult {
+                write_backend: WriteBackend::Web,
+                already_applied: false,
                 keeper_key: keeper_key.to_string(),
                 source_keys_trashed: source_keys.to_vec(),
                 metadata_fields_filled: vec![],
@@ -836,6 +860,8 @@ mod tests {
     #[tokio::test]
     async fn apply_continues_after_single_group_failure() {
         let plan = DedupePlan {
+            write_backend: WriteBackend::Web,
+            include_low_confidence: false,
             groups: vec![
                 group_plan("KEEP0001", "DUPE0001"),
                 group_plan("KEEP0002", "DUPE0002"),
@@ -875,5 +901,60 @@ mod tests {
             report.failed[0].error,
             "update-item-value: Zotero API request failed with status 412"
         );
+    }
+
+    #[tokio::test]
+    async fn apply_skips_low_confidence_before_calling_writer_by_default() {
+        let mut low = group_plan("KEEPLOW1", "DUPELOW1");
+        low.confidence = DedupeConfidence::Low;
+        low.confidence_note = Some("differing DOIs".to_string());
+        let plan = DedupePlan {
+            write_backend: WriteBackend::Desktop,
+            include_low_confidence: false,
+            groups: vec![group_plan("KEEP0001", "DUPE0001"), low],
+            total_groups: 2,
+            confirm_required: true,
+        };
+        let merger = FakeMerger {
+            fail_keeper: "",
+            calls: RefCell::new(Vec::new()),
+        };
+
+        let report = apply_dedupe_plan(&merger, &plan).await;
+
+        assert_eq!(*merger.calls.borrow(), vec!["KEEP0001"]);
+        assert_eq!(report.write_backend, WriteBackend::Desktop);
+        assert_eq!(report.total_groups, 2);
+        assert_eq!(report.eligible_groups, 1);
+        assert_eq!(report.applied_groups, 1);
+        assert_eq!(report.failed_groups, 0);
+        assert_eq!(report.skipped_low_confidence_groups, 1);
+        assert_eq!(report.skipped_low_confidence[0].keeper.key, "KEEPLOW1");
+    }
+
+    #[tokio::test]
+    async fn include_low_confidence_calls_writer_for_every_group() {
+        let mut low = group_plan("KEEPLOW1", "DUPELOW1");
+        low.confidence = DedupeConfidence::Low;
+        low.confidence_note = Some("differing DOIs".to_string());
+        let plan = DedupePlan {
+            write_backend: WriteBackend::Desktop,
+            include_low_confidence: true,
+            groups: vec![group_plan("KEEP0001", "DUPE0001"), low],
+            total_groups: 2,
+            confirm_required: true,
+        };
+        let merger = FakeMerger {
+            fail_keeper: "",
+            calls: RefCell::new(Vec::new()),
+        };
+
+        let report = apply_dedupe_plan(&merger, &plan).await;
+
+        assert_eq!(*merger.calls.borrow(), vec!["KEEP0001", "KEEPLOW1"]);
+        assert_eq!(report.eligible_groups, 2);
+        assert_eq!(report.applied_groups, 2);
+        assert_eq!(report.skipped_low_confidence_groups, 0);
+        assert!(report.skipped_low_confidence.is_empty());
     }
 }

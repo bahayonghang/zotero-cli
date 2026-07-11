@@ -239,6 +239,7 @@ mod tests {
                 "--limit",
                 "5",
                 "--confirm",
+                "--include-low-confidence",
             ]
             .as_slice(),
             ["zot", "library", "saved-search", "list"].as_slice(),

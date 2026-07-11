@@ -3,14 +3,19 @@ const ZOT_BRIDGE = {
   pluginVersion: "0.6.0",
   endpointPrefix: "/zot-bridge/v1",
   tokenHashPref: "extensions.zotero.zot-bridge.tokenHash",
+  instanceIdPref: "extensions.zotero.zot-bridge.instanceId",
   pairingLifetimeMs: 5 * 60 * 1000,
   replayLifetimeMs: 10 * 60 * 1000,
+  planLifetimeMs: 2 * 60 * 1000,
   pairing: null,
   replay: new Map(),
+  plans: new Map(),
+  operations: new Map(),
   menuIds: [],
 
   async startup() {
     await Zotero.initializationPromise;
+    this.ensureInstanceId();
     this.registerEndpoints();
     for (const window of Zotero.getMainWindows()) {
       this.addMenu(window);
@@ -27,6 +32,8 @@ const ZOT_BRIDGE = {
     }
     this.pairing = null;
     this.replay.clear();
+    this.plans.clear();
+    this.operations.clear();
   },
 
   registerEndpoints() {
@@ -63,10 +70,26 @@ const ZOT_BRIDGE = {
         return bridge.handleRevoke(request);
       }
     };
+    Zotero.Server.Endpoints[`${this.endpointPrefix}/merge/preview`] = class {
+      supportedMethods = ["POST"];
+      supportedDataTypes = ["application/json"];
+      permitBookmarklet = false;
+      async init(request) {
+        return bridge.handleMergePreview(request);
+      }
+    };
+    Zotero.Server.Endpoints[`${this.endpointPrefix}/merge/apply`] = class {
+      supportedMethods = ["POST"];
+      supportedDataTypes = ["application/json"];
+      permitBookmarklet = false;
+      async init(request) {
+        return bridge.handleMergeApply(request);
+      }
+    };
   },
 
   unregisterEndpoints() {
-    for (const path of ["health", "pair", "status", "auth/revoke"]) {
+    for (const path of ["health", "pair", "status", "auth/revoke", "merge/preview", "merge/apply"]) {
       delete Zotero.Server.Endpoints[`${this.endpointPrefix}/${path}`];
     }
   },
@@ -76,10 +99,11 @@ const ZOT_BRIDGE = {
       const body = this.parseRequest(request, ["protocol_version", "request_id", "sent_at", "client"], 4096);
       this.validateBase(body, false);
       return this.success(body.request_id, {
+        instance_id: this.ensureInstanceId(),
         plugin_version: this.pluginVersion,
         zotero_version: Zotero.version,
         protocol_version: this.protocolVersion,
-        capabilities: ["health", "pair", "status", "auth-revoke"],
+        capabilities: ["health", "pair", "status", "auth-revoke", "merge-preview", "merge-apply"],
       });
     } catch (error) {
       return this.failure(error);
@@ -110,8 +134,11 @@ const ZOT_BRIDGE = {
       this.setTokenHash(await this.sha256Hex(token));
       this.pairing = null;
       this.replay.clear();
+      this.plans.clear();
+      this.operations.clear();
       return this.success(body.request_id, {
         token,
+        instance_id: this.ensureInstanceId(),
         plugin_version: this.pluginVersion,
         protocol_version: this.protocolVersion,
       });
@@ -128,9 +155,12 @@ const ZOT_BRIDGE = {
       }
       const response = this.success(prepared.body.request_id, {
         paired: true,
+        instance_id: this.ensureInstanceId(),
         capabilities: [
           { name: "status", available: true },
           { name: "auth-revoke", available: true },
+          { name: "merge-preview", available: true },
+          { name: "merge-apply", available: true },
         ],
         libraries: this.libraryStatus(),
       });
@@ -151,10 +181,322 @@ const ZOT_BRIDGE = {
       this.cacheResponse(prepared, response);
       this.clearTokenHash();
       this.pairing = null;
+      this.plans.clear();
+      this.operations.clear();
       return response;
     } catch (error) {
       return this.failure(error);
     }
+  },
+
+  async handleMergePreview(request) {
+    try {
+      const prepared = await this.prepareProtected(
+        request,
+        64 * 1024,
+        ["scope", "keeper_key", "source_keys"],
+      );
+      if (prepared.cached) {
+        return prepared.cached;
+      }
+      const candidates = await this.resolveMergeCandidates(
+        prepared.body.scope,
+        prepared.body.keeper_key,
+        prepared.body.source_keys,
+      );
+      const preview = await this.buildMergePreview(candidates.keeper, candidates.sources);
+      const fingerprint = await this.mergeFingerprint(candidates.keeper, candidates.sources);
+      const planToken = this.randomBase64Url(32);
+      const planId = (await this.sha256Hex(planToken)).slice(0, 12);
+      const expiresAt = Date.now() + this.planLifetimeMs;
+      this.prunePlans();
+      this.plans.set(planToken, {
+        authHash: prepared.authHash,
+        scope: JSON.parse(JSON.stringify(prepared.body.scope)),
+        keeperKey: candidates.keeper.key,
+        sourceKeys: candidates.sources.map(item => item.key),
+        fingerprint,
+        preview,
+        expiresAt,
+      });
+      const response = this.success(prepared.body.request_id, {
+        ...preview,
+        plan_id: planId,
+        expires_at: new Date(expiresAt).toISOString(),
+        plan_token: planToken,
+      });
+      this.cacheResponse(prepared, response);
+      return response;
+    } catch (error) {
+      return this.failure(error);
+    }
+  },
+
+  async handleMergeApply(request) {
+    try {
+      const prepared = await this.prepareProtected(
+        request,
+        64 * 1024,
+        ["plan_token", "operation_id"],
+      );
+      if (prepared.cached) {
+        return prepared.cached;
+      }
+      this.requireString(prepared.body.plan_token, "plan_token", 32, 128);
+      this.requireString(prepared.body.operation_id, "operation_id", 1, 128);
+      this.prunePlans();
+      this.pruneOperations();
+      const operationHash = await this.sha256Hex(prepared.body.plan_token);
+      const existing = this.operations.get(prepared.body.operation_id);
+      if (existing) {
+        if (this.constantTimeEqual(existing.authHash, prepared.authHash)
+          && this.constantTimeEqual(existing.operationHash, operationHash)) {
+          const response = this.success(prepared.body.request_id, {
+            ...existing.result,
+            already_applied: true,
+          });
+          this.cacheResponse(prepared, response);
+          return response;
+        }
+        throw this.error(409, "bridge-replay", "operation_id was reused with different merge data", null);
+      }
+      const plan = this.plans.get(prepared.body.plan_token);
+      if (!plan || plan.expiresAt <= Date.now()) {
+        this.plans.delete(prepared.body.plan_token);
+        throw this.error(409, "bridge-plan-expired", "Merge preview plan expired", "Run the dry-run preview again");
+      }
+      if (!this.constantTimeEqual(plan.authHash, prepared.authHash)) {
+        throw this.error(401, "bridge-auth", "Merge plan belongs to another authorization", "Run the preview again");
+      }
+      const candidates = await this.resolveMergeCandidates(plan.scope, plan.keeperKey, plan.sourceKeys);
+      const fingerprint = await this.mergeFingerprint(candidates.keeper, candidates.sources);
+      if (!this.constantTimeEqual(plan.fingerprint, fingerprint)) {
+        throw this.error(409, "bridge-item-changed", "Merge candidates changed after preview", "Review a new dry-run preview before applying");
+      }
+      const originalFields = plan.preview.metadata_fields_to_fill.map(fill => ({
+        field: fill.field,
+        value: candidates.keeper.getField(fill.field),
+      }));
+      for (const fill of plan.preview.metadata_fields_to_fill) {
+        candidates.keeper.setField(fill.field, fill.value);
+      }
+      try {
+        const { mergeItems } = ChromeUtils.importESModule("chrome://zotero/content/mergeItems.mjs");
+        await mergeItems(candidates.keeper, candidates.sources);
+      } catch (_error) {
+        for (const original of originalFields) {
+          candidates.keeper.setField(original.field, original.value);
+        }
+        try {
+          await Zotero.Items.reload(
+            [candidates.keeper.id, ...candidates.sources.map(item => item.id)],
+            null,
+            true,
+          );
+        } catch (_reloadError) {
+          // The database transaction already rolled back; this only refreshes object cache state.
+        }
+        throw this.error(500, "bridge-transaction", "Zotero native merge transaction failed", "Review the Zotero error console; no database changes were committed");
+      }
+      const result = {
+        already_applied: false,
+        keeper_key: plan.preview.keeper_key,
+        source_keys_trashed: plan.preview.source_keys,
+        metadata_fields_filled: plan.preview.metadata_fields_to_fill.map(entry => entry.field),
+        skipped_incompatible_fields: plan.preview.skipped_incompatible_fields,
+        tags_added: plan.preview.tags_to_add,
+        collections_added: plan.preview.collections_to_add,
+        relations_to_add: plan.preview.relations_to_add,
+        children_reparented: plan.preview.children_to_reparent,
+        skipped_duplicate_attachments: plan.preview.skipped_duplicate_attachments,
+      };
+      const response = this.success(prepared.body.request_id, result);
+      this.operations.set(prepared.body.operation_id, {
+        authHash: prepared.authHash,
+        operationHash,
+        result,
+        expiresAt: Date.now() + this.replayLifetimeMs,
+      });
+      this.plans.delete(prepared.body.plan_token);
+      this.cacheResponse(prepared, response);
+      return response;
+    } catch (error) {
+      return this.failure(error);
+    }
+  },
+
+  validateScope(scope) {
+    if (!scope || typeof scope !== "object" || Array.isArray(scope)) {
+      throw this.error(400, "bridge-invalid-request", "scope must be an object", null);
+    }
+    const allowed = scope.type === "user" ? ["type"] : ["type", "group_id"];
+    if (Object.keys(scope).some(key => !allowed.includes(key))) {
+      throw this.error(400, "bridge-unknown-field", "scope contains unknown fields", null);
+    }
+    if (scope.type === "user") {
+      return Zotero.Libraries.userLibraryID;
+    }
+    if (scope.type === "group" && Number.isSafeInteger(scope.group_id) && scope.group_id > 0) {
+      const group = Zotero.Groups.getByGroupID(scope.group_id);
+      if (group) {
+        return group.libraryID;
+      }
+      throw this.error(404, "bridge-library-not-found", "Zotero group library was not found", "Open or sync the group library in Zotero");
+    }
+    throw this.error(400, "bridge-invalid-request", "scope type must be user or group", null);
+  },
+
+  async resolveMergeCandidates(scope, keeperKey, sourceKeys) {
+    const libraryID = this.validateScope(scope);
+    this.requireString(keeperKey, "keeper_key", 1, 64);
+    if (!Array.isArray(sourceKeys) || sourceKeys.length === 0 || sourceKeys.length > 50) {
+      throw this.error(400, "bridge-invalid-request", "source_keys must contain 1 to 50 item keys", null);
+    }
+    for (const key of sourceKeys) {
+      this.requireString(key, "source key", 1, 64);
+    }
+    const unique = new Set([keeperKey, ...sourceKeys]);
+    if (unique.size !== sourceKeys.length + 1) {
+      throw this.error(400, "bridge-invalid-request", "Merge item keys must be unique", null);
+    }
+    const library = Zotero.Libraries.get(libraryID);
+    if (!library) {
+      throw this.error(404, "bridge-library-not-found", "Zotero library was not found", "Open or sync the library in Zotero");
+    }
+    if (!library.editable) {
+      throw this.error(403, "bridge-library-readonly", "Zotero library is read-only", "Request write access or choose an editable library");
+    }
+    const items = [];
+    for (const key of [keeperKey, ...sourceKeys]) {
+      const item = await Zotero.Items.getByLibraryAndKeyAsync(libraryID, key);
+      if (!item) {
+        throw this.error(404, "bridge-item-not-found", `Merge item was not found: ${key}`, "Refresh Zotero and preview again");
+      }
+      if (item.libraryID !== libraryID) {
+        throw this.error(400, "bridge-cross-library", "Merge candidates must be in one library", null);
+      }
+      if (item.deleted) {
+        throw this.error(409, "bridge-item-changed", `Merge item is already deleted: ${key}`, "Preview the current library state again");
+      }
+      if (!item.isRegularItem() || item.parentID || item.parentItemID) {
+        throw this.error(400, "bridge-invalid-child", `Merge item is not a top-level bibliographic item: ${key}`, null);
+      }
+      items.push(item);
+    }
+    return { keeper: items[0], sources: items.slice(1) };
+  },
+
+  async buildMergePreview(keeper, sources) {
+    const planned = new Map();
+    for (const fieldID of Zotero.ItemFields.getItemTypeFields(keeper.itemTypeID)) {
+      const field = Zotero.ItemFields.getName(fieldID);
+      planned.set(field, keeper.getField(fieldID));
+    }
+    const fills = [];
+    const skipped = [];
+    for (const source of sources) {
+      for (const sourceFieldID of Zotero.ItemFields.getItemTypeFields(source.itemTypeID)) {
+        const sourceValue = source.getField(sourceFieldID);
+        if (this.isEmptyValue(sourceValue)) {
+          continue;
+        }
+        const baseFieldID = Zotero.ItemFields.getBaseIDFromTypeAndField(
+          source.itemTypeID,
+          sourceFieldID,
+        ) || sourceFieldID;
+        const keeperFieldID = Zotero.ItemFields.getFieldIDFromTypeAndBase(
+          keeper.itemTypeID,
+          baseFieldID,
+        );
+        if (!keeperFieldID) {
+          skipped.push({
+            field: Zotero.ItemFields.getName(sourceFieldID),
+            source_key: source.key,
+          });
+          continue;
+        }
+        const keeperField = Zotero.ItemFields.getName(keeperFieldID);
+        if (this.isEmptyValue(planned.get(keeperField))) {
+          const value = String(sourceValue);
+          planned.set(keeperField, value);
+          fills.push({ field: keeperField, source_key: source.key, value });
+        }
+      }
+    }
+    const keeperTags = new Set(keeper.getTags().map(entry => entry.tag));
+    const keeperCollections = new Set(keeper.getCollections().map(String));
+    const tagsToAdd = new Set();
+    const collectionsToAdd = new Set();
+    let childrenToReparent = 0;
+    for (const source of sources) {
+      for (const tag of source.getTags().map(entry => entry.tag)) {
+        if (!keeperTags.has(tag)) tagsToAdd.add(tag);
+      }
+      for (const collection of source.getCollections().map(String)) {
+        if (!keeperCollections.has(collection)) collectionsToAdd.add(collection);
+      }
+      childrenToReparent += source.getAttachments(true).length + source.getNotes(true).length;
+    }
+    return {
+      keeper_key: keeper.key,
+      source_keys: sources.map(item => item.key),
+      metadata_fields_to_fill: fills,
+      skipped_incompatible_fields: skipped,
+      tags_to_add: [...tagsToAdd].sort(),
+      collections_to_add: [...collectionsToAdd].sort(),
+      relations_to_add: sources.map(item => Zotero.URI.getItemURI(item)).sort(),
+      children_to_reparent: childrenToReparent,
+      skipped_duplicate_attachments: 0,
+      confirm_required: true,
+    };
+  },
+
+  async mergeFingerprint(keeper, sources) {
+    const snapshots = [];
+    for (const item of [keeper, ...sources]) {
+      const fields = {};
+      const fieldIDs = [...Zotero.ItemFields.getItemTypeFields(item.itemTypeID)]
+        .sort((a, b) => Zotero.ItemFields.getName(a).localeCompare(Zotero.ItemFields.getName(b)));
+      for (const fieldID of fieldIDs) {
+        fields[Zotero.ItemFields.getName(fieldID)] = item.getField(fieldID);
+      }
+      const childIDs = [...item.getAttachments(true), ...item.getNotes(true)];
+      const children = childIDs.length ? await Zotero.Items.getAsync(childIDs) : [];
+      snapshots.push({
+        key: item.key,
+        version: item.version,
+        itemType: item.itemType,
+        libraryID: item.libraryID,
+        deleted: Boolean(item.deleted),
+        fields,
+        creators: item.getCreators(),
+        tags: item.getTags().map(entry => [entry.tag, entry.type]).sort(),
+        collections: item.getCollections().map(String).sort(),
+        relations: item.getRelations(),
+        children: children.map(child => ({
+          key: child.key,
+          version: child.version,
+          itemType: child.itemType,
+          linkMode: child.attachmentLinkMode ?? null,
+          contentType: child.attachmentContentType ?? null,
+        })).sort((a, b) => a.key.localeCompare(b.key)),
+      });
+    }
+    return this.sha256Hex(this.canonicalStringify(snapshots));
+  },
+
+  canonicalStringify(value) {
+    if (Array.isArray(value)) {
+      return `[${value.map(entry => this.canonicalStringify(entry)).join(",")}]`;
+    }
+    if (value && typeof value === "object") {
+      return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${this.canonicalStringify(value[key])}`).join(",")}}`;
+    }
+    return JSON.stringify(value);
+  },
+
+  isEmptyValue(value) {
+    return value === null || value === undefined || (typeof value === "string" && value.trim() === "");
   },
 
   parseRequest(request, allowedFields, maxBytes) {
@@ -216,8 +558,12 @@ const ZOT_BRIDGE = {
     }
   },
 
-  async prepareProtected(request, maxBytes) {
-    const body = this.parseRequest(request, ["protocol_version", "request_id", "sent_at", "client"], maxBytes);
+  async prepareProtected(request, maxBytes, extraFields = []) {
+    const body = this.parseRequest(
+      request,
+      ["protocol_version", "request_id", "sent_at", "client", ...extraFields],
+      maxBytes,
+    );
     this.validateBase(body, true);
     const token = this.bearerToken(request);
     const authHash = await this.sha256Hex(token);
@@ -251,6 +597,24 @@ const ZOT_BRIDGE = {
     for (const [key, value] of this.replay) {
       if (value.expiresAt <= now) {
         this.replay.delete(key);
+      }
+    }
+  },
+
+  prunePlans() {
+    const now = Date.now();
+    for (const [key, value] of this.plans) {
+      if (value.expiresAt <= now) {
+        this.plans.delete(key);
+      }
+    }
+  },
+
+  pruneOperations() {
+    const now = Date.now();
+    for (const [key, value] of this.operations) {
+      if (value.expiresAt <= now) {
+        this.operations.delete(key);
       }
     }
   },
@@ -338,6 +702,8 @@ const ZOT_BRIDGE = {
     this.clearTokenHash();
     this.pairing = null;
     this.replay.clear();
+    this.plans.clear();
+    this.operations.clear();
     this.showPairingCode(window);
   },
 
@@ -378,6 +744,16 @@ const ZOT_BRIDGE = {
 
   getTokenHash() {
     return Zotero.Prefs.get(this.tokenHashPref, true) || "";
+  },
+
+  ensureInstanceId() {
+    const existing = Zotero.Prefs.get(this.instanceIdPref, true) || "";
+    if (existing) {
+      return existing;
+    }
+    const created = this.randomBase64Url(16);
+    Zotero.Prefs.set(this.instanceIdPref, created, true);
+    return created;
   },
 
   setTokenHash(value) {
@@ -479,6 +855,8 @@ function shutdown() {
   ZOT_BRIDGE.shutdown();
 }
 
+// Authorization and instance identity intentionally survive uninstall/reinstall
+// in the same Zotero profile. Users can explicitly revoke or reset them.
 function uninstall() {}
 
 function onMainWindowLoad({ window }) {

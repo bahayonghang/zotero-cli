@@ -7,16 +7,33 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use uuid::Uuid;
 use zot_core::net::USER_AGENT;
-use zot_core::{ZotError, ZotResult};
+use zot_core::{LibraryScope, ZotError, ZotResult};
 
 use crate::model::{
     BRIDGE_PROTOCOL_VERSION, BaseRequest, BridgeEnvelope, BridgeHealth, BridgePairResult,
-    BridgeRevokeResult, BridgeStatus, ClientIdentity, LocalHttpStatus, PairRequest,
+    BridgeRevokeResult, BridgeStatus, ClientIdentity, DesktopMergeApplyResult, DesktopMergePreview,
+    LocalHttpStatus, MergeApplyRequest, MergePreviewRequest, PairRequest,
 };
 
 pub const BRIDGE_BASE_URL: &str = "http://127.0.0.1:23119/zot-bridge/v1/";
 const LOCAL_API_URL: &str = "http://127.0.0.1:23119/api/";
 const MAX_RESPONSE_BYTES: usize = 64 * 1024;
+
+pub fn ensure_matching_instance_id(expected: &str, observed: &str) -> ZotResult<()> {
+    if expected.is_empty() || observed.is_empty() || expected == observed {
+        return Ok(());
+    }
+    Err(bridge_error(
+        "bridge-profile-mismatch",
+        "The running Zotero profile is not the profile paired with this zot configuration"
+            .to_string(),
+        Some(
+            "Start the previously paired Zotero profile, or explicitly pair this profile once"
+                .to_string(),
+        ),
+        None,
+    ))
+}
 
 #[derive(Clone)]
 pub struct DesktopClient {
@@ -24,6 +41,7 @@ pub struct DesktopClient {
     base_url: Url,
     local_api_url: Url,
     request_timeout: Duration,
+    merge_timeout: Duration,
 }
 
 impl fmt::Debug for DesktopClient {
@@ -32,16 +50,27 @@ impl fmt::Debug for DesktopClient {
             .field("base_url", &self.base_url)
             .field("local_api_url", &self.local_api_url)
             .field("request_timeout", &self.request_timeout)
+            .field("merge_timeout", &self.merge_timeout)
             .finish_non_exhaustive()
     }
 }
 
 impl DesktopClient {
     pub fn new() -> ZotResult<Self> {
-        Self::build(BRIDGE_BASE_URL, LOCAL_API_URL, Duration::from_secs(10))
+        Self::build(
+            BRIDGE_BASE_URL,
+            LOCAL_API_URL,
+            Duration::from_secs(10),
+            Duration::from_secs(120),
+        )
     }
 
-    fn build(base_url: &str, local_api_url: &str, request_timeout: Duration) -> ZotResult<Self> {
+    fn build(
+        base_url: &str,
+        local_api_url: &str,
+        request_timeout: Duration,
+        merge_timeout: Duration,
+    ) -> ZotResult<Self> {
         let base_url = parse_loopback_url(base_url, "bridge-base-url")?;
         let local_api_url = parse_loopback_url(local_api_url, "local-api-url")?;
         let client = reqwest::Client::builder()
@@ -54,12 +83,13 @@ impl DesktopClient {
             base_url,
             local_api_url,
             request_timeout,
+            merge_timeout,
         })
     }
 
     #[cfg(test)]
     fn with_base_url(base_url: &str, request_timeout: Duration) -> ZotResult<Self> {
-        Self::build(base_url, base_url, request_timeout)
+        Self::build(base_url, base_url, request_timeout, request_timeout)
     }
 
     pub async fn probe_local_http(&self) -> ZotResult<LocalHttpStatus> {
@@ -118,6 +148,59 @@ impl DesktopClient {
             .await
     }
 
+    pub async fn merge_preview(
+        &self,
+        token: &str,
+        scope: &LibraryScope,
+        keeper_key: &str,
+        source_keys: &[String],
+    ) -> ZotResult<DesktopMergePreview> {
+        let request = MergePreviewRequest {
+            base: self.base_request(),
+            scope: scope.into(),
+            keeper_key,
+            source_keys,
+        };
+        let request_id = request.base.request_id.clone();
+        self.post_with_timeout(
+            "merge/preview",
+            &request,
+            Some(token),
+            &request_id,
+            self.merge_timeout,
+        )
+        .await
+    }
+
+    pub async fn merge_apply(
+        &self,
+        token: &str,
+        plan_token: &str,
+        operation_id: &str,
+    ) -> ZotResult<DesktopMergeApplyResult> {
+        let request = MergeApplyRequest {
+            base: self.base_request(),
+            plan_token,
+            operation_id,
+        };
+        let request_id = request.base.request_id.clone();
+        let apply = || {
+            self.post_with_timeout(
+                "merge/apply",
+                &request,
+                Some(token),
+                &request_id,
+                self.merge_timeout,
+            )
+        };
+        match apply().await {
+            Err(ZotError::DesktopBridge { ref code, .. }) if code == "bridge-timeout" => {
+                apply().await
+            }
+            result => result,
+        }
+    }
+
     async fn post<T, B>(
         &self,
         path: &str,
@@ -129,15 +212,27 @@ impl DesktopClient {
         T: DeserializeOwned,
         B: Serialize + ?Sized,
     {
+        self.post_with_timeout(path, body, token, expected_request_id, self.request_timeout)
+            .await
+    }
+
+    async fn post_with_timeout<T, B>(
+        &self,
+        path: &str,
+        body: &B,
+        token: Option<&str>,
+        expected_request_id: &str,
+        timeout: Duration,
+    ) -> ZotResult<T>
+    where
+        T: DeserializeOwned,
+        B: Serialize + ?Sized,
+    {
         let url = self
             .base_url
             .join(path)
             .map_err(|err| bridge_error("bridge-url", err.to_string(), None, None))?;
-        let mut request = self
-            .client
-            .post(url)
-            .timeout(self.request_timeout)
-            .json(body);
+        let mut request = self.client.post(url).timeout(timeout).json(body);
         if let Some(token) = token {
             request = request.bearer_auth(token);
         }
@@ -331,6 +426,24 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn instance_identity_allows_migration_but_rejects_another_profile() {
+        ensure_matching_instance_id("", "running-profile").expect("legacy config migration");
+        ensure_matching_instance_id("paired-profile", "").expect("legacy plugin migration");
+        ensure_matching_instance_id("paired-profile", "paired-profile").expect("same profile");
+
+        let error = ensure_matching_instance_id("paired-profile", "different-profile")
+            .expect_err("profile mismatch");
+        match error {
+            ZotError::DesktopBridge { code, message, .. } => {
+                assert_eq!(code, "bridge-profile-mismatch");
+                assert!(!message.contains("paired-profile"));
+                assert!(!message.contains("different-profile"));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
     struct Captured {
         path: String,
         authorization: Option<String>,
@@ -485,6 +598,164 @@ mod tests {
             captured[2].authorization.as_deref(),
             Some("Bearer super-secret-token")
         );
+    }
+
+    #[tokio::test]
+    async fn merge_preview_and_apply_use_allowlisted_dtos_and_redact_plan_token() {
+        let responses = vec![
+            (
+                200,
+                envelope(
+                    serde_json::json!({
+                        "keeper_key": "KEEP0001",
+                        "source_keys": ["DUPE0001"],
+                        "metadata_fields_to_fill": [{
+                            "field": "DOI",
+                            "source_key": "DUPE0001",
+                            "value": "10.1000/test"
+                        }],
+                        "skipped_incompatible_fields": [],
+                        "tags_to_add": [],
+                        "collections_to_add": [],
+                        "relations_to_add": ["http://zotero.org/groups/42/items/DUPE0001"],
+                        "children_to_reparent": 2,
+                        "skipped_duplicate_attachments": 0,
+                        "confirm_required": true,
+                        "plan_id": "plan-visible",
+                        "expires_at": "2026-07-11T12:00:00Z",
+                        "plan_token": "raw-plan-token-must-stay-private"
+                    }),
+                    1,
+                ),
+                vec![],
+            ),
+            (
+                200,
+                envelope(
+                    serde_json::json!({
+                        "already_applied": false,
+                        "keeper_key": "KEEP0001",
+                        "source_keys_trashed": ["DUPE0001"],
+                        "metadata_fields_filled": ["DOI"],
+                        "skipped_incompatible_fields": [],
+                        "tags_added": [],
+                        "collections_added": [],
+                        "relations_to_add": ["http://zotero.org/groups/42/items/DUPE0001"],
+                        "children_reparented": 2,
+                        "skipped_duplicate_attachments": 0
+                    }),
+                    1,
+                ),
+                vec![],
+            ),
+        ];
+        let (base, handle) = spawn_server(responses);
+        let client = DesktopClient::with_base_url(&base, Duration::from_secs(1)).expect("client");
+        let mut preview = client
+            .merge_preview(
+                "bridge-token",
+                &LibraryScope::Group { group_id: 42 },
+                "KEEP0001",
+                &["DUPE0001".to_string()],
+            )
+            .await
+            .expect("preview");
+        assert_eq!(preview.plan_id, "plan-visible");
+        assert!(!format!("{preview:?}").contains("raw-plan-token"));
+        let plan_token = preview.take_plan_token();
+        let applied = client
+            .merge_apply("bridge-token", &plan_token, "operation-1")
+            .await
+            .expect("apply");
+        assert_eq!(applied.metadata_fields_filled, vec!["DOI"]);
+
+        let captured = handle.join().expect("join server");
+        assert_eq!(captured[0].path, "/merge/preview");
+        assert_eq!(captured[1].path, "/merge/apply");
+        assert_eq!(
+            captured[0].authorization.as_deref(),
+            Some("Bearer bridge-token")
+        );
+        let preview_body: serde_json::Value =
+            serde_json::from_str(&captured[0].body).expect("preview body");
+        assert_eq!(preview_body["scope"]["type"], "group");
+        assert_eq!(preview_body["scope"]["group_id"], 42);
+        assert_eq!(preview_body["source_keys"], serde_json::json!(["DUPE0001"]));
+        let apply_body: serde_json::Value =
+            serde_json::from_str(&captured[1].body).expect("apply body");
+        assert_eq!(apply_body["operation_id"], "operation-1");
+        assert_eq!(apply_body["plan_token"], plan_token);
+    }
+
+    #[tokio::test]
+    async fn merge_apply_retries_timeout_with_the_same_idempotency_payload() {
+        let server = Server::http(("127.0.0.1", 0)).expect("bind retry server");
+        let port = server
+            .server_addr()
+            .to_ip()
+            .expect("retry server IP")
+            .port();
+        let base = format!("http://127.0.0.1:{port}/");
+        let handle = std::thread::spawn(move || {
+            let mut captured = Vec::new();
+            let mut first = server.recv().expect("first apply request");
+            let mut first_body = String::new();
+            first
+                .as_reader()
+                .read_to_string(&mut first_body)
+                .expect("read first apply");
+            captured.push(first_body.clone());
+            std::thread::sleep(Duration::from_millis(120));
+            let request_id = serde_json::from_str::<serde_json::Value>(&first_body)
+                .expect("first apply JSON")["request_id"]
+                .as_str()
+                .expect("request id")
+                .to_string();
+            let body = envelope(
+                serde_json::json!({
+                    "already_applied": false,
+                    "keeper_key": "KEEP0001",
+                    "source_keys_trashed": ["DUPE0001"],
+                    "metadata_fields_filled": [],
+                    "skipped_incompatible_fields": [],
+                    "tags_added": [],
+                    "collections_added": [],
+                    "relations_to_add": [],
+                    "children_reparented": 0,
+                    "skipped_duplicate_attachments": 0
+                }),
+                1,
+            )
+            .replace("__REQUEST_ID__", &request_id);
+            let _ = first.respond(Response::from_string(body.clone()));
+
+            let mut retry = server.recv().expect("retry apply request");
+            let mut retry_body = String::new();
+            retry
+                .as_reader()
+                .read_to_string(&mut retry_body)
+                .expect("read retry apply");
+            captured.push(retry_body);
+            retry
+                .respond(Response::from_string(body))
+                .expect("respond to retry");
+            captured
+        });
+        let client =
+            DesktopClient::with_base_url(&base, Duration::from_millis(100)).expect("client");
+
+        let result = client
+            .merge_apply(
+                "bridge-token",
+                "private-plan-token-with-enough-characters",
+                "operation-retry",
+            )
+            .await
+            .expect("retry apply");
+        assert_eq!(result.keeper_key, "KEEP0001");
+        let captured = handle.join().expect("join retry server");
+        assert_eq!(captured.len(), 2);
+        assert_eq!(captured[0], captured[1]);
     }
 
     #[tokio::test]
@@ -692,6 +963,7 @@ mod tests {
         let err = DesktopClient::build(
             "https://example.com/zot-bridge/v1/",
             LOCAL_API_URL,
+            Duration::from_secs(1),
             Duration::from_secs(1),
         )
         .expect_err("remote bridge URL");

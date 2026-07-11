@@ -377,6 +377,7 @@ fn config_view(config: &AppConfig) -> serde_json::Value {
         "write_backend": write_backend_label(config.zotero.write_backend),
         "desktop_bridge": {
             "configured": config.zotero.desktop_bridge.is_configured(),
+            "connection_id": config.zotero.desktop_bridge.connection_id(),
             "plugin_version": blank_or_value(&config.zotero.desktop_bridge.plugin_version),
             "protocol_version": config.zotero.desktop_bridge.protocol_version,
             "paired_at": blank_or_value(&config.zotero.desktop_bridge.paired_at),

@@ -11,6 +11,10 @@ use crate::error::{ZotError, ZotResult};
 pub const CONFIG_DIR_NAME: &str = "zot";
 pub const CONFIG_FILE_NAME: &str = "config.toml";
 
+pub fn bridge_connection_id(instance_id: &str) -> Option<String> {
+    (!instance_id.is_empty()).then(|| instance_id.chars().take(8).collect())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum LibraryScope {
     User,
@@ -150,6 +154,8 @@ pub struct DesktopBridgeConfig {
     #[serde(default)]
     pub token: String,
     #[serde(default)]
+    pub instance_id: String,
+    #[serde(default)]
     pub plugin_version: String,
     #[serde(default)]
     pub protocol_version: Option<u32>,
@@ -168,6 +174,7 @@ impl fmt::Debug for DesktopBridgeConfig {
                     "(set)"
                 },
             )
+            .field("instance_id", &self.instance_id)
             .field("plugin_version", &self.plugin_version)
             .field("protocol_version", &self.protocol_version)
             .field("paired_at", &self.paired_at)
@@ -178,6 +185,10 @@ impl fmt::Debug for DesktopBridgeConfig {
 impl DesktopBridgeConfig {
     pub fn is_configured(&self) -> bool {
         !self.token.is_empty()
+    }
+
+    pub fn connection_id(&self) -> Option<String> {
+        bridge_connection_id(&self.instance_id)
     }
 }
 
@@ -339,6 +350,25 @@ impl AppConfig {
             None => Some(&self.zotero.desktop_bridge),
         }
     }
+
+    pub fn set_desktop_bridge_instance_id(
+        &mut self,
+        profile_name: Option<&str>,
+        instance_id: String,
+    ) -> bool {
+        let bridge = match profile_name {
+            Some(profile_name) => self
+                .profile
+                .get_mut(profile_name)
+                .map(|profile| &mut profile.desktop_bridge),
+            None => Some(&mut self.zotero.desktop_bridge),
+        };
+        let Some(bridge) = bridge else {
+            return false;
+        };
+        bridge.instance_id = instance_id;
+        true
+    }
 }
 
 pub fn parse_library_scope(value: &str) -> ZotResult<LibraryScope> {
@@ -498,6 +528,7 @@ mod tests {
             Some("work"),
             DesktopBridgeConfig {
                 token: "secret-token".to_string(),
+                instance_id: "profile-instance".to_string(),
                 plugin_version: "0.6.0".to_string(),
                 protocol_version: Some(1),
                 paired_at: "2026-07-11T00:00:00Z".to_string(),
@@ -507,6 +538,31 @@ mod tests {
         let effective = config.materialize_profile(None);
         assert_eq!(effective.zotero.write_backend, WriteBackend::Desktop);
         assert_eq!(effective.zotero.desktop_bridge.token, "secret-token");
+        assert_eq!(
+            effective.zotero.desktop_bridge.connection_id().as_deref(),
+            Some("profile-")
+        );
+    }
+
+    #[test]
+    fn legacy_bridge_config_defaults_instance_identity_for_migration() {
+        let config: AppConfig = toml::from_str(
+            "[zotero.desktop_bridge]\ntoken = 'secret-token'\nplugin_version = '0.6.0'\n",
+        )
+        .expect("parse legacy bridge config");
+        assert!(config.zotero.desktop_bridge.instance_id.is_empty());
+        assert_eq!(config.zotero.desktop_bridge.connection_id(), None);
+    }
+
+    #[test]
+    fn bridge_instance_migration_preserves_selected_backend() {
+        let mut config = AppConfig::default();
+        config.zotero.desktop_bridge.token = "secret-token".to_string();
+        config.zotero.write_backend = WriteBackend::Web;
+
+        assert!(config.set_desktop_bridge_instance_id(None, "profile-instance".to_string()));
+        assert_eq!(config.zotero.write_backend, WriteBackend::Web);
+        assert_eq!(config.zotero.desktop_bridge.instance_id, "profile-instance");
     }
 
     #[test]

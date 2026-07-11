@@ -8,6 +8,9 @@ repository.workspace = true
 rust-version.workspace = true
 description = "Remote Zotero Web API, enrichment, and embedding support for zot."
 
+[features]
+test-support = []
+
 [dependencies]
 chrono.workspace = true
 md5.workspace = true

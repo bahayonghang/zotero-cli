@@ -345,6 +345,8 @@ pub(crate) struct LibraryDedupeArgs {
     pub(crate) limit: usize,
     #[arg(long)]
     pub(crate) confirm: bool,
+    #[arg(long)]
+    pub(crate) include_low_confidence: bool,
 }
 
 #[derive(Args)]

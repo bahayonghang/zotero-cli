@@ -1,6 +1,6 @@
 use anyhow::Result;
 use zot_core::{AppConfig, ZotError, redact_secret};
-use zot_desktop::{BridgeHealth, BridgeStatus, LocalHttpStatus};
+use zot_desktop::{BridgeHealth, BridgeStatus, LocalHttpStatus, ensure_matching_instance_id};
 use zot_local::{PdfiumAvailability, PdfiumBackend};
 use zot_remote::BetterBibTexClient;
 
@@ -48,12 +48,26 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let desktop = ctx.desktop()?;
     let local_http = desktop.probe_local_http().await;
     let bridge_health = desktop.health().await;
-    let bridge_status = if bridge_health.is_ok() && ctx.config.zotero.desktop_bridge.is_configured()
+    let bridge_status = if let Ok(health) = &bridge_health
+        && ctx.config.zotero.desktop_bridge.is_configured()
     {
         Some(
-            desktop
-                .status(&ctx.config.zotero.desktop_bridge.token)
-                .await,
+            match ensure_matching_instance_id(
+                &ctx.config.zotero.desktop_bridge.instance_id,
+                &health.instance_id,
+            ) {
+                Ok(()) => match desktop
+                    .status(&ctx.config.zotero.desktop_bridge.token)
+                    .await
+                {
+                    Ok(status) => {
+                        ensure_matching_instance_id(&health.instance_id, &status.instance_id)
+                            .map(|()| status)
+                    }
+                    Err(error) => Err(error),
+                },
+                Err(error) => Err(error),
+            },
         )
     } else {
         None
@@ -365,6 +379,7 @@ mod tests {
     #[test]
     fn desktop_capability_reports_installed_but_unpaired() {
         let health = Ok(BridgeHealth {
+            instance_id: "test-instance".to_string(),
             plugin_version: "0.6.0".to_string(),
             zotero_version: "9.0.6".to_string(),
             protocol_version: 1,
