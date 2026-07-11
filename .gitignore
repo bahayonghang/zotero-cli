@@ -1,6 +1,8 @@
 ref/
 .omx/
 target/
+__pycache__/
+*.py[cod]
 .claude/
 docs/node_modules/
 docs/.vitepress/cache/
