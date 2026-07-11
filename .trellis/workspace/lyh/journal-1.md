@@ -180,3 +180,38 @@ D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: 完成重复条目安全清理与发布准备
+
+**Date**: 2026-07-11
+**Task**: 完成重复条目安全清理与发布准备
+**Branch**: `main`
+
+### Summary
+
+完成 library dedupe、跨类型合并与引文保护，补齐中英文 safety 清单；拆分提交 0.6.0 发布准备和 Trellis 0.6.6 运行时同步。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bb5df559a5eece49ded8cf50e4cdc2631a5dc429` | (see git log) |
+| `dd36072ca0f10a241a230ca2fef3708d43221142` | (see git log) |
+| `2407d12e14bb081118657a9d77bfbfa52177ab9c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
