@@ -493,7 +493,8 @@ mod tests {
     fn saved_search_delete_output_is_enveloped() {
         let ctx = json_ctx();
         let payload = serde_json::json!({ "deleted": ["SRCH01", "SRCH02"] });
-        let out = CommandOutput::new(&ctx, payload, None, |_| unreachable!()).expect("build output");
+        let out =
+            CommandOutput::new(&ctx, payload, None, |_| unreachable!()).expect("build output");
         let json = out.as_json().expect("json payload");
         assert!(json.contains("\"ok\": true"));
         assert!(json.contains("\"deleted\""));

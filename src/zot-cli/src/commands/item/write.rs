@@ -142,7 +142,9 @@ pub(crate) async fn handle_trash(ctx: &AppContext, args: ItemKeyArgs) -> Result<
     ctx.remote()?.delete_item(&args.key).await?;
     let key = args.key;
     let payload = serde_json::json!({ "trashed": key });
-    CommandOutput::new(ctx, payload, None, move |_| println!("Moved to trash: {key}"))
+    CommandOutput::new(ctx, payload, None, move |_| {
+        println!("Moved to trash: {key}")
+    })
 }
 
 pub(crate) async fn handle_restore(ctx: &AppContext, args: ItemKeyArgs) -> Result<CommandOutput> {

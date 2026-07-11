@@ -1,7 +1,7 @@
 use zot_core::{CliEnvelope, EnvelopeMeta};
 
 use crate::context::AppContext;
-use crate::format::{to_pretty_json, EnvelopeMetaSeed, ENVELOPE_API_VERSION};
+use crate::format::{ENVELOPE_API_VERSION, EnvelopeMetaSeed, to_pretty_json};
 
 /// Successful command output. Handlers return this; the dispatch layer calls
 /// [`CommandOutput::emit`] to print it. This is the single place where the

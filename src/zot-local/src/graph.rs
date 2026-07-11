@@ -71,7 +71,9 @@ pub(crate) fn assemble_graph(
 
     if opts.relations.coauthor {
         for group in invert_authors(&ordered).values() {
-            accumulate(group, opts.max_group_size, &mut pairs, |acc| acc.coauthor += 1);
+            accumulate(group, opts.max_group_size, &mut pairs, |acc| {
+                acc.coauthor += 1
+            });
         }
     }
     if opts.relations.tag {
@@ -176,7 +178,13 @@ pub(crate) fn assemble_graph(
         })
         .collect();
 
-    let metrics = compute_metrics(&nodes, &ordered, &community, connected_components, opts.top_n);
+    let metrics = compute_metrics(
+        &nodes,
+        &ordered,
+        &community,
+        connected_components,
+        opts.top_n,
+    );
 
     KnowledgeGraph {
         scope,
@@ -385,12 +393,15 @@ fn compute_metrics(
         top_by_degree,
         top_by_weighted_degree,
         communities: summarise_communities(ordered, community),
-        top_authors: top_counts(ordered.iter().flat_map(|item| {
-            item.creators
-                .iter()
-                .map(|creator| creator.full_name())
-                .filter(|name| !name.is_empty())
-        }), top_n),
+        top_authors: top_counts(
+            ordered.iter().flat_map(|item| {
+                item.creators
+                    .iter()
+                    .map(|creator| creator.full_name())
+                    .filter(|name| !name.is_empty())
+            }),
+            top_n,
+        ),
         top_tags: top_counts(
             ordered.iter().flat_map(|item| item.tags.iter().cloned()),
             top_n,
@@ -398,7 +409,11 @@ fn compute_metrics(
     }
 }
 
-fn rank_nodes(nodes: &[GraphNode], top_n: usize, score: impl Fn(&GraphNode) -> i64) -> Vec<RankedNode> {
+fn rank_nodes(
+    nodes: &[GraphNode],
+    top_n: usize,
+    score: impl Fn(&GraphNode) -> i64,
+) -> Vec<RankedNode> {
     let mut ranked: Vec<RankedNode> = nodes
         .iter()
         .map(|node| RankedNode {

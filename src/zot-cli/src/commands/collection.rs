@@ -38,7 +38,9 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
                 "item_key": args.item_key,
                 "collection_key": args.collection_key,
             });
-            CommandOutput::new(ctx, payload, None, |_| println!("Item added to collection."))
+            CommandOutput::new(ctx, payload, None, |_| {
+                println!("Item added to collection.")
+            })
         }
         CollectionCommand::RemoveItem(args) => {
             ctx.remote()?
