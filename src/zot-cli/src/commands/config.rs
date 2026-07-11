@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use zot_core::config::ProfileConfig;
-use zot_core::{AppConfig, canonicalize_or_original, detect_zotero_data_dir};
+use zot_core::{AppConfig, WriteBackend, canonicalize_or_original, detect_zotero_data_dir};
 
 use crate::cli::{
     ConfigCommand, ConfigInitArgs, ConfigKeyArg, ConfigProfilesCommand, ConfigProfilesUseArgs,
@@ -86,6 +86,18 @@ async fn handle_show(ctx: &AppContext) -> Result<CommandOutput> {
             redact_or_missing(&effective.embedding.api_key)
         );
         println!("Embedding model: {}", effective.embedding.model);
+        println!(
+            "Write backend: {}",
+            write_backend_label(effective.zotero.write_backend)
+        );
+        println!(
+            "Desktop bridge: {}",
+            if effective.zotero.desktop_bridge.is_configured() {
+                "configured"
+            } else {
+                "not paired"
+            }
+        );
     })
 }
 
@@ -169,6 +181,7 @@ enum ConfigTarget<'a> {
 enum SettingSlot<'a> {
     Text(&'a mut String),
     Limit(&'a mut usize),
+    Backend(&'a mut WriteBackend),
 }
 
 fn config_target<'a>(config: &'a mut AppConfig, profile_name: Option<&str>) -> ConfigTarget<'a> {
@@ -187,7 +200,7 @@ fn setting_slot<'a>(
     target: &'a mut ConfigTarget<'_>,
     key: &ConfigKeyArg,
 ) -> Option<SettingSlot<'a>> {
-    use SettingSlot::{Limit, Text};
+    use SettingSlot::{Backend, Limit, Text};
     match key {
         ConfigKeyArg::DataDir => match target {
             ConfigTarget::Root(config) => Some(Text(&mut config.zotero.data_dir)),
@@ -229,6 +242,10 @@ fn setting_slot<'a>(
             ConfigTarget::Root(config) => Some(Text(&mut config.export.default_style)),
             ConfigTarget::Profile(profile) => Some(Text(&mut profile.export.default_style)),
         },
+        ConfigKeyArg::WriteBackend => match target {
+            ConfigTarget::Root(config) => Some(Backend(&mut config.zotero.write_backend)),
+            ConfigTarget::Profile(profile) => Some(Backend(&mut profile.write_backend)),
+        },
     }
 }
 
@@ -239,6 +256,7 @@ fn apply_setting(target: &mut ConfigTarget<'_>, key: &ConfigKeyArg, value: &str)
     match setting_slot(target, key) {
         Some(SettingSlot::Text(slot)) => *slot = value.to_string(),
         Some(SettingSlot::Limit(slot)) => *slot = parse_limit(value)?,
+        Some(SettingSlot::Backend(slot)) => *slot = parse_write_backend(value)?,
         None => {
             return Err(zot_core::ZotError::InvalidInput {
                 code: "config-key".to_string(),
@@ -310,6 +328,19 @@ fn parse_limit(value: &str) -> Result<usize> {
     })
 }
 
+fn parse_write_backend(value: &str) -> Result<WriteBackend> {
+    match value {
+        "web" => Ok(WriteBackend::Web),
+        "desktop" => Ok(WriteBackend::Desktop),
+        _ => Err(zot_core::ZotError::InvalidInput {
+            code: "config-write-backend".to_string(),
+            message: format!("Invalid write backend '{value}'"),
+            hint: Some("Use 'web' or 'desktop'".to_string()),
+        }
+        .into()),
+    }
+}
+
 fn config_change_payload(
     config: &AppConfig,
     path: PathBuf,
@@ -342,6 +373,13 @@ fn config_view(config: &AppConfig) -> serde_json::Value {
         },
         "export": {
             "default_style": config.export.default_style,
+        },
+        "write_backend": write_backend_label(config.zotero.write_backend),
+        "desktop_bridge": {
+            "configured": config.zotero.desktop_bridge.is_configured(),
+            "plugin_version": blank_or_value(&config.zotero.desktop_bridge.plugin_version),
+            "protocol_version": config.zotero.desktop_bridge.protocol_version,
+            "paired_at": blank_or_value(&config.zotero.desktop_bridge.paired_at),
         },
     })
 }
@@ -400,7 +438,15 @@ impl ConfigKeyArgExt for ConfigKeyArg {
             ConfigKeyArg::OutputFormat => "output-format",
             ConfigKeyArg::OutputLimit => "output-limit",
             ConfigKeyArg::ExportStyle => "export-style",
+            ConfigKeyArg::WriteBackend => "write-backend",
         }
+    }
+}
+
+fn write_backend_label(value: WriteBackend) -> &'static str {
+    match value {
+        WriteBackend::Web => "web",
+        WriteBackend::Desktop => "desktop",
     }
 }
 
@@ -488,6 +534,7 @@ mod tests {
         for key in ConfigKeyArg::value_variants() {
             let value = match key {
                 ConfigKeyArg::OutputLimit => "25",
+                ConfigKeyArg::WriteBackend => "desktop",
                 _ => "value",
             };
 
@@ -591,5 +638,15 @@ mod tests {
     fn parses_output_limit_for_config_updates() {
         assert_eq!(parse_limit("25").expect("limit"), 25);
         assert!(parse_limit("bad").is_err());
+    }
+
+    #[test]
+    fn parses_write_backend_for_root_and_profile() {
+        assert_eq!(
+            parse_write_backend("desktop").expect("desktop"),
+            WriteBackend::Desktop
+        );
+        assert_eq!(parse_write_backend("web").expect("web"), WriteBackend::Web);
+        assert!(parse_write_backend("auto").is_err());
     }
 }

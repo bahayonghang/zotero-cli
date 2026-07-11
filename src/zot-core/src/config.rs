@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -94,6 +95,10 @@ pub struct ZoteroConfig {
     pub api_key: String,
     #[serde(default)]
     pub semantic_scholar_api_key: String,
+    #[serde(default)]
+    pub write_backend: WriteBackend,
+    #[serde(default)]
+    pub desktop_bridge: DesktopBridgeConfig,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -106,6 +111,10 @@ pub struct ProfileConfig {
     pub api_key: String,
     #[serde(default)]
     pub semantic_scholar_api_key: String,
+    #[serde(default)]
+    pub write_backend: WriteBackend,
+    #[serde(default)]
+    pub desktop_bridge: DesktopBridgeConfig,
     #[serde(default)]
     pub output: OutputConfig,
     #[serde(default)]
@@ -126,6 +135,50 @@ pub struct AppConfig {
     pub profile: std::collections::BTreeMap<String, ProfileConfig>,
     #[serde(default)]
     pub default: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum WriteBackend {
+    #[default]
+    Web,
+    Desktop,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DesktopBridgeConfig {
+    #[serde(default)]
+    pub token: String,
+    #[serde(default)]
+    pub plugin_version: String,
+    #[serde(default)]
+    pub protocol_version: Option<u32>,
+    #[serde(default)]
+    pub paired_at: String,
+}
+
+impl fmt::Debug for DesktopBridgeConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DesktopBridgeConfig")
+            .field(
+                "token",
+                &if self.token.is_empty() {
+                    "(missing)"
+                } else {
+                    "(set)"
+                },
+            )
+            .field("plugin_version", &self.plugin_version)
+            .field("protocol_version", &self.protocol_version)
+            .field("paired_at", &self.paired_at)
+            .finish()
+    }
+}
+
+impl DesktopBridgeConfig {
+    pub fn is_configured(&self) -> bool {
+        !self.token.is_empty()
+    }
 }
 
 impl AppConfig {
@@ -170,6 +223,17 @@ impl AppConfig {
             path: path.clone(),
             source,
         })?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).map_err(
+                |source| ZotError::Io {
+                    path: path.clone(),
+                    source,
+                },
+            )?;
+        }
         Ok(path)
     }
 
@@ -185,6 +249,8 @@ impl AppConfig {
             self.zotero.library_id = profile.library_id.clone();
             self.zotero.api_key = profile.api_key.clone();
             self.zotero.semantic_scholar_api_key = profile.semantic_scholar_api_key.clone();
+            self.zotero.write_backend = profile.write_backend;
+            self.zotero.desktop_bridge = profile.desktop_bridge.clone();
             self.output = profile.output.clone();
             self.export = profile.export.clone();
         }
@@ -231,6 +297,46 @@ impl AppConfig {
                 .insert("profile".to_string(), profile_name.to_string());
         } else {
             self.default.remove("profile");
+        }
+    }
+
+    pub fn effective_profile_name(&self, explicit: Option<&str>) -> Option<String> {
+        explicit
+            .map(ToOwned::to_owned)
+            .or_else(|| self.default_profile_name().map(ToOwned::to_owned))
+    }
+
+    pub fn set_desktop_bridge(&mut self, profile_name: Option<&str>, bridge: DesktopBridgeConfig) {
+        if let Some(profile_name) = profile_name {
+            let profile = self.profile.entry(profile_name.to_string()).or_default();
+            profile.desktop_bridge = bridge;
+            profile.write_backend = WriteBackend::Desktop;
+        } else {
+            self.zotero.desktop_bridge = bridge;
+            self.zotero.write_backend = WriteBackend::Desktop;
+        }
+    }
+
+    pub fn clear_desktop_bridge(&mut self, profile_name: Option<&str>) {
+        if let Some(profile_name) = profile_name {
+            if let Some(profile) = self.profile.get_mut(profile_name) {
+                profile.desktop_bridge = DesktopBridgeConfig::default();
+            }
+        } else {
+            self.zotero.desktop_bridge = DesktopBridgeConfig::default();
+        }
+    }
+
+    pub fn desktop_bridge_for_target(
+        &self,
+        profile_name: Option<&str>,
+    ) -> Option<&DesktopBridgeConfig> {
+        match profile_name {
+            Some(name) => self
+                .profile
+                .get(name)
+                .map(|profile| &profile.desktop_bridge),
+            None => Some(&self.zotero.desktop_bridge),
         }
     }
 }
@@ -374,5 +480,65 @@ mod tests {
 
         config.set_default_profile(None);
         assert_eq!(config.default_profile_name(), None);
+    }
+
+    #[test]
+    fn old_config_defaults_to_web_without_bridge_credentials() {
+        let config: AppConfig =
+            toml::from_str("[zotero]\ndata_dir = 'Zotero'\n").expect("parse legacy config");
+        assert_eq!(config.zotero.write_backend, WriteBackend::Web);
+        assert!(!config.zotero.desktop_bridge.is_configured());
+    }
+
+    #[test]
+    fn materializes_profile_bridge_and_backend() {
+        let mut config = AppConfig::default();
+        config.set_default_profile(Some("work"));
+        config.set_desktop_bridge(
+            Some("work"),
+            DesktopBridgeConfig {
+                token: "secret-token".to_string(),
+                plugin_version: "0.6.0".to_string(),
+                protocol_version: Some(1),
+                paired_at: "2026-07-11T00:00:00Z".to_string(),
+            },
+        );
+
+        let effective = config.materialize_profile(None);
+        assert_eq!(effective.zotero.write_backend, WriteBackend::Desktop);
+        assert_eq!(effective.zotero.desktop_bridge.token, "secret-token");
+    }
+
+    #[test]
+    fn bridge_debug_redacts_token() {
+        let bridge = DesktopBridgeConfig {
+            token: "secret-token".to_string(),
+            ..DesktopBridgeConfig::default()
+        };
+        let debug = format!("{bridge:?}");
+        assert!(debug.contains("(set)"));
+        assert!(!debug.contains("secret-token"));
+    }
+
+    #[test]
+    fn app_config_debug_redacts_bridge_token() {
+        let mut config = AppConfig::default();
+        config.zotero.desktop_bridge.token = "secret-token".to_string();
+        let debug = format!("{config:?}");
+        assert!(!debug.contains("secret-token"));
+    }
+
+    #[test]
+    fn effective_profile_prefers_explicit_then_default() {
+        let mut config = AppConfig::default();
+        config.set_default_profile(Some("default"));
+        assert_eq!(
+            config.effective_profile_name(Some("explicit")),
+            Some("explicit".to_string())
+        );
+        assert_eq!(
+            config.effective_profile_name(None),
+            Some("default".to_string())
+        );
     }
 }

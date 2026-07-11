@@ -153,6 +153,31 @@ pub(crate) enum McpCommand {
 }
 
 #[derive(Subcommand)]
+pub(crate) enum BridgeCommand {
+    Setup(BridgeSetupArgs),
+    Pair(BridgePairArgs),
+    Status,
+    Revoke(BridgeRevokeArgs),
+}
+
+#[derive(Args)]
+pub(crate) struct BridgeSetupArgs {
+    #[arg(long)]
+    pub(crate) output: Option<PathBuf>,
+}
+
+#[derive(Args)]
+pub(crate) struct BridgePairArgs {
+    pub(crate) code: String,
+}
+
+#[derive(Args)]
+pub(crate) struct BridgeRevokeArgs {
+    #[arg(long)]
+    pub(crate) local_only: bool,
+}
+
+#[derive(Subcommand)]
 pub(crate) enum ConfigCommand {
     Init(ConfigInitArgs),
     Show,

@@ -24,6 +24,12 @@ test:
 build:
   cargo build --release -p zot-cli
 
+plugin-test:
+  node --test plugins/zot-bridge/tests/bootstrap.test.cjs
+
+xpi-check: plugin-test
+  cargo test -p zot-cli bridge_xpi
+
 docs:
   npm --prefix docs install
   npm --prefix docs run dev

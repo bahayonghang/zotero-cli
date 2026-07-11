@@ -1,5 +1,6 @@
 use anyhow::Result;
-use zot_core::{AppConfig, redact_secret};
+use zot_core::{AppConfig, ZotError, redact_secret};
+use zot_desktop::{BridgeHealth, BridgeStatus, LocalHttpStatus};
 use zot_local::{PdfiumAvailability, PdfiumBackend};
 use zot_remote::BetterBibTexClient;
 
@@ -44,6 +45,21 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         .unwrap_or_default();
     let bbt = BetterBibTexClient::new(ctx.http());
     let bbt_available = bbt.probe().await;
+    let desktop = ctx.desktop()?;
+    let local_http = desktop.probe_local_http().await;
+    let bridge_health = desktop.health().await;
+    let bridge_status = if bridge_health.is_ok() && ctx.config.zotero.desktop_bridge.is_configured()
+    {
+        Some(
+            desktop
+                .status(&ctx.config.zotero.desktop_bridge.token)
+                .await,
+        )
+    } else {
+        None
+    };
+    let local_sqlite_available = library.is_ok();
+    let web_write_configured = ctx.config.write_credentials_configured();
     let pdf_available = pdf_status.available;
     let semantic_status = library::semantic_status(ctx).await.ok();
     let payload = serde_json::json!({
@@ -51,6 +67,20 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         "data_dir": data_dir,
         "db_exists": db_path.exists(),
         "write_credentials": write_credentials_payload(&ctx.config),
+        "selected_write_backend": match ctx.write_backend() {
+            zot_core::WriteBackend::Web => "web",
+            zot_core::WriteBackend::Desktop => "desktop",
+        },
+        "capabilities": {
+            "local_sqlite_read": local_sqlite_capability(&library),
+            "local_http_read": local_http_capability(&local_http),
+            "desktop_write": desktop_write_capability(
+                ctx.config.zotero.desktop_bridge.is_configured(),
+                &bridge_health,
+                bridge_status.as_ref(),
+            ),
+            "web_write": web_write_capability(&ctx.config),
+        },
         "embedding": {
             "configured": ctx.config.embedding.is_configured(),
             "url": ctx.config.embedding.url,
@@ -75,12 +105,36 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         "schema_version": schema_version,
     });
     let write_creds_label = write_credentials_label(&ctx.config);
+    let local_http_label = capability_label(&local_http);
+    let desktop_write_label = desktop_capability_label(
+        ctx.config.zotero.desktop_bridge.is_configured(),
+        &bridge_health,
+        bridge_status.as_ref(),
+    );
     CommandOutput::new(ctx, payload, None, move |_| {
         println!("{DOCTOR_BANNER}");
         println!("Config: {}", AppConfig::config_file().display());
         println!("Data dir: {}", data_dir.display());
         println!("Database exists: {}", db_path.exists());
         println!("Write credentials: {write_creds_label}");
+        println!(
+            "Local SQLite read: {}",
+            if local_sqlite_available {
+                "available"
+            } else {
+                "unavailable"
+            }
+        );
+        println!("Local HTTP read: {local_http_label}");
+        println!("Desktop write: {desktop_write_label}");
+        println!(
+            "Web write: {}",
+            if web_write_configured {
+                "configured"
+            } else {
+                "not configured"
+            }
+        );
         println!("PDF backend: {}", pdf_backend_label(&pdf_status));
         println!(
             "Better BibTeX: {}",
@@ -104,6 +158,133 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
             println!("Schema version: {version}");
         }
     })
+}
+
+fn local_sqlite_capability(
+    library: &zot_core::ZotResult<zot_local::LocalLibrary>,
+) -> serde_json::Value {
+    match library {
+        Ok(_) => serde_json::json!({
+            "configured": true,
+            "available": true,
+        }),
+        Err(error) => serde_json::json!({
+            "configured": true,
+            "available": false,
+            "error": error.payload(),
+        }),
+    }
+}
+
+fn local_http_capability(status: &zot_core::ZotResult<LocalHttpStatus>) -> serde_json::Value {
+    match status {
+        Ok(status) => serde_json::json!({
+            "configured": true,
+            "available": status.available,
+            "zotero_version": status.zotero_version,
+            "connector_api_version": status.connector_api_version,
+        }),
+        Err(error) => serde_json::json!({
+            "configured": true,
+            "available": false,
+            "error": error.payload(),
+        }),
+    }
+}
+
+fn desktop_write_capability(
+    configured: bool,
+    health: &zot_core::ZotResult<BridgeHealth>,
+    status: Option<&zot_core::ZotResult<BridgeStatus>>,
+) -> serde_json::Value {
+    match health {
+        Err(error) => serde_json::json!({
+            "configured": configured,
+            "available": false,
+            "error": error.payload(),
+        }),
+        Ok(health) if !configured => serde_json::json!({
+            "configured": false,
+            "available": false,
+            "installed": true,
+            "plugin_version": health.plugin_version,
+            "zotero_version": health.zotero_version,
+            "protocol_version": health.protocol_version,
+            "hint": "Show a pairing code in Zotero and run `zot bridge pair <code>`",
+        }),
+        Ok(health) => match status {
+            Some(Ok(status)) => serde_json::json!({
+                "configured": true,
+                "available": status.paired,
+                "installed": true,
+                "plugin_version": health.plugin_version,
+                "zotero_version": health.zotero_version,
+                "protocol_version": health.protocol_version,
+                "capabilities": status.capabilities,
+                "libraries": status.libraries,
+            }),
+            Some(Err(error)) => serde_json::json!({
+                "configured": true,
+                "available": false,
+                "installed": true,
+                "plugin_version": health.plugin_version,
+                "zotero_version": health.zotero_version,
+                "protocol_version": health.protocol_version,
+                "error": error.payload(),
+            }),
+            None => serde_json::json!({
+                "configured": true,
+                "available": false,
+                "installed": true,
+                "plugin_version": health.plugin_version,
+                "zotero_version": health.zotero_version,
+                "protocol_version": health.protocol_version,
+                "error": {
+                    "code": "bridge-status",
+                    "message": "Desktop bridge status was not checked",
+                    "hint": "Run `zot bridge status`"
+                }
+            }),
+        },
+    }
+}
+
+fn web_write_capability(config: &AppConfig) -> serde_json::Value {
+    let configured = config.write_credentials_configured();
+    serde_json::json!({
+        "configured": configured,
+        "available": configured,
+        "checked": "credentials-only",
+        "hint": if configured {
+            serde_json::Value::Null
+        } else {
+            serde_json::Value::String("Run `zot config init` or set ZOT_LIBRARY_ID and ZOT_API_KEY for Web API writes".to_string())
+        },
+    })
+}
+
+fn capability_label<T>(result: &Result<T, ZotError>) -> &'static str {
+    if result.is_ok() {
+        "available"
+    } else {
+        "unavailable"
+    }
+}
+
+fn desktop_capability_label(
+    configured: bool,
+    health: &zot_core::ZotResult<BridgeHealth>,
+    status: Option<&zot_core::ZotResult<BridgeStatus>>,
+) -> &'static str {
+    if health.is_err() {
+        "unavailable"
+    } else if !configured {
+        "plugin installed; not paired"
+    } else if status.is_some_and(|value| value.as_ref().is_ok_and(|status| status.paired)) {
+        "available"
+    } else {
+        "configured; unavailable"
+    }
 }
 
 fn write_credentials_payload(config: &AppConfig) -> serde_json::Value {
@@ -179,6 +360,32 @@ mod tests {
         );
 
         eprintln!("doctor 写凭据说明校验完成");
+    }
+
+    #[test]
+    fn desktop_capability_reports_installed_but_unpaired() {
+        let health = Ok(BridgeHealth {
+            plugin_version: "0.6.0".to_string(),
+            zotero_version: "9.0.6".to_string(),
+            protocol_version: 1,
+            capabilities: vec!["status".to_string()],
+        });
+        let payload = desktop_write_capability(false, &health, None);
+        assert_eq!(payload["configured"], false);
+        assert_eq!(payload["available"], false);
+        assert_eq!(payload["installed"], true);
+        assert_eq!(
+            desktop_capability_label(false, &health, None),
+            "plugin installed; not paired"
+        );
+    }
+
+    #[test]
+    fn web_capability_is_credentials_only() {
+        let payload = web_write_capability(&AppConfig::default());
+        assert_eq!(payload["configured"], false);
+        assert_eq!(payload["available"], false);
+        assert_eq!(payload["checked"], "credentials-only");
     }
 
     #[test]
