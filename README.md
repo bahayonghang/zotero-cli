@@ -53,14 +53,14 @@ This matches the underlying products:
 
 ## What the skill can do with Zotero content
 
-| What you want | What the `zot` skill can surface |
-| --- | --- |
-| Find the right source | Search by query, tag, creator, year, collection, citation key, library, or feed |
-| Read the evidence | Return item metadata, child items, citations, PDF text, outline, notes, and annotations |
-| Build a working set | Create a topic workspace, import matching papers, index it, and query it |
-| Reuse full-library context | Build a library semantic index and run BM25 / semantic / hybrid retrieval |
-| Update the library safely | Add notes, tags, collection membership, imports, duplicate merges, and status sync with explicit permission |
-| Keep the agent honest | Run `doctor`, enforce dry-run gates, emit a stable JSON envelope, and never write to `zotero.sqlite` directly |
+| What you want              | What the `zot` skill can surface                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Find the right source      | Search by query, tag, creator, year, collection, citation key, library, or feed                               |
+| Read the evidence          | Return item metadata, child items, citations, PDF text, outline, notes, and annotations                       |
+| Build a working set        | Create a topic workspace, import matching papers, index it, and query it                                      |
+| Reuse full-library context | Build a library semantic index and run BM25 / semantic / hybrid retrieval                                     |
+| Update the library safely  | Add notes, tags, collection membership, imports, duplicate merges, and status sync with explicit permission   |
+| Keep the agent honest      | Run `doctor`, enforce dry-run gates, emit a stable JSON envelope, and never write to `zotero.sqlite` directly |
 
 ---
 
@@ -144,6 +144,7 @@ If you need to debug or drive the runtime manually, these are the usual starting
 zot --json doctor
 zot --json library search "reward hacking" --limit 10
 zot --json library recent --count 10
+zot --json library dedupe --collection COLL001
 zot --json item get ATTN001
 zot --json item merge KEEP001 DUPE001
 zot --json item annotation list --item-key ATTN001

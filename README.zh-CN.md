@@ -144,6 +144,7 @@ skill 会把这些请求路由到 `library`、`item`、`collection`、`workspace
 zot --json doctor
 zot --json library search "reward hacking" --limit 10
 zot --json library recent --count 10
+zot --json library dedupe --collection COLL001
 zot --json item get ATTN001
 zot --json item merge KEEP001 DUPE001
 zot --json item annotation list --item-key ATTN001

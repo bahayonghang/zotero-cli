@@ -1,0 +1,7 @@
+{"file": ".trellis/tasks/07-11-dedupe-cleanup/research/2026-07-11-feasibility.md", "reason": "可行性结论：Zotero 同类型限制仅 UI 层、Web API 写语义（400/relations/parentItem/批量50）、缺口 G1-G4 与来源"}
+{"file": ".trellis/spec/zot-local/backend/index.md", "reason": "zot-local 预开发检查单入口（R3 检测修正所在包）"}
+{"file": ".trellis/spec/zot-local/backend/database-guidelines.md", "reason": "只读 Zotero SQLite 访问与查询过滤规范，R3 改 search SQL 必读"}
+{"file": ".trellis/spec/zot-remote/backend/index.md", "reason": "远端客户端边界（item_uri 新增、写路径复用）"}
+{"file": ".trellis/spec/zot-remote/backend/quality-guidelines.md", "reason": "批量、API 前置条件与网络测试规范，R1/R4 写路径"}
+{"file": ".trellis/spec/zot-cli/backend/index.md", "reason": "命令层结构、JSON envelope 与 dry-run 门约定（dedupe 新命令、preview 扩展）"}
+{"file": ".trellis/spec/zot-core/backend/index.md", "reason": "共享模型约定（MergePreview 扩展、DedupePlan 新模型）"}

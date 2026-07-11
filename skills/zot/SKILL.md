@@ -145,6 +145,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 - 手工合并（不带 `--confirm` 是 dry-run preview）：`item merge`
 - collection 关系：`collection add-item` / `remove-item` / `create` / `rename` / `delete`
 - duplicates（不带 `--confirm` 是 dry-run）：`library duplicates` / `duplicates-merge`
+- 整库/整 collection 批量去重（自动选 keeper；不带 `--confirm` 是 dry-run 计划）：`library dedupe`
 - 状态同步（不带 `--apply` 是 dry-run）：`sync update-status`
 
 ### 7. 配置排障
@@ -292,6 +293,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `library saved-search create`
 - `library saved-search delete`
 - `library duplicates-merge --confirm`
+- `library dedupe --confirm`
 - `sync update-status --apply`
 - `config init`
 - `config set`
@@ -311,14 +313,16 @@ cargo run -q -p zot-cli -- --json doctor
    - `collection delete`
    - `library saved-search delete`
    - `library duplicates-merge --confirm`
+   - `library dedupe --confirm`
    - `item merge --confirm`
    - `sync update-status --apply`
 
    层 C，批量写（影响一组条目，必须先在小范围试，再放开）：
    - `item tag batch --add-tag/--remove-tag`
    - `library duplicates-merge`（多源 → 单 keeper）
+   - `library dedupe --confirm`（整库/整 collection 多组批量合并，先用 `--collection` 圈小范围、复查 low-confidence 组）
 
-4. `item merge` / `library duplicates-merge` / `sync update-status` 不带 `--confirm` / `--apply` 时本身就是 dry-run preview；要把 preview 当成“还没改”，不要错说成“已经合并 / 已经写回”。
+4. `item merge` / `library duplicates-merge` / `library dedupe` / `sync update-status` 不带 `--confirm` / `--apply` 时本身就是 dry-run preview；要把 preview 当成“还没改”，不要错说成“已经合并 / 已经写回”。
 5. 写权限缺失时停在只读分析，不要假装成功。
 
 ## 常见语义差异
@@ -331,6 +335,7 @@ cargo run -q -p zot-cli -- --json doctor
 - feeds 不通过 `--library group:<id>` 访问，而是用 `library feeds` / `feed-items`
 - `item download` 下载本地附件文件，`item attach` 上传新附件
 - `item merge` 是手工选 keeper/source 的通用合并，`library duplicates-merge` 是先找重复、再按 keeper 合并
+- `library dedupe` 是整库/整 collection 自动选 keeper 的批量清理，`library duplicates-merge` 是单组手工指定 keeper 的合并
 - `config show` 是看有效配置，`config profiles use` 是切换默认 profile
 
 ## 自然语言到动作的典型映射

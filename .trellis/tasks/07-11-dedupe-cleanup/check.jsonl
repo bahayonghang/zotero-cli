@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/07-11-dedupe-cleanup/research/2026-07-11-feasibility.md", "reason": "验收对照：G1-G4 缺口是否闭合、Web API 语义是否被正确使用"}
+{"file": ".trellis/spec/zot-local/backend/quality-guidelines.md", "reason": "检索/索引不变量与测试要求，核对 R3 未破坏 search 下游"}
+{"file": ".trellis/spec/zot-remote/backend/error-handling.md", "reason": "远端错误映射检查（逐组失败汇总的错误形状）"}
+{"file": ".trellis/spec/zot-cli/backend/index.md", "reason": "JSON envelope 稳定性与命令层规范核对"}
+{"file": ".trellis/spec/guides/index.md", "reason": "共享思维/检查指南入口"}

@@ -20,6 +20,14 @@ categories with different rules:
   and tags.
 - Return `Ok(None)` or `Ok(Vec::new())` for expected misses, as
   `get_item` and `get_notes` do.
+- Trash filtering on item search is **opt-in**: `SearchOptions::exclude_trashed`
+  (default `false`) appends the `deletedItems` exclusion via `trashed_exclusion()`
+  to the list-all branch and every LIKE collector. `find_duplicates` must always
+  opt in — a duplicate group must never pair a live item with one already in the
+  trash, or re-running cleanup keeps reporting groups it already resolved.
+  Note/annotation queries exclude `deletedItems` unconditionally, but
+  `library search` / `list` intentionally keep returning trashed items by
+  default; flipping that default is a breaking behavior decision, not a bug fix.
 
 ## Sidecar Databases
 

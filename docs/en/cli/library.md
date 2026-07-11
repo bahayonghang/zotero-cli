@@ -18,6 +18,7 @@
 - `library semantic-status`
 - `library duplicates`
 - `library duplicates-merge`
+- `library dedupe`
 - `library saved-search list`
 - `library saved-search create`
 - `library saved-search delete`
@@ -119,9 +120,51 @@ zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --dupli
 - preserve or add collections
 - re-parent child items
 - skip obviously duplicate attachments when possible
-- move duplicate items to Trash
+- add a `dc:replaces` relation on the keeper for every merged item, so citations already inserted in Word / LibreOffice keep resolving
+- move duplicate items to Trash (recoverable; nothing is deleted permanently)
 
-If you already have two explicit item keys rather than a duplicate-candidate set, switch to `item merge` on the [item](/en/cli/item) page.
+Notes:
+
+- duplicate detection skips items already in Trash
+- items of different types can be merged; the keeper keeps its own type, and only fields valid for that type are filled
+- source fields the keeper's type does not support are skipped and reported as `skipped_incompatible_fields` (field + source key) in both preview and applied output
+- the `dc:replaces` URIs appear as `relations_to_add` in the same output
+
+If you already have two explicit item keys rather than a duplicate-candidate set, switch to `item merge` on the [item](/en/cli/item) page. To clean the whole library in one pass, use `library dedupe` below.
+
+## dedupe
+
+`library dedupe` is the batch cleanup entry: detect duplicate groups, pick one keeper per group automatically, and emit a cleanup plan for the whole library or one collection.
+
+```bash
+zot --json library dedupe
+zot --json library dedupe --method doi --limit 100
+zot --json library dedupe --collection COLL001
+zot --json library dedupe --collection COLL001 --confirm
+```
+
+Available options:
+
+- `--method <both|doi|title>` (default `both`)
+- `--collection <key>`
+- `--limit <n>` (default 50)
+- `--confirm`
+
+Without `--confirm` the command is a pure local dry-run: no network access, no write credentials required. The plan JSON contains `groups[]`, `total_groups`, and `confirm_required`; each group carries:
+
+- `match_type`: `doi`, `title`, or a combined value such as `doi+title` — detection groups sharing an item are merged into one component, so every item appears at most once in the plan
+- `confidence`: `normal` or `low`; `low` groups add a `confidence_note` (year spread > 1, or differing DOIs inside the group) and deserve a manual look before confirming
+- `keeper`: the surviving item (`key`, `item_type`, `title`)
+- `reason`: why the keeper won — type priority first (journalArticle = conferencePaper > book / bookSection > thesis > report > preprint > document > others), then tie-breaks on non-empty metadata fields, local attachment count, earlier `dateAdded`, and finally key order
+- `absorb`: the items merged into the keeper and moved to Trash
+
+`--confirm` applies the plan group by group through the same merge engine as `duplicates-merge`, including `dc:replaces` and cross-type field safety. One failed group does not abort the rest; the report contains `applied`, `failed`, `total_groups`, `applied_groups`, and `failed_groups`.
+
+Notes:
+
+- groups may mix item types (for example preprint + conferencePaper); the keeper keeps its own type
+- review `confidence: "low"` groups, or start with a single `--collection`, before a whole-library `--confirm`
+- to hand-pick the keeper of a single group, stay with `library duplicates-merge`
 
 ## saved search
 

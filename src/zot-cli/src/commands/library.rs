@@ -9,6 +9,7 @@ use crate::cli::{
     LibrarySavedSearchDeleteArgs, LibrarySemanticIndexArgs, LibrarySemanticSearchArgs,
 };
 use crate::commands::item::merge::merge_item_set;
+use crate::commands::library_dedupe::{RemoteGroupMerger, apply_dedupe_plan, build_dedupe_plan};
 use crate::context::AppContext;
 use crate::format::{EnvelopeMetaSeed, print_items, print_stats};
 use crate::output::CommandOutput;
@@ -29,6 +30,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 direction: args.direction.into(),
                 limit: args.limit,
                 offset: args.offset,
+                exclude_trashed: false,
             })?;
             let seed = Some(EnvelopeMetaSeed {
                 count: Some(result.items.len()),
@@ -193,6 +195,33 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                     serde_json::to_string_pretty(payload).expect("serialize merge operation")
                 );
             })
+        }
+        LibraryCommand::Dedupe(args) => {
+            let groups = library.find_duplicates(
+                args.method.into(),
+                args.collection.as_deref(),
+                args.limit,
+            )?;
+            let plan = build_dedupe_plan(&library, &groups)?;
+            if args.confirm {
+                // Only the apply path needs write credentials; the default
+                // dry-run stays fully local.
+                let remote = ctx.remote()?;
+                let report = apply_dedupe_plan(&RemoteGroupMerger(&remote), &plan).await;
+                CommandOutput::new(ctx, report, None, |report| {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(report).expect("serialize dedupe report")
+                    );
+                })
+            } else {
+                CommandOutput::new(ctx, plan, None, |plan| {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(plan).expect("serialize dedupe plan")
+                    );
+                })
+            }
         }
         LibraryCommand::SavedSearch { command } => handle_saved_search(ctx, command).await,
     }

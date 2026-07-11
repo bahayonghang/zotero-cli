@@ -18,6 +18,7 @@
 - `item tag batch`
 - `item annotation create`
 - `item annotation create-area`
+- `item merge --confirm`
 - `collection create`
 - `collection rename`
 - `collection delete`
@@ -26,6 +27,7 @@
 - `library saved-search create`
 - `library saved-search delete`
 - `library duplicates-merge --confirm`
+- `library dedupe --confirm`
 - `sync update-status --apply`
 - `config init`
 - `config set`
@@ -38,9 +40,11 @@
 3. 这些动作要确认意图已经明确：
    - `item trash`
    - `item note delete`
+   - `item merge --confirm`
    - `collection delete`
    - `library saved-search delete`
    - `library duplicates-merge --confirm`
+   - `library dedupe --confirm`
    - `sync update-status --apply`
 
 ## 读写边界

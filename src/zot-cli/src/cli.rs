@@ -199,6 +199,20 @@ mod tests {
             ["zot", "library", "recent", "--count", "10"].as_slice(),
             ["zot", "library", "recent", "2026-04-01", "--limit", "20"].as_slice(),
             ["zot", "library", "duplicates", "--method", "both"].as_slice(),
+            ["zot", "library", "dedupe"].as_slice(),
+            [
+                "zot",
+                "library",
+                "dedupe",
+                "--method",
+                "doi",
+                "--collection",
+                "COLTR02",
+                "--limit",
+                "5",
+                "--confirm",
+            ]
+            .as_slice(),
             ["zot", "library", "saved-search", "list"].as_slice(),
             [
                 "zot",

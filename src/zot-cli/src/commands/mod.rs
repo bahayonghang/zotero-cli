@@ -4,6 +4,7 @@ pub(crate) mod doctor;
 pub(crate) mod graph;
 pub(crate) mod item;
 pub(crate) mod library;
+pub(crate) mod library_dedupe;
 pub(crate) mod mcp;
 pub(crate) mod sync;
 pub(crate) mod workspace;

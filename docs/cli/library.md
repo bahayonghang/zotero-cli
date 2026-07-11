@@ -18,6 +18,7 @@
 - `library semantic-status`
 - `library duplicates`
 - `library duplicates-merge`
+- `library dedupe`
 - `library saved-search list`
 - `library saved-search create`
 - `library saved-search delete`
@@ -119,9 +120,51 @@ zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --dupli
 - 保留 / 补齐 collections
 - re-parent child items
 - 尝试跳过重复 attachment
-- 把 duplicate 送入 Trash
+- 给 keeper 写一条指向每个被并条目的 `dc:replaces` relation，Word / LibreOffice 里已插入的引文不会断链
+- 把 duplicate 送入 Trash（可恢复，不做永久删除）
 
-如果你不是从重复候选里合并，而是手里已经有两条明确的 key，改走 [item](/cli/item) 里的 `item merge`。
+说明：
+
+- 重复检测会跳过已在回收站里的条目
+- 不同 item type 的条目可以合并；keeper 保持自身类型，只补对该类型合法的字段
+- keeper 类型不支持的源字段会被跳过，并在 preview / applied 输出里以 `skipped_incompatible_fields`（字段名 + 来源 key）列出
+- `dc:replaces` 的 URI 会在同一份输出里以 `relations_to_add` 给出
+
+如果你不是从重复候选里合并，而是手里已经有两条明确的 key，改走 [item](/cli/item) 里的 `item merge`。要一次清理整库，用下面的 `library dedupe`。
+
+## dedupe
+
+`library dedupe` 是批量清理入口：一条命令完成检测重复组、每组自动选 keeper、输出整库或整 collection 的清理计划。
+
+```bash
+zot --json library dedupe
+zot --json library dedupe --method doi --limit 100
+zot --json library dedupe --collection COLL001
+zot --json library dedupe --collection COLL001 --confirm
+```
+
+可用参数：
+
+- `--method <both|doi|title>`（默认 `both`）
+- `--collection <key>`
+- `--limit <n>`（默认 50）
+- `--confirm`
+
+不带 `--confirm` 时是纯本地 dry-run：不触网，也不需要写凭据。计划 JSON 包含 `groups[]`、`total_groups`、`confirm_required`，每组给出：
+
+- `match_type`：`doi`、`title`，或组合值如 `doi+title`——共享条目的检测组会先合并成一个连通分量，每个条目在计划中最多出现一次
+- `confidence`：`normal` 或 `low`；`low` 组会附 `confidence_note`（年份差 > 1，或组内 DOI 互异），确认前值得人工看一眼
+- `keeper`：保留下来的条目（`key`、`item_type`、`title`）
+- `reason`：keeper 胜出的依据——先按类型优先级（journalArticle = conferencePaper > book / bookSection > thesis > report > preprint > document > 其他），再依次以非空元数据字段数、本地附件数、更早的 `dateAdded`、key 顺序做 tie-break
+- `absorb`：被并入 keeper 并送入 Trash 的条目
+
+`--confirm` 会按计划逐组执行，走与 `duplicates-merge` 相同的合并引擎，包括 `dc:replaces` 与跨类型字段安全。单组失败不会中断其余组；结果包含 `applied`、`failed`、`total_groups`、`applied_groups`、`failed_groups`。
+
+说明：
+
+- 组内可以混合 item type（例如 preprint + conferencePaper）；keeper 保持自身类型
+- 整库 `--confirm` 之前，先复查 `confidence: "low"` 的组，或先用单个 `--collection` 小范围试
+- 要对单个组手工指定 keeper，继续用 `library duplicates-merge`
 
 ## saved search
 

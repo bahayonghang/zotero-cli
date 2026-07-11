@@ -102,7 +102,9 @@ Notes:
 - it is preview-first by default; without `--confirm`, nothing is written
 - `--keep` selects which item survives; without it, the first key is kept
 - only top-level bibliographic items are supported
-- the preview reports metadata fills, added tags / collections, child re-parent count, and skipped duplicate attachments
+- the preview reports metadata fills, added tags / collections, child re-parent count, skipped duplicate attachments, plus `skipped_incompatible_fields` and `relations_to_add`
+- items of different types can be merged; the keeper keeps its own type, and source fields invalid for that type are skipped and listed in `skipped_incompatible_fields`
+- on `--confirm` the keeper gains a `dc:replaces` relation for every merged item, so citations already inserted in Word / LibreOffice keep resolving; merged items go to Trash, not permanent deletion
 - if you are merging from duplicate-detection results first, `library duplicates-merge` remains available
 
 ## note / tag / annotation / scite

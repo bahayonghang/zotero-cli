@@ -31,6 +31,7 @@ pub(crate) enum LibraryCommand {
     SemanticStatus,
     Duplicates(LibraryDuplicatesArgs),
     DuplicatesMerge(LibraryDuplicatesMergeArgs),
+    Dedupe(LibraryDedupeArgs),
     SavedSearch {
         #[command(subcommand)]
         command: LibrarySavedSearchCommand,
@@ -305,6 +306,18 @@ pub(crate) struct LibraryDuplicatesMergeArgs {
     pub(crate) keeper: String,
     #[arg(long = "duplicate")]
     pub(crate) duplicates: Vec<String>,
+    #[arg(long)]
+    pub(crate) confirm: bool,
+}
+
+#[derive(Args)]
+pub(crate) struct LibraryDedupeArgs {
+    #[arg(long, default_value = "both")]
+    pub(crate) method: DuplicateMethodArg,
+    #[arg(long)]
+    pub(crate) collection: Option<String>,
+    #[arg(long, default_value_t = 50)]
+    pub(crate) limit: usize,
     #[arg(long)]
     pub(crate) confirm: bool,
 }

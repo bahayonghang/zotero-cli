@@ -618,6 +618,18 @@ impl ZoteroRemote {
         format!("{}/{scope}/{path}", self.base_url)
     }
 
+    /// Canonical public URI for an item in this library
+    /// (`http://zotero.org/users|groups/{library_id}/items/{KEY}`), the form
+    /// Zotero stores in item `relations` values such as `dc:replaces`. This
+    /// is the fixed zotero.org namespace, not the API `base_url`.
+    pub fn item_uri(&self, key: &str) -> String {
+        let scope = match self.scope {
+            LibraryScope::User => "users",
+            LibraryScope::Group { .. } => "groups",
+        };
+        format!("http://zotero.org/{scope}/{}/items/{key}", self.library_id)
+    }
+
     async fn library_version(&self) -> ZotResult<i64> {
         let response = self
             .http_get(self.endpoint("items?limit=1&format=keys"))
@@ -871,6 +883,38 @@ mod tests {
             base_url,
         )
         .expect("construct zotero remote")
+    }
+
+    #[test]
+    fn item_uri_uses_user_and_group_scope_prefixes() {
+        // `dc:replaces` relations must carry the canonical zotero.org URI,
+        // never the (overridable) API base URL.
+        let runtime = HttpRuntime::default();
+        let user = ZoteroRemote::with_base_url(
+            &runtime,
+            "12345",
+            "test-key",
+            LibraryScope::User,
+            "http://127.0.0.1:1",
+        )
+        .expect("construct user-scope remote");
+        assert_eq!(
+            user.item_uri("ABCD1234"),
+            "http://zotero.org/users/12345/items/ABCD1234"
+        );
+
+        let group = ZoteroRemote::with_base_url(
+            &runtime,
+            "67890",
+            "test-key",
+            LibraryScope::Group { group_id: 67890 },
+            "http://127.0.0.1:1",
+        )
+        .expect("construct group-scope remote");
+        assert_eq!(
+            group.item_uri("ABCD1234"),
+            "http://zotero.org/groups/67890/items/ABCD1234"
+        );
     }
 
     #[tokio::test]

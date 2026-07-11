@@ -350,13 +350,26 @@ pub struct MergeFieldFill {
     pub value: String,
 }
 
+/// A non-empty source field that could not be carried over because the
+/// keeper's item type has no such field (filling it would fail the write
+/// with 400 Invalid field). Surfaced so discarded data stays visible.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MergeSkippedField {
+    pub field: String,
+    pub source_key: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MergePreview {
     pub keeper_key: String,
     pub source_keys: Vec<String>,
     pub metadata_fields_to_fill: Vec<MergeFieldFill>,
+    pub skipped_incompatible_fields: Vec<MergeSkippedField>,
     pub tags_to_add: Vec<String>,
     pub collections_to_add: Vec<String>,
+    /// `dc:replaces` URIs the keeper gains, one per merged source, so
+    /// word-processor citations keep resolving after sources are trashed.
+    pub relations_to_add: Vec<String>,
     pub children_to_reparent: usize,
     pub skipped_duplicate_attachments: usize,
     pub confirm_required: bool,
@@ -367,8 +380,10 @@ pub struct MergeApplyResult {
     pub keeper_key: String,
     pub source_keys_trashed: Vec<String>,
     pub metadata_fields_filled: Vec<String>,
+    pub skipped_incompatible_fields: Vec<MergeSkippedField>,
     pub tags_added: Vec<String>,
     pub collections_added: Vec<String>,
+    pub relations_to_add: Vec<String>,
     pub children_reparented: usize,
     pub skipped_duplicate_attachments: usize,
 }
@@ -378,6 +393,68 @@ pub struct MergeApplyResult {
 pub enum MergeOperation {
     Preview(MergePreview),
     Applied(MergeApplyResult),
+}
+
+/// Review-priority marker for one `library dedupe` group. `Low` flags groups
+/// whose members might not be true duplicates (year spread > 1, or several
+/// distinct DOIs); detection recall is unchanged, the dry-run plan just asks
+/// for a closer look.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DedupeConfidence {
+    Normal,
+    Low,
+}
+
+/// Compact identity of one item inside a `library dedupe` plan group.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DedupeItemRef {
+    pub key: String,
+    pub item_type: String,
+    pub title: String,
+}
+
+/// Planned cleanup for one duplicate group: which item survives (`keeper`),
+/// why it was chosen (`reason`), and which items get merged into it and
+/// trashed (`absorb`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DedupeGroupPlan {
+    pub match_type: String,
+    pub confidence: DedupeConfidence,
+    /// Present only when `confidence` is `low`; names the trigger(s).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence_note: Option<String>,
+    pub keeper: DedupeItemRef,
+    /// The comparison layers that actually decided the keeper.
+    pub reason: String,
+    pub absorb: Vec<DedupeItemRef>,
+}
+
+/// Dry-run output of `library dedupe`: one planned merge per duplicate group.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DedupePlan {
+    pub groups: Vec<DedupeGroupPlan>,
+    pub total_groups: usize,
+    pub confirm_required: bool,
+}
+
+/// One group that could not be merged during `library dedupe --confirm`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DedupeGroupFailure {
+    pub keeper: String,
+    pub sources: Vec<String>,
+    pub error: String,
+}
+
+/// Result of `library dedupe --confirm`. A failed group never aborts the
+/// remaining groups; it lands in `failed` and the loop moves on.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DedupeApplyReport {
+    pub applied: Vec<MergeApplyResult>,
+    pub failed: Vec<DedupeGroupFailure>,
+    pub total_groups: usize,
+    pub applied_groups: usize,
+    pub failed_groups: usize,
 }
 
 /// The kind of local relationship an edge in the knowledge graph represents.

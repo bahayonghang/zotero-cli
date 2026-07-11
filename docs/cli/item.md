@@ -102,7 +102,9 @@ zot --json item merge KEEP001 DUPE001 --keep DUPE001 --confirm
 - 默认先 preview，不加 `--confirm` 不落库
 - `--keep` 用来指定哪一条留下；不传时默认保留第一个 key
 - 只支持 top-level bibliographic item
-- preview 会列出 metadata 补齐、tags / collections 新增、child re-parent 数、重复 attachment 跳过数
+- preview 会列出 metadata 补齐、tags / collections 新增、child re-parent 数、重复 attachment 跳过数，以及 `skipped_incompatible_fields` 和 `relations_to_add`
+- 不同 item type 的条目可以合并；keeper 保持自身类型，对该类型非法的源字段会被跳过并列进 `skipped_incompatible_fields`
+- `--confirm` 后 keeper 会得到指向每个被并条目的 `dc:replaces` relation，Word / LibreOffice 里已插入的引文不会断链；被并条目进 Trash，不做永久删除
 - 如果你是先从重复检测结果里合并，也可以继续走 `library duplicates-merge`
 
 ## note / tag / annotation / scite

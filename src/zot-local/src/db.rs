@@ -35,6 +35,18 @@ fn escape_like(value: &str) -> String {
     out
 }
 
+/// SQL fragment that drops items sitting in Zotero's trash, mirroring the
+/// `deletedItems` filter used by `search_notes`. Appended to search
+/// statements only when [`SearchOptions::exclude_trashed`] is set, so
+/// default `search`/`list_items` behavior still returns trashed items.
+fn trashed_exclusion(exclude_trashed: bool) -> &'static str {
+    if exclude_trashed {
+        " AND i.itemID NOT IN (SELECT itemID FROM deletedItems)"
+    } else {
+        ""
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortField {
     DateAdded,
@@ -68,6 +80,10 @@ pub struct SearchOptions {
     pub direction: SortDirection,
     pub limit: usize,
     pub offset: usize,
+    /// Drop items sitting in Zotero's trash (`deletedItems`). Defaults to
+    /// `false` so `search`/`list_items` keep returning trashed items;
+    /// duplicate detection opts in to avoid re-reporting cleaned-up groups.
+    pub exclude_trashed: bool,
 }
 
 impl Default for SearchOptions {
@@ -83,6 +99,7 @@ impl Default for SearchOptions {
             direction: SortDirection::Desc,
             limit: 50,
             offset: 0,
+            exclude_trashed: false,
         }
     }
 }
@@ -173,14 +190,16 @@ impl LocalLibrary {
         let mut item_ids: HashSet<i64> = HashSet::new();
 
         if options.query.is_empty() {
+            let sql = format!(
+                "SELECT i.itemID FROM items i
+                 JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+                 WHERE i.libraryID = ?1
+                 AND it.typeName NOT IN ('attachment','note','annotation'){}",
+                trashed_exclusion(options.exclude_trashed)
+            );
             let mut stmt = self
                 .conn
-                .prepare_cached(
-                    "SELECT i.itemID FROM items i
-                     JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
-                     WHERE i.libraryID = ?1
-                     AND it.typeName NOT IN ('attachment','note','annotation')",
-                )
+                .prepare_cached(&sql)
                 .map_err(sql_err("search-all"))?;
             let rows = stmt
                 .query_map(params![self.library_id], |row| row.get::<_, i64>(0))
@@ -190,10 +209,26 @@ impl LocalLibrary {
             }
         } else {
             let like = format!("%{}%", escape_like(&options.query));
-            self.collect_matching_item_ids_from_field_search(&like, &mut item_ids)?;
-            self.collect_matching_item_ids_from_creator_search(&like, &mut item_ids)?;
-            self.collect_matching_item_ids_from_tag_search(&like, &mut item_ids)?;
-            self.collect_matching_item_ids_from_fulltext_search(&like, &mut item_ids)?;
+            self.collect_matching_item_ids_from_field_search(
+                &like,
+                options.exclude_trashed,
+                &mut item_ids,
+            )?;
+            self.collect_matching_item_ids_from_creator_search(
+                &like,
+                options.exclude_trashed,
+                &mut item_ids,
+            )?;
+            self.collect_matching_item_ids_from_tag_search(
+                &like,
+                options.exclude_trashed,
+                &mut item_ids,
+            )?;
+            self.collect_matching_item_ids_from_fulltext_search(
+                &like,
+                options.exclude_trashed,
+                &mut item_ids,
+            )?;
         }
 
         if let Some(collection) = options.collection.as_deref() {
@@ -1082,7 +1117,16 @@ impl LocalLibrary {
         collection: Option<&str>,
         limit: usize,
     ) -> ZotResult<Vec<DuplicateGroup>> {
-        let items = self.list_items(collection, 10_000, 0)?;
+        // Trashed items must never join a duplicate group: cleaned-up
+        // duplicates would otherwise be re-reported on the next scan.
+        let items = self
+            .search(SearchOptions {
+                collection: collection.map(ToOwned::to_owned),
+                limit: 10_000,
+                exclude_trashed: true,
+                ..SearchOptions::default()
+            })?
+            .items;
         let mut groups = Vec::new();
         let mut seen: BTreeSet<String> = BTreeSet::new();
 
@@ -1583,18 +1627,21 @@ impl LocalLibrary {
     fn collect_matching_item_ids_from_field_search(
         &self,
         like: &str,
+        exclude_trashed: bool,
         item_ids: &mut HashSet<i64>,
     ) -> ZotResult<()> {
-        let mut stmt = self
-            .conn
-            .prepare_cached(
-                "SELECT DISTINCT i.itemID FROM items i
+        let sql = format!(
+            "SELECT DISTINCT i.itemID FROM items i
              JOIN itemData id ON i.itemID = id.itemID
              JOIN itemDataValues iv ON id.valueID = iv.valueID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE iv.value LIKE ?1 ESCAPE '\\' AND i.libraryID = ?2
-             AND it.typeName NOT IN ('attachment','note','annotation')",
-            )
+             AND it.typeName NOT IN ('attachment','note','annotation'){}",
+            trashed_exclusion(exclude_trashed)
+        );
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
             .map_err(sql_err("search-fields"))?;
         let rows = stmt
             .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
@@ -1608,18 +1655,21 @@ impl LocalLibrary {
     fn collect_matching_item_ids_from_creator_search(
         &self,
         like: &str,
+        exclude_trashed: bool,
         item_ids: &mut HashSet<i64>,
     ) -> ZotResult<()> {
-        let mut stmt = self
-            .conn
-            .prepare_cached(
-                "SELECT DISTINCT ic.itemID FROM itemCreators ic
+        let sql = format!(
+            "SELECT DISTINCT ic.itemID FROM itemCreators ic
              JOIN creators c ON ic.creatorID = c.creatorID
              JOIN items i ON ic.itemID = i.itemID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE (c.firstName LIKE ?1 ESCAPE '\\' OR c.lastName LIKE ?1 ESCAPE '\\') AND i.libraryID = ?2
-             AND it.typeName NOT IN ('attachment','note','annotation')",
-            )
+             AND it.typeName NOT IN ('attachment','note','annotation'){}",
+            trashed_exclusion(exclude_trashed)
+        );
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
             .map_err(sql_err("search-creators"))?;
         let rows = stmt
             .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
@@ -1633,18 +1683,21 @@ impl LocalLibrary {
     fn collect_matching_item_ids_from_tag_search(
         &self,
         like: &str,
+        exclude_trashed: bool,
         item_ids: &mut HashSet<i64>,
     ) -> ZotResult<()> {
-        let mut stmt = self
-            .conn
-            .prepare_cached(
-                "SELECT DISTINCT it.itemID FROM itemTags it
+        let sql = format!(
+            "SELECT DISTINCT it.itemID FROM itemTags it
              JOIN tags t ON it.tagID = t.tagID
              JOIN items i ON it.itemID = i.itemID
              JOIN itemTypes ity ON i.itemTypeID = ity.itemTypeID
              WHERE t.name LIKE ?1 ESCAPE '\\' AND i.libraryID = ?2
-             AND ity.typeName NOT IN ('attachment','note','annotation')",
-            )
+             AND ity.typeName NOT IN ('attachment','note','annotation'){}",
+            trashed_exclusion(exclude_trashed)
+        );
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
             .map_err(sql_err("search-tags"))?;
         let rows = stmt
             .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
@@ -1658,19 +1711,22 @@ impl LocalLibrary {
     fn collect_matching_item_ids_from_fulltext_search(
         &self,
         like: &str,
+        exclude_trashed: bool,
         item_ids: &mut HashSet<i64>,
     ) -> ZotResult<()> {
-        let mut stmt = self
-            .conn
-            .prepare_cached(
-                "SELECT DISTINCT ia.parentItemID FROM fulltextItemWords fw
+        let sql = format!(
+            "SELECT DISTINCT ia.parentItemID FROM fulltextItemWords fw
              JOIN fulltextWords w ON fw.wordID = w.wordID
              JOIN itemAttachments ia ON fw.itemID = ia.itemID
              JOIN items i ON ia.parentItemID = i.itemID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE w.word LIKE ?1 ESCAPE '\\' AND ia.parentItemID IS NOT NULL AND i.libraryID = ?2
-             AND it.typeName NOT IN ('attachment','note','annotation')",
-            )
+             AND it.typeName NOT IN ('attachment','note','annotation'){}",
+            trashed_exclusion(exclude_trashed)
+        );
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
             .map_err(sql_err("search-fulltext"))?;
         let rows = stmt
             .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
@@ -2408,6 +2464,12 @@ mod tests {
     }
 
     fn rich_fixture_library() -> TestFixture {
+        rich_fixture_library_with_extra_sql("")
+    }
+
+    /// Build the rich fixture, then apply `extra_sql` on top (e.g. moving a
+    /// seeded item into `deletedItems`) before the read-only open.
+    fn rich_fixture_library_with_extra_sql(extra_sql: &str) -> TestFixture {
         let dir = match tempfile::tempdir() {
             Ok(dir) => dir,
             Err(err) => panic!("tempdir failed: {err}"),
@@ -2688,6 +2750,11 @@ Original Date: 2017');
             "#,
         ) {
             panic!("seed rich fixture failed: {err}");
+        }
+        if !extra_sql.is_empty()
+            && let Err(err) = conn.execute_batch(extra_sql)
+        {
+            panic!("seed extra fixture sql failed: {err}");
         }
         drop(conn);
         let lib = match LocalLibrary::open(dir.path(), LibraryScope::User) {
@@ -3144,5 +3211,82 @@ Original Date: 2017');
                 keys.contains(&"ATTN001") && keys.contains(&"DUPE008")
             }));
         }
+    }
+
+    #[test]
+    fn find_duplicates_excludes_trashed_items() {
+        // R3 regression: DUPE008 duplicates ATTN001 by title and DOI. Once it
+        // sits in the trash the pair must vanish from every duplicate group,
+        // otherwise a completed cleanup would be re-reported on rescan.
+        let fixture = rich_fixture_library_with_extra_sql(
+            "INSERT INTO deletedItems VALUES (8, '2026-07-11 00:00:00');",
+        );
+        let lib = &fixture.lib;
+
+        for method in [
+            DuplicateMatchMethod::Title,
+            DuplicateMatchMethod::Doi,
+            DuplicateMatchMethod::Both,
+        ] {
+            let groups = match lib.find_duplicates(method, None, 10) {
+                Ok(groups) => groups,
+                Err(err) => panic!("find duplicates failed for {:?}: {err}", method),
+            };
+            assert!(
+                groups
+                    .iter()
+                    .flat_map(|group| group.items.iter())
+                    .all(|item| item.key != "DUPE008"),
+                "trashed DUPE008 must not appear in any duplicate group ({method:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn search_excludes_trashed_items_only_when_opted_in() {
+        // R3 scope control: TRSH007 is seeded in `deletedItems`. Default
+        // search (both the full-scan and the LIKE branch) keeps returning it;
+        // only `exclude_trashed: true` filters it out.
+        let fixture = rich_fixture_library();
+        let lib = &fixture.lib;
+
+        let default_all = match lib.search(SearchOptions::default()) {
+            Ok(result) => result,
+            Err(err) => panic!("default full-scan search failed: {err}"),
+        };
+        assert!(default_all.items.iter().any(|item| item.key == "TRSH007"));
+
+        let filtered_all = match lib.search(SearchOptions {
+            exclude_trashed: true,
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("filtered full-scan search failed: {err}"),
+        };
+        assert!(filtered_all.items.iter().all(|item| item.key != "TRSH007"));
+
+        let default_query = match lib.search(SearchOptions {
+            query: "Survey".to_string(),
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("default LIKE search failed: {err}"),
+        };
+        assert!(default_query.items.iter().any(|item| item.key == "TRSH007"));
+
+        let filtered_query = match lib.search(SearchOptions {
+            query: "Survey".to_string(),
+            exclude_trashed: true,
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("filtered LIKE search failed: {err}"),
+        };
+        assert!(
+            filtered_query
+                .items
+                .iter()
+                .all(|item| item.key != "TRSH007")
+        );
     }
 }
