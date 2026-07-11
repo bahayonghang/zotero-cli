@@ -55,4 +55,8 @@ _install-skills:
                   shutil.rmtree(destination)
               shutil.copytree(skill, destination)
 
-ci: fmt check clippy test
+skills-check:
+  python scripts/check_skill_mirrors.py
+  python -m unittest discover -s scripts/tests -p "test_*.py"
+
+ci: fmt check clippy test skills-check

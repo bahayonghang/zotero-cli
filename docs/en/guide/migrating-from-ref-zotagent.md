@@ -172,7 +172,7 @@ Main work:
 
 Constraints:
 
-- continue writing through the Zotero Web API only
+- keep these import writes on the Zotero Web API; do not expand the desktop bridge into a generic item creator
 - keep the current JSON envelope
 
 Verification:

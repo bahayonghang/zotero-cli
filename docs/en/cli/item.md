@@ -78,7 +78,7 @@ zot --json item attach ATTN001 --file supplement.pdf
 zot --json item download ATCH005 --output downloads/
 ```
 
-These commands mutate the library. Check first that:
+These commands mutate the library through the Zotero Web API. Check first that:
 
 1. `doctor` has been run
 2. `ZOT_API_KEY` is configured
@@ -93,21 +93,29 @@ Notes:
 
 ```bash
 zot --json item merge KEEP001 DUPE001
-zot --json item merge KEEP001 DUPE001 --confirm
-zot --json item merge KEEP001 DUPE001 --keep DUPE001 --confirm
+zot --json --write-backend desktop item merge KEEP001 DUPE001
+zot --json --write-backend desktop item merge KEEP001 DUPE001 --confirm
+zot --json --write-backend web item merge KEEP001 DUPE001 --confirm
 ```
 
 Notes:
 
 - it is preview-first by default; without `--confirm`, nothing is written
+- without an override it uses the effective profile's `write_backend`; global `--write-backend desktop|web` applies to one call only
+- preview and confirm must stay on the same backend; neither desktop nor Web failures fall back automatically
 - `--keep` selects which item survives; without it, the first key is kept
 - only top-level bibliographic items are supported
 - the preview reports metadata fills, added tags / collections, child re-parent count, skipped duplicate attachments, plus `skipped_incompatible_fields` and `relations_to_add`
 - items of different types can be merged; the keeper keeps its own type, and source fields invalid for that type are skipped and listed in `skipped_incompatible_fields`
 - on `--confirm` the keeper gains a `dc:replaces` relation for every merged item, so citations already inserted in Word / LibreOffice keep resolving; merged items go to Trash, not permanent deletion
+- desktop uses Zotero 9 native `mergeItems()` to combine metadata fill and structural merge in one transaction; the Web backend retains its existing multi-request, non-transactional semantics
+- JSON reports the actual `write_backend`. Desktop preview exposes only a redacted `plan_id`, never the raw plan token; an idempotent retry may return `already_applied`
+- desktop requires Zotero running, an installed and paired bridge, and an editable target library; failures stop with a structured bridge error
 - if you are merging from duplicate-detection results first, `library duplicates-merge` remains available
 
 ## note / tag / annotation / scite
+
+Note, tag, and annotation mutations still use the Web API. Do not describe Zotero Local HTTP or the desktop bridge as write transports for these commands.
 
 ### notes
 

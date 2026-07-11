@@ -110,7 +110,8 @@ zot --json library duplicates --method title
 zot --json library duplicates --method doi
 
 zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002
-zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
+zot --json --write-backend desktop library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
+zot --json --write-backend web library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
 ```
 
 `duplicates-merge` 默认是 dry-run。只有加 `--confirm` 才会真正：
@@ -129,6 +130,8 @@ zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --dupli
 - 不同 item type 的条目可以合并；keeper 保持自身类型，只补对该类型合法的字段
 - keeper 类型不支持的源字段会被跳过，并在 preview / applied 输出里以 `skipped_incompatible_fields`（字段名 + 来源 key）列出
 - `dc:replaces` 的 URI 会在同一份输出里以 `relations_to_add` 给出
+- 未显式覆盖时使用 effective profile 的 `write_backend`；preview/confirm 保持同一 backend，失败不自动 fallback
+- desktop 使用 Zotero 原生事务合并；Web backend 保持原有多请求写入语义
 
 如果你不是从重复候选里合并，而是手里已经有两条明确的 key，改走 [item](/cli/item) 里的 `item merge`。要一次清理整库，用下面的 `library dedupe`。
 
@@ -140,7 +143,8 @@ zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --dupli
 zot --json library dedupe
 zot --json library dedupe --method doi --limit 100
 zot --json library dedupe --collection COLL001
-zot --json library dedupe --collection COLL001 --confirm
+zot --json --write-backend desktop library dedupe --collection COLL001 --confirm
+zot --json --write-backend web library dedupe --collection COLL001 --confirm
 ```
 
 可用参数：
@@ -149,6 +153,7 @@ zot --json library dedupe --collection COLL001 --confirm
 - `--collection <key>`
 - `--limit <n>`（默认 50）
 - `--confirm`
+- `--include-low-confidence`
 
 不带 `--confirm` 时是纯本地 dry-run：不触网，也不需要写凭据。计划 JSON 包含 `groups[]`、`total_groups`、`confirm_required`，每组给出：
 
@@ -158,12 +163,14 @@ zot --json library dedupe --collection COLL001 --confirm
 - `reason`：keeper 胜出的依据——先按类型优先级（journalArticle = conferencePaper > book / bookSection > thesis > report > preprint > document > 其他），再依次以非空元数据字段数、本地附件数、更早的 `dateAdded`、key 顺序做 tie-break
 - `absorb`：被并入 keeper 并送入 Trash 的条目
 
-`--confirm` 会按计划逐组执行，走与 `duplicates-merge` 相同的合并引擎，包括 `dc:replaces` 与跨类型字段安全。单组失败不会中断其余组；结果包含 `applied`、`failed`、`total_groups`、`applied_groups`、`failed_groups`。
+`--confirm` 会按计划逐组执行，走与 `duplicates-merge` 相同的 selected backend，包括 `dc:replaces` 与跨类型字段安全。单组失败不会中断其余组。默认只执行 normal-confidence 组；low-confidence 进入 `skipped_low_confidence`，writer 不会收到这些组。结果包含 `applied`、`failed`、`skipped_low_confidence`、`total_groups`、`eligible_groups`、`applied_groups`、`failed_groups`、`skipped_low_confidence_groups`。
 
 说明：
 
 - 组内可以混合 item type（例如 preprint + conferencePaper）；keeper 保持自身类型
 - 整库 `--confirm` 之前，先复查 `confidence: "low"` 的组，或先用单个 `--collection` 小范围试
+- 普通 confirm 不授权 low-confidence。只有单独展示这些组并取得明确风险授权后，才使用 `--include-low-confidence`
+- desktop 需要 Zotero 正在运行、bridge 已安装配对且目标库可写；desktop 失败不检查 Web credentials，也不 fallback
 - 要对单个组手工指定 keeper，继续用 `library duplicates-merge`
 
 ## saved search

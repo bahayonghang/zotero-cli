@@ -1,12 +1,15 @@
 # Database Guidelines
 
-`zot-cli` does not write SQL directly. It chooses the correct runtime path and
-delegates database or remote work to the owning crate.
+`zot-cli` does not write SQL directly. It chooses the exact read or selected
+write backend and delegates work to the owning crate.
 
 ## Access Boundaries
 
 - Use `ctx.local_library()?` for local Zotero reads through `zot-local`.
 - Use `ctx.remote()?` for Zotero Web API writes through `zot-remote`.
+- Use `ctx.desktop()?` only after `ctx.write_backend()` selects desktop for an
+  implemented bridge operation. A desktop construction or operation failure
+  must never fall back to `ctx.remote()`.
 - Use workspace stores from `zot-local` for workspace TOML/index operations.
 - Use `ctx.library_index_path()` for the library-wide semantic index path.
 - Use `ctx.pdf_backend()` (`Arc<dyn PdfBackend>`) for PDF extraction; only
@@ -33,7 +36,7 @@ stays the only production entry point — it makes the seam replaceable:
 
 ## Doctor Gate
 
-Operational guidance in `AGENTS.md` and `skills/zot-skills/SKILL.md` requires
+Operational guidance in `AGENTS.md` and `skills/zot/SKILL.md` requires
 `zot --json doctor` first for:
 
 - New environments.
@@ -50,15 +53,28 @@ cargo run -q -p zot-cli -- --json doctor
 
 Use one invocation path consistently during an agent session.
 
+Doctor reports `local_sqlite_read`, `local_http_read`, `desktop_write`, and
+`web_write` independently plus `selected_write_backend`. Web credentials do
+not represent desktop capability, and Local HTTP remains read-only.
+
 ## Write Boundaries
 
-Command handlers can orchestrate Web API writes, but remote mutation logic
-belongs in `zot-remote`. Examples:
+Command handlers can orchestrate two distinct write paths:
+
+- `item merge`, `library duplicates-merge`, and `library dedupe` select a
+  `MergeWriter` from `ctx.write_backend()`. Desktop uses `zot-desktop`; Web
+  uses `zot-remote`. Preview and confirm keep the same backend.
+- Other current mutations use the Web API, and remote mutation logic belongs
+  in `zot-remote`.
+
+Examples:
 
 - `item note add/update/delete` calls `ctx.remote()?`.
 - `collection create/rename/delete/add-item/remove-item` calls `ctx.remote()?`.
 - `sync update-status --apply` calls `ctx.remote()?` only when apply is set.
 - Merge commands return a preview unless `--confirm` is set.
+- `library dedupe --confirm` skips low-confidence groups before writer calls
+  unless the user explicitly supplied `--include-low-confidence`.
 
 ## Code Example
 
@@ -78,6 +94,9 @@ if self.config.zotero.api_key.is_empty() {
 ## Avoid
 
 - Do not touch `zotero.sqlite` for writes.
+- Do not describe Zotero Local HTTP as a write transport.
+- Do not add automatic desktop/Web fallback around writer construction or
+  operation errors.
 - Do not make `--json` subcommand-local. It is a global flag and must be
   parsed before the subcommand.
 - Do not treat saved searches as result snapshots; they are remote query

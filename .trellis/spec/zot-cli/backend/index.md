@@ -42,4 +42,4 @@ doctor diagnostics, and orchestration between `zot-core`, `zot-local`, and
 - `src/zot-cli/src/format.rs`
 - `src/zot-cli/src/commands/`
 - `src/zot-cli/tests/workspace_version_guard.rs`
-- `skills/zot-skills/SKILL.md`
+- `skills/zot/SKILL.md`

@@ -98,7 +98,7 @@ zot completions powershell
 The Rust runtime is not a flat connector wrapper. Its boundaries are deliberate:
 
 - local reads come from `zotero.sqlite` plus attachment storage
-- writes go through the Zotero Web API only
+- merge/dedupe can use the paired desktop bridge or explicit Web backend; other mutations remain on the Zotero Web API
 - output stays centered on the stable JSON envelope
 - the primary mental model is `library` / `item` / `collection` / `workspace` / `sync`
 

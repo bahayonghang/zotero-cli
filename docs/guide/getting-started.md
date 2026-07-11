@@ -49,11 +49,26 @@ cargo run -q -p zot-cli -- --json doctor
 
 同一轮任务固定一种调用路径，不要混用。
 
-如果 `doctor` 里 `write_credentials` 是缺失状态，而你当前只做本地检索、PDF 读取、outline、批注读取或本地索引，这一项可以忽略。它只影响 Zotero Web API 写操作。
+`doctor` 会独立报告 `local_sqlite_read`、`local_http_read`、`desktop_write`、`web_write` 和 `selected_write_backend`。`write_credentials` 缺失只表示 Web 写不可用，不阻塞本地读取或已配对的 desktop merge/dedupe。
 
 如果 `doctor` 里 `pdf_backend.available=false`，但平台受支持，`zot` 会在第一次真正需要 Pdfium 的本地 PDF 读取时自动下载受管 Pdfium；`doctor` 本身不会触发下载。
 
-### 4. 需要远端写入或保存查询时，先配 config
+### 4. 本机 merge/dedupe 先安装并配对 bridge
+
+```bash
+zot --json bridge setup
+```
+
+这条命令只生成 XPI 并打开所在目录。接下来需要手动安装到 Zotero、重启 Zotero，再使用 Zotero UI 显示的五分钟单次配对码：
+
+```bash
+zot --json bridge pair PAIR-CODE
+zot --json bridge status
+```
+
+desktop 第一阶段只支持 `item merge`、`library duplicates-merge`、`library dedupe`。Zotero Local HTTP 和 `zotero.sqlite` 都只读，不能替代 bridge。
+
+### 5. 需要其他远端写入或保存查询时，先配 Web config
 
 如果你后面要做这些事：
 
@@ -119,7 +134,12 @@ zot --json workspace query llm-safety "主要的失败模式有哪些？" --mode
 重点关注这些字段：
 
 - `db_exists`
-- `write_credentials.configured`
+- `capabilities.local_sqlite_read`
+- `capabilities.local_http_read`
+- `capabilities.desktop_write`
+- `capabilities.web_write`
+- `selected_write_backend`
+- `write_credentials.configured`（只表示 Web 写凭据）
 - `pdf_backend.available`
 - `better_bibtex.available`
 - `libraries.feeds_available`
@@ -143,6 +163,7 @@ just ci
 2. `cargo check --workspace`
 3. `cargo clippy --workspace --all-targets -- -D warnings`
 4. `cargo test --workspace`
+5. canonical skill mirror check
 
 ## 配置位置
 

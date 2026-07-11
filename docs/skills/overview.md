@@ -18,6 +18,8 @@
 
 那就先走 skill，而不是先背命令。
 
+skill 会把本地 SQLite / Local HTTP 只读、desktop bridge merge/dedupe 和显式 Web API mutation 分开路由。desktop 失败不会自动 fallback，未实现的本机 tag/note/collection 写入也不会被虚构。
+
 如果你的目标是：
 
 - 从 Zotero collection、workspace 或显式 item key 里做真实文献驱动的 brainstorming

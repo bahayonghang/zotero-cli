@@ -26,7 +26,7 @@ features:
   - title: "skill 是主入口"
     details: "`skills/zot/SKILL.md` 是对 Agent 的工作流契约，Rust `zot` CLI 是它背后的执行层。"
   - title: "写入边界明确"
-    details: "文档会直接写清楚 doctor 前置、Web API 写权限、安全门，以及 `mcp serve` 当前不可用。"
+    details: "文档会直接写清楚四类 doctor capability、desktop merge/dedupe、Web API 写权限、安全门，以及 `mcp serve` 当前不可用。"
 ---
 
 ## 从这里开始

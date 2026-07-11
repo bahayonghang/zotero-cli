@@ -26,7 +26,7 @@ features:
   - title: "Skill first, runtime second"
     details: "`skills/zot/SKILL.md` is the workflow contract for agents. The Rust `zot` CLI is the execution layer behind it."
   - title: "Explicit write boundaries"
-    details: "Doctor gates, Web API write credentials, safety checks, and the current `mcp serve` limitation are documented directly."
+    details: "The four doctor capabilities, desktop merge/dedupe, Web API write credentials, safety gates, and the current `mcp serve` limitation are documented directly."
 ---
 
 ## Start here

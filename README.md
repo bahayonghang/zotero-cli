@@ -12,7 +12,7 @@
 
 **An agent-first Zotero skill runtime for querying, reading, and safely updating library content.**
 
-Turn an existing Zotero library into a dependable content surface for AI workflows: find items, read PDF evidence, extract annotations and notes, build topic workspaces, and perform gated Zotero Web API writes.
+Turn an existing Zotero library into a dependable content surface for AI workflows: find items, read PDF evidence, extract annotations and notes, build topic workspaces, merge duplicates through Zotero Desktop, and perform gated Zotero Web API writes.
 
 <img src="./docs/public/images/zot-icon.png" alt="zot icon" width="180" />
 
@@ -45,9 +45,9 @@ This matches the underlying products:
 - Zotero stores library data in `zotero.sqlite` plus attachment files under `storage/`.
 - Zotero items carry metadata, notes, tags, attachments, and other related data.
 - Zotero annotations can be turned into notes with links back to the source PDF page.
-- Zotero write operations go through the Web API with write-scoped credentials and version checks.
+- Zotero Desktop can perform allowlisted local merges through the paired bridge plugin; other supported mutations use the Web API with write-scoped credentials and version checks.
 
-`zot` mirrors that structure for agents: read local content directly, route mutations through the Web API, and keep the workflow explicit.
+`zot` mirrors that structure for agents: read local content directly, route merge/dedupe to the selected desktop or Web backend, keep other mutations on the Web API, and never fall back across backends automatically.
 
 ---
 
@@ -96,11 +96,26 @@ cargo run -q -p zot-cli -- --json doctor
 
 Keep one invocation path for the whole session. Do not switch back and forth.
 
-`doctor` reports `write_credentials` even in local-only setups. That field is optional for local reads and only matters for Zotero Web API writes.
+`doctor` reports `local_sqlite_read`, `local_http_read`, `desktop_write`, and `web_write` independently, plus the effective `selected_write_backend`. Web credentials are optional for local reads and paired desktop merge/dedupe.
 
 If local PDF reads need Pdfium and no compatible library is already present, `zot` will auto-download a managed Pdfium binary on the first local PDF read on supported Windows, macOS, and glibc Linux targets.
 
-### 4. Initialize config when you need writes or saved searches
+### 4. Pair Zotero Desktop for local merge/dedupe
+
+```bash
+zot --json bridge setup
+```
+
+`bridge setup` generates the bundled XPI and opens its folder. Install it manually in Zotero, restart Zotero, then use the five-minute, single-use code shown by the Zotero UI:
+
+```bash
+zot --json bridge pair PAIR-CODE
+zot --json bridge status
+```
+
+The desktop backend currently supports `item merge`, `library duplicates-merge`, and `library dedupe`. It is not a generic local write channel.
+
+### 5. Initialize Web config for other writes or saved searches
 
 If you plan to write notes, tags, collection membership, saved searches, or publication status:
 
@@ -142,6 +157,7 @@ If you need to debug or drive the runtime manually, these are the usual starting
 
 ```bash
 zot --json doctor
+zot --json bridge status
 zot --json library search "reward hacking" --limit 10
 zot --json library recent --count 10
 zot --json library dedupe --collection COLL001
@@ -194,8 +210,11 @@ Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.
 ## Current boundary
 
 - `zot mcp serve` is scaffolded and currently returns `mcp-not-implemented`. For now, use the skill plus the runtime.
-- Local reads come from the Zotero data directory. Mutations go through the Zotero Web API only.
-- Missing write credentials do not block local reads. They only block Zotero Web API writes.
+- Local SQLite and Zotero Local HTTP are read-only. Never use either as a write transport.
+- Paired desktop writes currently cover merge/dedupe only. Note, tag, collection, import, annotation, saved-search, and status-sync mutations still use the Web API.
+- `--write-backend desktop|web` selects one backend for the call. Errors stay on that backend; there is no automatic fallback.
+- Old profiles that have never paired the bridge continue to default to Web.
+- Merge/dedupe is preview-first. Batch dedupe skips low-confidence groups unless the user separately authorizes `--include-low-confidence` after reviewing them.
 - Annotation creation is PDF-first. It requires a local PDF, Pdfium support, and write credentials.
 - Citation-key lookup prefers Better BibTeX support and falls back to compatible local parsing when possible.
 - Legacy connector-style `search` / `fetch` ideas are intentionally mapped onto explicit `library`, `item`, `collection`, `workspace`, and `sync` workflows.
@@ -213,7 +232,7 @@ If you need to override Pdfium resolution manually:
 just ci
 ```
 
-This runs `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace`.
+This runs `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and the canonical skill mirror check.
 
 ---
 
