@@ -215,3 +215,134 @@ D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: 完成 Zotero 本机桥接基础
+
+**Date**: 2026-07-11
+**Task**: 完成 Zotero 本机桥接基础
+**Branch**: `dev`
+
+### Summary
+
+实现并验证 Zot Bridge 插件、Rust desktop client、配对撤销、doctor 能力与真实 Zotero 9.0.6 smoke；补充协议规范并归档子任务。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `eedb83f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 8: 完成本机 merge 与 dedupe 闭环
+
+**Date**: 2026-07-11
+**Task**: 完成本机 merge 与 dedupe 闭环
+**Branch**: `dev`
+
+### Summary
+
+实现 desktop/web writer 边界、Zotero 原生 merge preview/apply、dedupe 低置信度门与幂等重试；修复同 profile XPI 重装后的连接持久化并验证 installed CLI。just xpi-check、just ci、diff/secret scan 通过；用户明确豁免隔离 profile 真实 merge smoke，未执行任何真实合并写入。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `52cdef8` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 9: 完成本机写入 skill 与文档对齐
+
+**Date**: 2026-07-12
+**Task**: 完成本机写入 skill 与文档对齐
+**Branch**: `dev`
+
+### Summary
+
+更新 canonical zot skill 与 35 条路由评测，增加镜像漂移守卫，完成双语 desktop/Web 写入文档和 executable spec 对齐；iteration-2 安全断言 3/3，全部质量门通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8d3affa` | (see git log) |
+| `50f639e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 10: 归档本机安全写入父任务
+
+**Date**: 2026-07-12
+**Task**: 归档本机安全写入父任务
+**Branch**: `dev`
+
+### Summary
+
+三个第一阶段子任务均已完成并归档；完成父任务最终生命周期归档，无新增代码提交。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

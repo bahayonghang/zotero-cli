@@ -172,7 +172,7 @@
 
 约束：
 
-- 继续只通过 Zotero Web API 写库
+- 这组 import 能力继续只走 Zotero Web API；desktop bridge 不扩展成任意条目创建器
 - 保持现有 JSON envelope
 
 验证：

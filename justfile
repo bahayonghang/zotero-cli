@@ -24,6 +24,12 @@ test:
 build:
   cargo build --release -p zot-cli
 
+plugin-test:
+  node --test plugins/zot-bridge/tests/bootstrap.test.cjs
+
+xpi-check: plugin-test
+  cargo test -p zot-cli bridge_xpi
+
 docs:
   npm --prefix docs install
   npm --prefix docs run dev
@@ -49,4 +55,8 @@ _install-skills:
                   shutil.rmtree(destination)
               shutil.copytree(skill, destination)
 
-ci: fmt check clippy test
+skills-check:
+  python scripts/check_skill_mirrors.py
+  python -m unittest discover -s scripts/tests -p "test_*.py"
+
+ci: fmt check clippy test skills-check

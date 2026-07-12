@@ -17,6 +17,9 @@
 | “把附件 ATCH005 下载出来” | 下载本地附件 | 附件 key、目标路径、缺失文件 |
 | “给这篇文献加一条 note” | 受控写入 | 改了什么、是否具备写权限 |
 | “先预览再合并 KEEP001 和 DUPE001” | 手工 merge preview | 会补什么、会移动什么、何时真正写入 |
+| “没有 API key，用本机 Zotero 清理重复项” | desktop dedupe | bridge capability、preview、normal-only confirm |
+| “这次明确走 Zotero Web API 合并” | explicit Web merge | Web credentials、同 backend preview/confirm |
+| “直接 UPDATE zotero.sqlite” | 拒绝直接数据库写 | SQLite/Local HTTP 只读、受支持写通道 |
 | “先看当前配置和默认 profile” | 配置排障 | 当前 config、profile、缺什么 |
 
 ## 一句话判断
@@ -27,7 +30,10 @@
 - 明确说“保存条件”“以后还要反复用”：优先理解成 saved search
 - 明确说“下载附件”“导出文件”：优先理解成附件面
 - 明确说“先预览再合并”：优先理解成 `item merge`，不是直接 `duplicates-merge`
-- 任何写入：先过安全门
+- 本地只读请求：不启动 bridge，也不要求 Web key
+- 任何写入：先过 doctor，再按 explicit override 或 effective `selected_write_backend` 选择一个后端
+- desktop 当前只支持 merge/dedupe；tag/note/collection 等请求不能虚构本机写能力
+- backend 错误不自动 fallback；low-confidence 默认 skip，不自行追加 `--include-low-confidence`
 - 任何“为什么不工作”：先过 doctor / config
 
 ## 什么时候先跑 doctor
@@ -41,6 +47,8 @@
 - citation key 查询
 - 配置排障
 - 用户反馈“为什么不工作”
+
+重点看 `capabilities.local_sqlite_read`、`local_http_read`、`desktop_write`、`web_write` 和 `selected_write_backend`，不要只看 Web `write_credentials`。
 
 ## skills 页和 CLI 页的分工
 

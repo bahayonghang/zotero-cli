@@ -8,8 +8,8 @@ use crate::cli::{
     LibraryCommand, LibrarySavedSearchCommand, LibrarySavedSearchCreateArgs,
     LibrarySavedSearchDeleteArgs, LibrarySemanticIndexArgs, LibrarySemanticSearchArgs,
 };
-use crate::commands::item::merge::merge_item_set;
-use crate::commands::library_dedupe::{RemoteGroupMerger, apply_dedupe_plan, build_dedupe_plan};
+use crate::commands::item::merge::{merge_item_set, selected_merge_writer};
+use crate::commands::library_dedupe::{WriterGroupMerger, apply_dedupe_plan, build_dedupe_plan};
 use crate::context::AppContext;
 use crate::format::{EnvelopeMetaSeed, print_items, print_stats};
 use crate::output::CommandOutput;
@@ -202,12 +202,17 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 args.collection.as_deref(),
                 args.limit,
             )?;
-            let plan = build_dedupe_plan(&library, &groups)?;
+            let plan = build_dedupe_plan(
+                &library,
+                &groups,
+                ctx.write_backend(),
+                args.include_low_confidence,
+            )?;
             if args.confirm {
                 // Only the apply path needs write credentials; the default
                 // dry-run stays fully local.
-                let remote = ctx.remote()?;
-                let report = apply_dedupe_plan(&RemoteGroupMerger(&remote), &plan).await;
+                let writer = selected_merge_writer(ctx)?;
+                let report = apply_dedupe_plan(&WriterGroupMerger(writer.as_ref()), &plan).await;
                 CommandOutput::new(ctx, report, None, |report| {
                     println!(
                         "{}",
@@ -427,7 +432,8 @@ async fn merge_duplicates(
         }
         .into());
     }
-    merge_item_set(&ctx.remote()?, keeper_key, &duplicates, confirm).await
+    let writer = selected_merge_writer(ctx)?;
+    merge_item_set(writer.as_ref(), keeper_key, &duplicates, confirm).await
 }
 
 #[cfg(test)]

@@ -39,6 +39,14 @@ pub enum ZotError {
         status: Option<u16>,
     },
 
+    #[error("Desktop bridge error: {message}")]
+    DesktopBridge {
+        code: String,
+        message: String,
+        hint: Option<String>,
+        status: Option<u16>,
+    },
+
     #[error("PDF error: {message}")]
     Pdf {
         code: String,
@@ -90,6 +98,16 @@ impl ZotError {
                 hint: hint.clone(),
             },
             ZotError::Remote {
+                code,
+                message,
+                hint,
+                ..
+            } => ErrorPayload {
+                code: code.clone(),
+                message: message.clone(),
+                hint: hint.clone(),
+            },
+            ZotError::DesktopBridge {
                 code,
                 message,
                 hint,

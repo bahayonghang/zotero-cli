@@ -24,6 +24,7 @@ fn workspace_internal_dependencies_are_centralized() {
 
     // 1.3 校验内部 crate 只保留 path，不再手写 version
     assert_workspace_dependency(workspace_dependencies, "zot-core", "src/zot-core");
+    assert_workspace_dependency(workspace_dependencies, "zot-desktop", "src/zot-desktop");
     assert_workspace_dependency(workspace_dependencies, "zot-local", "src/zot-local");
     assert_workspace_dependency(workspace_dependencies, "zot-remote", "src/zot-remote");
 
@@ -49,8 +50,10 @@ fn workspace_internal_dependencies_are_centralized() {
     assert_member_dependencies(
         &workspace_root,
         "src/zot-cli/Cargo.toml",
-        &["zot-core", "zot-local", "zot-remote"],
+        &["zot-core", "zot-desktop", "zot-local", "zot-remote"],
     );
+
+    assert_member_dependencies(&workspace_root, "src/zot-desktop/Cargo.toml", &["zot-core"]);
 
     eprintln!("成员 crate 的依赖继承方式校验完成");
 }

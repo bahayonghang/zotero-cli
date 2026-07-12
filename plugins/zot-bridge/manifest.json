@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Zot Bridge",
+  "version": "0.6.0",
+  "description": "Authenticated localhost bridge for safe, allowlisted Zotero desktop operations.",
+  "author": "bahayonghang",
+  "applications": {
+    "zotero": {
+      "id": "zot-bridge@bahayonghang",
+      "update_url": "https://github.com/bahayonghang/zotero-cli/releases/latest/download/zot-bridge-update.json",
+      "strict_min_version": "9.0",
+      "strict_max_version": "9.*"
+    }
+  }
+}

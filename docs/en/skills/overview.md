@@ -18,6 +18,8 @@ If your goal is to:
 
 start from the skill, not the command list.
 
+The skill keeps local SQLite / Local HTTP reads, desktop-bridge merge/dedupe, and explicit Web API mutations as separate routes. Desktop failures do not fall back automatically, and unsupported local tag, note, or collection writes are never invented.
+
 If your goal is to:
 
 - brainstorm from real Zotero collections, workspaces, or explicit item keys

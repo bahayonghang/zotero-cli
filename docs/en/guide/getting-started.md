@@ -49,11 +49,26 @@ cargo run -q -p zot-cli -- --json doctor
 
 Pick one invocation path and keep it consistent for the session.
 
-If `doctor` shows missing `write_credentials` and you only need local search, PDF reads, outlines, annotation reads, or local indexing, that is safe to ignore. Those credentials only matter for Zotero Web API writes.
+`doctor` reports `local_sqlite_read`, `local_http_read`, `desktop_write`, `web_write`, and `selected_write_backend` independently. Missing `write_credentials` means Web writes are unavailable; it does not block local reads or paired desktop merge/dedupe.
 
 If `doctor` shows `pdf_backend.available=false` on a supported platform, `zot` will auto-download a managed Pdfium binary the first time a local PDF read actually needs it. `doctor` itself does not trigger the download.
 
-### 4. Configure writes and saved-search support when needed
+### 4. Install and pair the bridge for local merge/dedupe
+
+```bash
+zot --json bridge setup
+```
+
+This only generates the XPI and opens its folder. Install it manually in Zotero, restart Zotero, then use the five-minute, single-use code shown by Zotero UI:
+
+```bash
+zot --json bridge pair PAIR-CODE
+zot --json bridge status
+```
+
+The first desktop release supports only `item merge`, `library duplicates-merge`, and `library dedupe`. Zotero Local HTTP and `zotero.sqlite` remain read-only and cannot replace the bridge.
+
+### 5. Configure Web writes and saved-search support when needed
 
 If you plan to:
 
@@ -119,7 +134,12 @@ Run `doctor` first when:
 Pay special attention to:
 
 - `db_exists`
-- `write_credentials.configured`
+- `capabilities.local_sqlite_read`
+- `capabilities.local_http_read`
+- `capabilities.desktop_write`
+- `capabilities.web_write`
+- `selected_write_backend`
+- `write_credentials.configured` (Web writes only)
 - `pdf_backend.available`
 - `better_bibtex.available`
 - `libraries.feeds_available`
@@ -143,6 +163,7 @@ just ci
 2. `cargo check --workspace`
 3. `cargo clippy --workspace --all-targets -- -D warnings`
 4. `cargo test --workspace`
+5. canonical skill mirror check
 
 ## Configuration
 

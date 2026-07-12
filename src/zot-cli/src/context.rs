@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
-use zot_core::{AppConfig, LibraryScope};
+use zot_core::{AppConfig, LibraryScope, WriteBackend};
+use zot_desktop::DesktopClient;
 use zot_local::{LocalLibrary, PdfBackend, PdfiumBackend};
 use zot_remote::{HttpRuntime, ZoteroRemote};
 
@@ -37,7 +38,10 @@ impl fmt::Debug for AppContext {
 impl AppContext {
     pub(crate) fn from_cli(cli: &Cli) -> Result<Self> {
         let scope = zot_core::parse_library_scope(&cli.library)?;
-        let config = AppConfig::load(cli.profile.as_deref())?;
+        let mut config = AppConfig::load(cli.profile.as_deref())?;
+        if let Some(write_backend) = cli.write_backend {
+            config.zotero.write_backend = write_backend.into();
+        }
         let http = Arc::new(HttpRuntime::new()?);
         Ok(Self {
             json: cli.json,
@@ -83,6 +87,14 @@ impl AppContext {
             &self.config.zotero.api_key,
             self.scope.clone(),
         )
+    }
+
+    pub(crate) fn desktop(&self) -> zot_core::ZotResult<DesktopClient> {
+        DesktopClient::new()
+    }
+
+    pub(crate) fn write_backend(&self) -> WriteBackend {
+        self.config.zotero.write_backend
     }
 
     pub(crate) fn library_index_path(&self) -> PathBuf {

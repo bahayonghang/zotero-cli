@@ -49,8 +49,9 @@ impl ZoteroRemote {
     /// Construct a client pointed at an explicit base URL (fake server in
     /// tests), bypassing the `ZOT_ZOTERO_API_BASE` env override so parallel
     /// tests never race on process-global environment state.
-    #[cfg(test)]
-    fn with_base_url(
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn with_base_url_for_tests(
         runtime: &HttpRuntime,
         library_id: impl Into<String>,
         api_key: &str,
@@ -875,7 +876,7 @@ mod tests {
     use crate::test_support::spawn_server;
 
     fn client(base_url: String) -> ZoteroRemote {
-        ZoteroRemote::with_base_url(
+        ZoteroRemote::with_base_url_for_tests(
             &HttpRuntime::default(),
             "12345",
             "test-key",
@@ -890,7 +891,7 @@ mod tests {
         // `dc:replaces` relations must carry the canonical zotero.org URI,
         // never the (overridable) API base URL.
         let runtime = HttpRuntime::default();
-        let user = ZoteroRemote::with_base_url(
+        let user = ZoteroRemote::with_base_url_for_tests(
             &runtime,
             "12345",
             "test-key",
@@ -903,7 +904,7 @@ mod tests {
             "http://zotero.org/users/12345/items/ABCD1234"
         );
 
-        let group = ZoteroRemote::with_base_url(
+        let group = ZoteroRemote::with_base_url_for_tests(
             &runtime,
             "67890",
             "test-key",

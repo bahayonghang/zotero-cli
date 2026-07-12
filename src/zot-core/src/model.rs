@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::config::WriteBackend;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Creator {
     pub first_name: String,
@@ -361,6 +363,9 @@ pub struct MergeSkippedField {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MergePreview {
+    pub write_backend: WriteBackend,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_id: Option<String>,
     pub keeper_key: String,
     pub source_keys: Vec<String>,
     pub metadata_fields_to_fill: Vec<MergeFieldFill>,
@@ -377,6 +382,9 @@ pub struct MergePreview {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MergeApplyResult {
+    pub write_backend: WriteBackend,
+    #[serde(default)]
+    pub already_applied: bool,
     pub keeper_key: String,
     pub source_keys_trashed: Vec<String>,
     pub metadata_fields_filled: Vec<String>,
@@ -433,6 +441,8 @@ pub struct DedupeGroupPlan {
 /// Dry-run output of `library dedupe`: one planned merge per duplicate group.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DedupePlan {
+    pub write_backend: WriteBackend,
+    pub include_low_confidence: bool,
     pub groups: Vec<DedupeGroupPlan>,
     pub total_groups: usize,
     pub confirm_required: bool,
@@ -450,11 +460,15 @@ pub struct DedupeGroupFailure {
 /// remaining groups; it lands in `failed` and the loop moves on.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DedupeApplyReport {
+    pub write_backend: WriteBackend,
     pub applied: Vec<MergeApplyResult>,
     pub failed: Vec<DedupeGroupFailure>,
+    pub skipped_low_confidence: Vec<DedupeGroupPlan>,
     pub total_groups: usize,
+    pub eligible_groups: usize,
     pub applied_groups: usize,
     pub failed_groups: usize,
+    pub skipped_low_confidence_groups: usize,
 }
 
 /// The kind of local relationship an edge in the knowledge graph represents.

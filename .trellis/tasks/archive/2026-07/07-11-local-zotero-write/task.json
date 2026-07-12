@@ -1,0 +1,30 @@
+{
+  "id": "local-zotero-write",
+  "name": "local-zotero-write",
+  "title": "Zotero 本机安全写入与 skill 路由优化",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "lyh",
+  "assignee": "lyh",
+  "createdAt": "2026-07-11",
+  "completedAt": "2026-07-12",
+  "branch": null,
+  "base_branch": "dev",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-11-zotero-bridge-foundation",
+    "07-11-local-merge-dedupe",
+    "07-11-local-write-skill-docs"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

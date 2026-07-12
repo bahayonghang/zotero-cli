@@ -110,7 +110,8 @@ zot --json library duplicates --method title
 zot --json library duplicates --method doi
 
 zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002
-zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
+zot --json --write-backend desktop library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
+zot --json --write-backend web library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
 ```
 
 `duplicates-merge` is dry-run by default. Only `--confirm` performs the actual merge:
@@ -129,6 +130,8 @@ Notes:
 - items of different types can be merged; the keeper keeps its own type, and only fields valid for that type are filled
 - source fields the keeper's type does not support are skipped and reported as `skipped_incompatible_fields` (field + source key) in both preview and applied output
 - the `dc:replaces` URIs appear as `relations_to_add` in the same output
+- without an override the effective profile's `write_backend` is used; preview and confirm stay on one backend, with no automatic fallback
+- desktop uses Zotero's native transaction; the Web backend retains its existing multi-request write semantics
 
 If you already have two explicit item keys rather than a duplicate-candidate set, switch to `item merge` on the [item](/en/cli/item) page. To clean the whole library in one pass, use `library dedupe` below.
 
@@ -140,7 +143,8 @@ If you already have two explicit item keys rather than a duplicate-candidate set
 zot --json library dedupe
 zot --json library dedupe --method doi --limit 100
 zot --json library dedupe --collection COLL001
-zot --json library dedupe --collection COLL001 --confirm
+zot --json --write-backend desktop library dedupe --collection COLL001 --confirm
+zot --json --write-backend web library dedupe --collection COLL001 --confirm
 ```
 
 Available options:
@@ -149,6 +153,7 @@ Available options:
 - `--collection <key>`
 - `--limit <n>` (default 50)
 - `--confirm`
+- `--include-low-confidence`
 
 Without `--confirm` the command is a pure local dry-run: no network access, no write credentials required. The plan JSON contains `groups[]`, `total_groups`, and `confirm_required`; each group carries:
 
@@ -158,12 +163,14 @@ Without `--confirm` the command is a pure local dry-run: no network access, no w
 - `reason`: why the keeper won — type priority first (journalArticle = conferencePaper > book / bookSection > thesis > report > preprint > document > others), then tie-breaks on non-empty metadata fields, local attachment count, earlier `dateAdded`, and finally key order
 - `absorb`: the items merged into the keeper and moved to Trash
 
-`--confirm` applies the plan group by group through the same merge engine as `duplicates-merge`, including `dc:replaces` and cross-type field safety. One failed group does not abort the rest; the report contains `applied`, `failed`, `total_groups`, `applied_groups`, and `failed_groups`.
+`--confirm` applies the plan group by group through the same selected backend as `duplicates-merge`, including `dc:replaces` and cross-type field safety. One failed group does not abort the rest. By default only normal-confidence groups run; low-confidence groups enter `skipped_low_confidence` and are never sent to the writer. The report includes `applied`, `failed`, `skipped_low_confidence`, `total_groups`, `eligible_groups`, `applied_groups`, `failed_groups`, and `skipped_low_confidence_groups`.
 
 Notes:
 
 - groups may mix item types (for example preprint + conferencePaper); the keeper keeps its own type
 - review `confidence: "low"` groups, or start with a single `--collection`, before a whole-library `--confirm`
+- ordinary confirmation does not authorize low-confidence groups. Use `--include-low-confidence` only after showing those groups separately and obtaining explicit risk authorization
+- desktop requires Zotero running, an installed and paired bridge, and an editable library; desktop failures do not consult Web credentials or fall back
 - to hand-pick the keeper of a single group, stay with `library duplicates-merge`
 
 ## saved search
