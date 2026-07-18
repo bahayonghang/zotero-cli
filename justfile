@@ -3,6 +3,9 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 default:
   @just --list
 
+help:
+  @just --list
+
 version-check:
   cargo test -p zot-cli --test workspace_version_guard
 
