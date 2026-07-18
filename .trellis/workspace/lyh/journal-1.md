@@ -412,3 +412,36 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: Optimize zot connector skill
+
+**Date**: 2026-07-18
+**Task**: Optimize zot connector skill
+**Branch**: `dev`
+
+### Summary
+
+重写 canonical zot skill 的 connector import 与 Web mutation 路由，同步 35 条 eval/test fixture 和 near-neighbor 负例；完成 just install、skills-check、just ci 与 diff 检查，归档子任务 3，保留父任务供最终集成复核。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7fd1938` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
