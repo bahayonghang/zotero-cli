@@ -1,6 +1,6 @@
 ---
 name: zot
-description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。
+description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v0.6.0)
 ---
 
 # zot

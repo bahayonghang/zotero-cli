@@ -1,6 +1,6 @@
 ---
 name: zot-brainstorm
-description: Use when the user wants Zotero-backed research brainstorming, gap analysis, limitation analysis, innovation directions, or next-step research ideas from existing Zotero collections, workspaces, or explicit item keys. This skill turns real Zotero references into traceable Markdown and HTML reports. Do not use for ordinary Zotero lookup, library maintenance, generic web literature search, citation-format teaching, or paper summaries that are not grounded in Zotero sources.
+description: Use when the user wants Zotero-backed research brainstorming, gap analysis, limitation analysis, innovation directions, or next-step research ideas from existing Zotero collections, workspaces, or explicit item keys. This skill turns real Zotero references into traceable Markdown and HTML reports. Do not use for ordinary Zotero lookup, library maintenance, generic web literature search, citation-format teaching, or paper summaries that are not grounded in Zotero sources. (v0.6.0)
 ---
 
 # zot-brainstorm
