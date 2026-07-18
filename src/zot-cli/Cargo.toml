@@ -8,6 +8,9 @@ repository.workspace = true
 rust-version.workspace = true
 description = "The Rust-first Zotero CLI for researchers, terminal-lovers, and AI agents."
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "zot"
 path = "src/main.rs"
