@@ -45,9 +45,9 @@
 - Zotero 的库数据在 `zotero.sqlite` 和 `storage/` 附件目录里。
 - 条目本身携带 metadata、notes、tags、attachments 等结构化内容。
 - Zotero 批注可以进入 note，并带回源 PDF 页面的链接。
-- 配对后的 desktop bridge 可调用 Zotero 原生合并；其他已支持 mutation 走带写权限和版本控制的 Web API。
+- Zotero Desktop 内置 connector 可把 BibTeX / RIS 导入当前选中的可写目标；其他已支持 mutation 走带写权限和版本控制的 Web API。
 
-`zot` 把这套模型变成 Agent 可稳定调用的工作流：本地直读内容，merge/dedupe 按选定的 desktop 或 Web backend 执行，其他 mutation 保持 Web 路径，backend 失败后绝不自动切换。
+`zot` 把这套模型变成 Agent 可稳定调用的工作流：本地直读内容，通过内置 connector 新增导入，merge/dedupe 与其他 mutation 统一走 Web API。
 
 ---
 
@@ -96,26 +96,20 @@ cargo run -q -p zot-cli -- --json doctor
 
 同一轮任务里固定一种调用方式，不要来回切。
 
-`doctor` 会分别报告 `local_sqlite_read`、`local_http_read`、`desktop_write`、`web_write`，并给出有效的 `selected_write_backend`。本地读取和已配对的 desktop merge/dedupe 不要求 Web 凭据。
+`doctor` 会分别报告 `local_sqlite_read`、`local_http_read`、`connector_write` 和 `web_write`。本地读取与 connector 导入不要求 Web 凭据；merge/dedupe 与其他 Web API mutation 需要写凭据。
 
 如果本地 PDF 读取需要 Pdfium，而当前机器上还没有可用库，`zot` 会在受支持的 Windows、macOS、glibc Linux 平台上，在第一次本地 PDF 读取时自动下载受管 Pdfium。
 
-### 4. 本机 merge/dedupe 先配对 Zotero Desktop
+### 4. 通过 Zotero Desktop 内置 connector 导入
 
 ```bash
-zot --json bridge setup
+zot --json item import --file references.bib
+zot --json item import --file references.bib --confirm
 ```
 
-`bridge setup` 只生成内置 XPI 并打开所在目录。用户需要在 Zotero 里手动安装、重启，然后使用 Zotero UI 显示的五分钟单次配对码：
+无需安装插件或配对。Zotero 必须正在运行，且其 UI 当前选中的 library / collection 必须可写。不加 `--confirm` 时只校验并预览，不发送导入记录。
 
-```bash
-zot --json bridge pair PAIR-CODE
-zot --json bridge status
-```
-
-desktop backend 当前只支持 `item merge`、`library duplicates-merge` 和 `library dedupe`，不是任意本机写通道。
-
-### 5. 其他写入或 saved search 使用 Web config
+### 5. merge/dedupe 与其他写入使用 Web config
 
 如果你后面要写 note、tag、collection 关系、saved search 或 publication status：
 
@@ -157,7 +151,6 @@ skill 会把这些请求路由到 `library`、`item`、`collection`、`workspace
 
 ```bash
 zot --json doctor
-zot --json bridge status
 zot --json library search "reward hacking" --limit 10
 zot --json library recent --count 10
 zot --json library dedupe --collection COLL001
@@ -211,9 +204,9 @@ just docs
 
 - `zot mcp serve` 现在只是 scaffold，会返回 `mcp-not-implemented`。当前应走 skill + runtime。
 - 本地 SQLite 和 Zotero Local HTTP 都只读，不能作为写通道。
-- desktop 写入当前只覆盖 merge/dedupe；note、tag、collection、import、annotation、saved-search、status-sync mutation 仍走 Web API。
-- `--write-backend desktop|web` 为当前调用选择一个后端；失败保留在原后端，不自动 fallback。
-- 从未配对 bridge 的旧 profile 继续默认使用 Web。
+- 内置 connector 只负责把新的 BibTeX / RIS 记录导入 Zotero UI 当前选中的可写目标，不能更新或合并已有条目。
+- merge/dedupe、note、tag、collection、Web import、annotation、saved-search、status-sync mutation 统一走 Zotero Web API。
+- 旧 `desktop_bridge` / `write_backend` 配置会被忽略；`doctor` 会给出迁移提示，方便安全删除。
 - merge/dedupe 默认先 preview；批量 dedupe 默认跳过 low-confidence，只有单独展示并取得明确风险授权后才可使用 `--include-low-confidence`。
 - annotation 创建是 PDF-first，依赖本地 PDF、Pdfium 和写凭证。
 - citation key 查询优先走 Better BibTeX，可用时补强；否则退回兼容的本地解析。

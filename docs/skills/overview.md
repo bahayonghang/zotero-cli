@@ -18,7 +18,7 @@
 
 那就先走 skill，而不是先背命令。
 
-skill 会把本地 SQLite / Local HTTP 只读、desktop bridge merge/dedupe 和显式 Web API mutation 分开路由。desktop 失败不会自动 fallback，未实现的本机 tag/note/collection 写入也不会被虚构。
+skill 会把本地 SQLite / Local HTTP 只读、connector 新增导入和 Web API mutation 分开路由。connector 不会被描述成已有条目的通用更新或 merge 通道，未实现的本机 tag/note/collection 写入也不会被虚构。
 
 如果你的目标是：
 

@@ -35,9 +35,9 @@
 
 ## Execution rules
 
-1. In a new environment or before any write, run `zot --json doctor` and inspect the four capabilities plus `selected_write_backend`
+1. In a new environment or before any write, run `zot --json doctor` and inspect the four capabilities
 2. If the user only wants inspection or analysis, do not mutate the library
-3. If the user names desktop or Web, use only that backend; otherwise use the effective profile. Keep failures on the selected backend and never fall back automatically
+3. Only new BibTeX/RIS imports can use the connector; merge/dedupe and all other mutations use the Web API
 4. Confirm intent for these actions before proceeding:
    - `item trash`
    - `item note delete`
@@ -47,26 +47,25 @@
    - `library duplicates-merge --confirm`
    - `library dedupe --confirm`
    - `sync update-status --apply`
-5. Preview merge/dedupe first, report keeper, sources, backend, confidence, and skipped groups, then wait for confirmation
+5. Preview merge/dedupe first, report keeper, sources, confidence, and skipped groups, then wait for confirmation
 6. `library dedupe --confirm` skips low-confidence groups by default. Ordinary confirmation is not risk authorization; add `--include-low-confidence` only after showing those groups separately and obtaining explicit authorization
 
 ## Read/write boundary
 
 - Local reads: `zotero.sqlite`, Zotero Local HTTP, attachment storage, and local index sidecars
-- Desktop writes: the paired plugin currently supports only `item merge`, `library duplicates-merge`, and `library dedupe`
-- Web writes: note, tag, collection, import, annotation, saved-search, status-sync, and explicitly selected Web merge/dedupe
+- Connector writes: only new BibTeX/RIS imports, with the selected Zotero UI target rechecked for writability immediately before confirmation
+- Web writes: merge/dedupe, note, tag, collection, Web import, annotation, saved-search, and status-sync
 
 **Never write directly to `zotero.sqlite`, and never describe Local HTTP as a write transport.**
 
 ## What to do when write access is missing
 
-If `doctor` shows that the selected capability is unavailable:
+If `doctor` shows that the required capability is unavailable:
 
 - stay in read-only mode
-- for desktop, distinguish Zotero stopped, plugin missing, unpaired, auth/protocol, and profile-mismatch states and give recovery for that backend
+- for connector import, start Zotero and select a writable library or collection in its UI
 - for Web, identify missing `ZOT_LIBRARY_ID` / `ZOT_API_KEY`
 - do not pretend the action succeeded
-- do not switch backends on the user's behalf
 
 If the task is configuration troubleshooting:
 
@@ -74,12 +73,12 @@ If the task is configuration troubleshooting:
 - use `config init` or `config set` only when the user wants the environment changed
 - treat profile switching as a side effect too
 
-## Bridge installation and secret boundary
+## Connector target boundary
 
-- `bridge setup` only generates the XPI and opens its folder; it does not install it or modify a Zotero profile
-- the pairing code expires after five minutes, is single-use, and is shown only by Zotero UI
-- never record a real code, desktop token, API key, or raw plan token in logs, prompts, issues, fixtures, or docs
-- `bridge revoke` removes the current authorization; upgrading the plugin in the same profile preserves connection identity
+- the connector needs no plugin, pairing code, or token
+- both dry-run and confirm inspect the current target; confirm rechecks `editable` / `libraryEditable` immediately before import
+- a read-only target must fail closed before any import request is sent
+- never record an API key in logs, prompts, issues, fixtures, or docs
 
 ## Extra notes for annotations and attach mode
 

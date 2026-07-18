@@ -110,8 +110,7 @@ zot --json library duplicates --method title
 zot --json library duplicates --method doi
 
 zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002
-zot --json --write-backend desktop library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
-zot --json --write-backend web library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
+zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
 ```
 
 `duplicates-merge` 默认是 dry-run。只有加 `--confirm` 才会真正：
@@ -130,8 +129,8 @@ zot --json --write-backend web library duplicates-merge --keeper KEEP001 --dupli
 - 不同 item type 的条目可以合并；keeper 保持自身类型，只补对该类型合法的字段
 - keeper 类型不支持的源字段会被跳过，并在 preview / applied 输出里以 `skipped_incompatible_fields`（字段名 + 来源 key）列出
 - `dc:replaces` 的 URI 会在同一份输出里以 `relations_to_add` 给出
-- 未显式覆盖时使用 effective profile 的 `write_backend`；preview/confirm 保持同一 backend，失败不自动 fallback
-- desktop 使用 Zotero 原生事务合并；Web backend 保持原有多请求写入语义
+- preview/confirm 统一使用 Zotero Web API；确认前必须配置 `library_id` 与 `api_key`
+- Web API 保持多请求、非事务写入语义
 
 如果你不是从重复候选里合并，而是手里已经有两条明确的 key，改走 [item](/cli/item) 里的 `item merge`。要一次清理整库，用下面的 `library dedupe`。
 
@@ -143,8 +142,7 @@ zot --json --write-backend web library duplicates-merge --keeper KEEP001 --dupli
 zot --json library dedupe
 zot --json library dedupe --method doi --limit 100
 zot --json library dedupe --collection COLL001
-zot --json --write-backend desktop library dedupe --collection COLL001 --confirm
-zot --json --write-backend web library dedupe --collection COLL001 --confirm
+zot --json library dedupe --collection COLL001 --confirm
 ```
 
 可用参数：

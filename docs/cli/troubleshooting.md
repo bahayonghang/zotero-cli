@@ -16,15 +16,15 @@ cargo run -q -p zot-cli -- --json doctor
 
 ### 1. 不能写 Zotero
 
-先看 `doctor` 的 `selected_write_backend` 和对应 capability：
+先看 `doctor` 中对应的 capability：
 
-- desktop：检查 `capabilities.desktop_write`，区分 Zotero 未运行、插件未安装、未配对、auth/protocol/profile mismatch
-- Web：检查 `capabilities.web_write` 和 `write_credentials`，通常缺少：
+- connector 导入：检查 `capabilities.connector_write`，确认 Zotero 正在运行，且 UI 当前选中的 library / collection 可写
+- merge/dedupe 与其他 mutation：检查 `capabilities.web_write` 和 `write_credentials`，通常缺少：
 
 - `ZOT_API_KEY`
 - `ZOT_LIBRARY_ID`
 
-没有 Web 凭据时仍可本地只读，也可在 bridge 已配对时进行 desktop merge/dedupe。所选 backend 失败不会自动 fallback。
+没有 Web 凭据时仍可本地只读，也可通过 connector 导入新 BibTeX / RIS 记录；不能确认 merge/dedupe 或其他 Web mutation。
 
 ### 2. `library citekey` 找不到结果
 

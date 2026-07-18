@@ -30,10 +30,10 @@ It is not a command catalog.
 - “save this filter” or “reuse this later”: treat it as a saved-search request
 - “download the attachment”: treat it as an attachment task, not upload
 - “preview this merge first”: treat it as `item merge`, not immediate duplicate merge
-- local read-only requests: do not start the bridge or require a Web key
-- any mutation: run doctor, then choose exactly one backend from an explicit override or effective `selected_write_backend`
-- desktop currently supports merge/dedupe only; do not invent local tag, note, or collection writes
-- never fall back after a backend error; skip low-confidence groups by default and never add `--include-low-confidence` on the user's behalf
+- local read-only requests: do not require a Web key
+- any mutation: run doctor first; only new BibTeX/RIS imports can use the connector, while all other mutations use the Web API
+- the connector cannot update or merge existing items; do not invent local tag, note, or collection writes
+- skip low-confidence groups by default and never add `--include-low-confidence` on the user's behalf
 - any “why is this broken?” question: start with doctor or config
 
 ## When to run doctor first
@@ -47,7 +47,7 @@ Run `doctor` first when:
 - the task depends on citation-key lookup
 - the user is troubleshooting configuration or profile state
 
-Inspect `capabilities.local_sqlite_read`, `local_http_read`, `desktop_write`, `web_write`, and `selected_write_backend`; do not reduce the decision to Web `write_credentials`.
+Inspect `capabilities.local_sqlite_read`, `local_http_read`, `connector_write`, and `web_write`; do not reduce the decision to Web `write_credentials`.
 
 ## Division of labor between skills and CLI docs
 

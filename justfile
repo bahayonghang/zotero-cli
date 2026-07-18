@@ -3,6 +3,9 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-Command"]
 default:
   @just --list
 
+help:
+  @just --list
+
 version-check:
   cargo test -p zot-cli --test workspace_version_guard
 
@@ -24,15 +27,26 @@ test:
 build:
   cargo build --release -p zot-cli
 
-plugin-test:
-  node --test plugins/zot-bridge/tests/bootstrap.test.cjs
-
-xpi-check: plugin-test
-  cargo test -p zot-cli bridge_xpi
-
 docs:
   npm --prefix docs install
   npm --prefix docs run dev
+
+[script("python")]
+version-sync:
+  import re
+  from pathlib import Path
+
+  cargo = Path("Cargo.toml").read_text(encoding="utf-8")
+  m = re.search(r'^version = "(\d+\.\d+\.\d+)"', cargo, re.MULTILINE)
+  version = m.group(1)
+  for sk in sorted(Path("skills").rglob("SKILL.md")):
+      lines = sk.read_text(encoding="utf-8").splitlines(keepends=True)
+      for i, line in enumerate(lines):
+          if line.startswith("description: "):
+              line = re.sub(r'\s*\(v\d+\.\d+\.\d+\)', "", line)
+              lines[i] = f"{line.rstrip()} (v{version})\n"
+      sk.write_text("".join(lines), encoding="utf-8")
+  print(f"version-sync: synced v{version} to skills/*/SKILL.md")
 
 install: install-local _install-skills
 
@@ -55,8 +69,8 @@ _install-skills:
                   shutil.rmtree(destination)
               shutil.copytree(skill, destination)
 
-skills-check:
+skills-check: _install-skills
   python scripts/check_skill_mirrors.py
   python -m unittest discover -s scripts/tests -p "test_*.py"
 
-ci: fmt check clippy test skills-check
+ci: version-sync fmt check clippy test skills-check

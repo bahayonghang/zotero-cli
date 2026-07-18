@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/zot-cli/backend/desktop-bridge.md", "reason": "被删除/改写的 bridge spec 本体,删前需通读牵连点"}
+{"file": ".trellis/spec/zot-cli/backend/merge-dedupe.md", "reason": "merge/dedupe 收敛为 Web 单后端,双后端叙述需清理"}
+{"file": ".trellis/spec/zot-cli/backend/index.md", "reason": "spec index 去 bridge 死链"}
+{"file": ".trellis/spec/zot-core/backend/error-handling.md", "reason": "删 ZotError::DesktopBridge 后错误模型收敛"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "删除时保留 selected_merge_writer/trait 复用,避免过度删改"}

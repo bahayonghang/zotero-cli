@@ -9,7 +9,6 @@
 | `--json` | Return the standard JSON envelope for scripts and agents |
 | `--profile <name>` | Select a config profile |
 | `--library <scope>` | Select library scope; only `user` or `group:<id>` is supported |
-| `--write-backend <web|desktop>` | Override the write backend for one call without changing config |
 
 ## Top-level commands
 
@@ -17,7 +16,6 @@ The current top-level commands come from `src/zot-cli/src/main.rs`:
 
 - `doctor`
 - `config`
-- `bridge`
 - `library`
 - `item`
 - `collection`
@@ -43,7 +41,7 @@ Failure:
 ## Recommended runtime habits
 
 1. Run `doctor` first in a new environment
-2. Before writes, inspect the four capabilities, `selected_write_backend`, and prerequisites for that backend
+2. Before writes, inspect the four capabilities and distinguish connector imports from Web API mutations
 3. Prefer `--json` for automation
 4. Stick to one invocation path per session: `zot ...` or `cargo run -q -p zot-cli -- ...`
 5. Treat feeds as explicit `library feeds` / `library feed-items` flows, not as a global `--library` scope
@@ -53,7 +51,6 @@ Failure:
 ```bash
 zot --json doctor
 zot --json config show
-zot --json bridge status
 zot --json library search "attention" --tag transformer --creator Vaswani --year 2017
 zot --json library recent --count 10
 zot --json library citekey Smith2024
@@ -69,8 +66,7 @@ zot completions powershell
 
 ## Command responsibilities
 
-- `config`: inspect and update runtime config, profiles, write backend, and Web write credentials
-- `bridge`: generate the XPI, pair, inspect status, and revoke desktop merge/dedupe authorization
+- `config`: inspect and update runtime config, profiles, and Web write credentials
 - `library`: default read-first surface for search, enumeration, semantic flows, feeds, and duplicates
 - `item`: single-item inspection, most write actions, attachment download, annotations, and Scite
 - `collection`: maintenance of real Zotero collections plus fine-grained collection reads

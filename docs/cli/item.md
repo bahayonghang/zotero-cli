@@ -93,29 +93,24 @@ zot --json item download ATCH005 --output downloads/
 
 ```bash
 zot --json item merge KEEP001 DUPE001
-zot --json --write-backend desktop item merge KEEP001 DUPE001
-zot --json --write-backend desktop item merge KEEP001 DUPE001 --confirm
-zot --json --write-backend web item merge KEEP001 DUPE001 --confirm
+zot --json item merge KEEP001 DUPE001 --confirm
 ```
 
 说明：
 
 - 默认先 preview，不加 `--confirm` 不落库
-- 未显式覆盖时使用 effective profile 的 `write_backend`；global `--write-backend desktop|web` 只影响当前调用
-- preview 和 confirm 必须保持同一 backend；desktop/Web 任一失败都不会自动 fallback
+- preview 与 confirm 统一使用 Zotero Web API；确认前必须配置 `library_id` 与 `api_key`
 - `--keep` 用来指定哪一条留下；不传时默认保留第一个 key
 - 只支持 top-level bibliographic item
 - preview 会列出 metadata 补齐、tags / collections 新增、child re-parent 数、重复 attachment 跳过数，以及 `skipped_incompatible_fields` 和 `relations_to_add`
 - 不同 item type 的条目可以合并；keeper 保持自身类型，对该类型非法的源字段会被跳过并列进 `skipped_incompatible_fields`
 - `--confirm` 后 keeper 会得到指向每个被并条目的 `dc:replaces` relation，Word / LibreOffice 里已插入的引文不会断链；被并条目进 Trash，不做永久删除
-- desktop 通过 Zotero 9 原生 `mergeItems()` 在单个事务中完成 metadata fill 与结构合并；Web backend 保持原有多请求、非事务写入语义
-- JSON 会报告实际 `write_backend`。desktop preview 只暴露脱敏 `plan_id`，不暴露 raw plan token；幂等重试可能返回 `already_applied`
-- desktop 需要 Zotero 正在运行、bridge 已安装并配对且目标库可写；失败后停在结构化 bridge error
+- Web API 合并保持多请求、非事务写入语义；`already_applied` 仍会随 applied 结果输出
 - 如果你是先从重复检测结果里合并，也可以继续走 `library duplicates-merge`
 
 ## note / tag / annotation / scite
 
-note、tag 和 annotation mutation 当前仍走 Web API；不要把 Zotero Local HTTP 或 desktop bridge 描述成这些命令的写通道。
+note、tag 和 annotation mutation 当前仍走 Web API；不要把 Zotero Local HTTP 或内置 connector 描述成这些命令的写通道。
 
 ### notes
 

@@ -346,3 +346,133 @@ D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: connector 本机导入路径(子任务 1)
+
+**Date**: 2026-07-18
+**Task**: connector 本机导入路径(子任务 1)
+**Branch**: `dev`
+
+### Summary
+
+在 zot-desktop 新增 connector client(ping/getSelectedCollection/import),wire zot item import 命令把 BibTeX/RIS 导入运行中 Zotero 当前选中 collection:格式自动判定、dry-run 复述目标与记录数、confirm 前强制 editable/library_editable 只读校验(只读目标绝不发 import),doctor 新增 connector_write 能力位(scope: import-only)。错误路径无 Web fallback,connector 模块不依赖 bridge 内部。just ci 全绿 217 测试;同步 executable spec(新增 connector.md,更新 error-handling/quality-guidelines/desktop-bridge/index)。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3bfee8e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 12: Remove zot-bridge and desktop write backend
+
+**Date**: 2026-07-18
+**Task**: Remove zot-bridge and desktop write backend
+**Branch**: `dev`
+
+### Summary
+
+Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy JSON fields; merge/dedupe now use Web API only. Added root/profile legacy-config migration detection, moved local HTTP probing into ConnectorClient, and synchronized bilingual docs/specs. Verified just ci (217 tests), VitePress build, live read-only doctor, no-credential merge, and removed clap surfaces. Real credentialed merge --confirm remains unrun because this environment has no Web credentials and no real-library write authorization.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bae3544` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 13: Optimize zot connector skill
+
+**Date**: 2026-07-18
+**Task**: Optimize zot connector skill
+**Branch**: `dev`
+
+### Summary
+
+重写 canonical zot skill 的 connector import 与 Web mutation 路由，同步 35 条 eval/test fixture 和 near-neighbor 负例；完成 just install、skills-check、just ci 与 diff 检查，归档子任务 3，保留父任务供最终集成复核。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7fd1938` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 14: Finalize connector replacement parent
+
+**Date**: 2026-07-18
+**Task**: Finalize connector replacement parent
+**Branch**: `dev`
+
+### Summary
+
+完成 07-18-connector-replace-bridge 父任务最终集成复核：just ci、VitePress build、skills-check、diff check、live doctor 与 connector dry-run 通过；真实 item import --confirm/只读实库目标和带 Web 凭据的 merge --confirm 仍为 missing evidence，未改写为通过且未写真实库。归档父任务，三个子任务记录保持完整。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

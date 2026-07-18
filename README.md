@@ -45,9 +45,9 @@ This matches the underlying products:
 - Zotero stores library data in `zotero.sqlite` plus attachment files under `storage/`.
 - Zotero items carry metadata, notes, tags, attachments, and other related data.
 - Zotero annotations can be turned into notes with links back to the source PDF page.
-- Zotero Desktop can perform allowlisted local merges through the paired bridge plugin; other supported mutations use the Web API with write-scoped credentials and version checks.
+- Zotero Desktop's built-in connector can import BibTeX or RIS into the selected writable target; other supported mutations use the Web API with write-scoped credentials and version checks.
 
-`zot` mirrors that structure for agents: read local content directly, route merge/dedupe to the selected desktop or Web backend, keep other mutations on the Web API, and never fall back across backends automatically.
+`zot` mirrors that structure for agents: read local content directly, import new records through the built-in connector, and route merge/dedupe plus other mutations through the Web API.
 
 ---
 
@@ -96,26 +96,20 @@ cargo run -q -p zot-cli -- --json doctor
 
 Keep one invocation path for the whole session. Do not switch back and forth.
 
-`doctor` reports `local_sqlite_read`, `local_http_read`, `desktop_write`, and `web_write` independently, plus the effective `selected_write_backend`. Web credentials are optional for local reads and paired desktop merge/dedupe.
+`doctor` reports `local_sqlite_read`, `local_http_read`, `connector_write`, and `web_write` independently. Web credentials are optional for local reads and connector imports, but required for merge/dedupe and other Web API mutations.
 
 If local PDF reads need Pdfium and no compatible library is already present, `zot` will auto-download a managed Pdfium binary on the first local PDF read on supported Windows, macOS, and glibc Linux targets.
 
-### 4. Pair Zotero Desktop for local merge/dedupe
+### 4. Import through Zotero Desktop's built-in connector
 
 ```bash
-zot --json bridge setup
+zot --json item import --file references.bib
+zot --json item import --file references.bib --confirm
 ```
 
-`bridge setup` generates the bundled XPI and opens its folder. Install it manually in Zotero, restart Zotero, then use the five-minute, single-use code shown by the Zotero UI:
+No plugin or pairing is required. Zotero must be running, and the library or collection selected in its UI must be writable. Without `--confirm`, the command validates and previews the import without sending records.
 
-```bash
-zot --json bridge pair PAIR-CODE
-zot --json bridge status
-```
-
-The desktop backend currently supports `item merge`, `library duplicates-merge`, and `library dedupe`. It is not a generic local write channel.
-
-### 5. Initialize Web config for other writes or saved searches
+### 5. Initialize Web config for merge/dedupe and other writes
 
 If you plan to write notes, tags, collection membership, saved searches, or publication status:
 
@@ -157,7 +151,6 @@ If you need to debug or drive the runtime manually, these are the usual starting
 
 ```bash
 zot --json doctor
-zot --json bridge status
 zot --json library search "reward hacking" --limit 10
 zot --json library recent --count 10
 zot --json library dedupe --collection COLL001
@@ -211,9 +204,9 @@ Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.
 
 - `zot mcp serve` is scaffolded and currently returns `mcp-not-implemented`. For now, use the skill plus the runtime.
 - Local SQLite and Zotero Local HTTP are read-only. Never use either as a write transport.
-- Paired desktop writes currently cover merge/dedupe only. Note, tag, collection, import, annotation, saved-search, and status-sync mutations still use the Web API.
-- `--write-backend desktop|web` selects one backend for the call. Errors stay on that backend; there is no automatic fallback.
-- Old profiles that have never paired the bridge continue to default to Web.
+- The built-in connector only imports new BibTeX/RIS records into Zotero's currently selected writable target; it does not update or merge existing items.
+- Merge/dedupe, note, tag, collection, Web import, annotation, saved-search, and status-sync mutations use the Zotero Web API.
+- Legacy `desktop_bridge` and `write_backend` config entries are ignored; `doctor` reports a migration hint so they can be removed safely.
 - Merge/dedupe is preview-first. Batch dedupe skips low-confidence groups unless the user separately authorizes `--include-low-confidence` after reviewing them.
 - Annotation creation is PDF-first. It requires a local PDF, Pdfium support, and write credentials.
 - Citation-key lookup prefers Better BibTeX support and falls back to compatible local parsing when possible.

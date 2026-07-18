@@ -16,15 +16,15 @@ cargo run -q -p zot-cli -- --json doctor
 
 ### 1. Cannot write to Zotero
 
-Check `selected_write_backend` and the matching capability in `doctor`:
+Check the matching capability in `doctor`:
 
-- desktop: inspect `capabilities.desktop_write` and distinguish Zotero stopped, plugin missing, unpaired, auth/protocol, and profile-mismatch states
-- Web: inspect `capabilities.web_write` and `write_credentials`; the usual missing pieces are:
+- connector import: inspect `capabilities.connector_write`, make sure Zotero is running, and select a writable library or collection in its UI
+- merge/dedupe and other mutations: inspect `capabilities.web_write` and `write_credentials`; the usual missing pieces are:
 
 - `ZOT_API_KEY`
 - `ZOT_LIBRARY_ID`
 
-Without Web credentials, local reads still work, and paired desktop merge/dedupe remains available. A failure on the selected backend never falls back automatically.
+Without Web credentials, local reads and connector imports of new BibTeX/RIS records still work; merge/dedupe and other Web mutations cannot be confirmed.
 
 ### 2. `library citekey` returns nothing
 

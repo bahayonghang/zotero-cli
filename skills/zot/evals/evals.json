@@ -289,57 +289,57 @@
     },
     {
       "id": 27,
-      "prompt": "我没有 Zotero API key，但 Zotero 桌面端和 bridge 都已经配好了。帮我清理 user library 里的重复条目，先给计划，确认前不要写入。",
-      "expected_output": "先用 doctor/bridge capability 确认 desktop，再跑 dedupe preview；不要求 Web key，不自动包含 low-confidence，等待确认后才执行。",
+      "prompt": "我没有 Zotero API key，想直接在本机把 user library 的重复条目清掉。先给我计划，确认前不要写入。",
+      "expected_output": "可以先跑本地只读 dedupe preview，但必须说明实际 merge/dedupe 已不能无凭据本机执行，confirm 需要 Zotero Web API 凭据。",
       "files": [],
       "expectations": [
-        "Reads capabilities.desktop_write and selected_write_backend instead of requiring Web API credentials.",
-        "Runs library dedupe without --confirm first and describes the result as a preview with no library mutation.",
-        "Does not add --include-low-confidence and does not route to --write-backend web."
+        "Runs library dedupe without --confirm first and describes the result as a local preview with no library mutation.",
+        "States that confirmed merge or dedupe requires ZOT_LIBRARY_ID and ZOT_API_KEY.",
+        "Does not claim the connector can merge items or execute --confirm without Web credentials."
       ]
     },
     {
       "id": 28,
-      "prompt": "这次不要走本机插件。我明确要求用 Zotero Web API 预览合并 KEEP001 和 DUPE001，确认后也继续用 Web。",
-      "expected_output": "显式选择 web，检查 web_write/credentials，preview 与 confirm 保持同一后端，失败不转 desktop。",
+      "prompt": "把 downloads/new-papers.bib 导入 Zotero 当前选中的 collection。先告诉我目标和条目数，确认后再写。",
+      "expected_output": "走 connector 的 item import --file dry-run，复述当前目标、可写性、条目数和格式；用户确认后才追加 --confirm。",
       "files": [],
       "expectations": [
-        "Uses --write-backend web for both the preview and any later confirmed merge.",
-        "Checks capabilities.web_write or the Web credential gate before execution.",
-        "Does not probe, pair, or fall back to the desktop bridge when the Web operation fails."
+        "Routes the BibTeX file to item import --file without --confirm for the first call.",
+        "Restates the Zotero UI selected target, writability, entry count, and detected format before writing.",
+        "Uses --confirm only after confirmation and does not invent another confirmation flag or use the Web API."
       ]
     },
     {
       "id": 29,
-      "prompt": "我想在本机合并重复文献，但 doctor 说 desktop_write installed=false。你直接帮我处理到能继续的下一步，别改走云端。",
-      "expected_output": "停在 desktop 路径，说明 setup 只生成 XPI，要求手动安装、重启、配对和 status；不 fallback 到 Web。",
+      "prompt": "把这几条 RIS 存进 Zotero 当前的 group collection；dry-run 显示这个目标是只读的，别换到别的库。",
+      "expected_output": "点名 connector 目标只读并停止，要求用户在 Zotero UI 选择可写目标后重新预览；不得发送 import 或 fallback 到 Web。",
       "files": [],
       "expectations": [
-        "Stops before merge apply and keeps the selected backend as desktop.",
-        "Explains that bridge setup generates and opens the XPI but does not install it automatically.",
-        "Provides manual install/restart/pair/status recovery steps without attempting a Web fallback."
+        "Routes RIS input to the connector import workflow and honors the currently selected Zotero target.",
+        "Names the read-only target gate and stops before item import --confirm.",
+        "Does not choose another collection automatically or fall back to the Web API."
       ]
     },
     {
       "id": 30,
-      "prompt": "Zotero 现在没开，desktop bridge 连不上。我还是想清理重复项，你先继续做能安全做的部分。",
-      "expected_output": "可以做本地只读 dedupe preview，但必须停止 desktop confirm，并要求启动 Zotero 后重试；不得自动 Web fallback。",
+      "prompt": "我有 BibTeX key vaswani_attention_2023。帮我找到 Zotero 条目，把引用插进 draft.tex，并维护 references.bib；顺便解释为什么又出现 PXW99EKT。",
+      "expected_output": "先用 library citekey 把 BibTeX citation key 解析成 Zotero item key，再用 item cite/item export 取数据，由 agent 更新草稿和 references.bib，并解释双 key 区别。",
       "files": [],
       "expectations": [
-        "Allows the pure local dedupe preview without claiming a write occurred.",
-        "Stops the confirmed desktop write until Zotero is running and the bridge is reachable.",
-        "Does not switch to Web credentials or a Web writer after the desktop error."
+        "Explains that PXW99EKT is a Zotero item key while vaswani_attention_2023 is a BibTeX citation key.",
+        "Uses library citekey, then item cite and item export with the resolved item key.",
+        "Treats draft and references.bib edits as agent file edits rather than inventing a CLI command."
       ]
     },
     {
       "id": 31,
-      "prompt": "只帮我在本地 Zotero 库里搜 title 含 reward model 的条目，不要改任何东西，也不要折腾插件或 API key。",
-      "expected_output": "走本地只读 library search，不要求 bridge pairing 或 Web credentials。",
+      "prompt": "帮我去网上找 2026 年最新的 reward model 论文，我没有说要查 Zotero，也不需要写进文献库。",
+      "expected_output": "这是通用找论文请求，不应触发 zot skill，也不应把范围擅自收缩到本地 Zotero 库。",
       "files": [],
       "expectations": [
-        "Routes to a local read-only library search.",
-        "Does not run bridge setup, pairing, status, or construct a desktop writer.",
-        "Does not require ZOT_API_KEY or ZOT_LIBRARY_ID for the read."
+        "Does not trigger the zot skill for a generic web literature search.",
+        "Does not claim to have searched the user's Zotero library.",
+        "Uses a general research workflow unless the user later asks to involve Zotero."
       ]
     },
     {
@@ -366,24 +366,24 @@
     },
     {
       "id": 34,
-      "prompt": "desktop bridge 已配对。现在请用本机通道给 ATTN001 加 priority tag；不要访问 Web API。",
-      "expected_output": "诚实说明 Phase 1 desktop 不支持 tag mutation，停止且不 fallback；不得虚构本机 tag 写入。",
+      "prompt": "APA 7 的三位作者文内引用应该怎么写？只讲格式规则，不要访问或修改我的 Zotero。",
+      "expected_output": "这是通用引用格式教学，不应触发 zot skill，也不应访问 Zotero。",
       "files": [],
       "expectations": [
-        "States that desktop bridge currently supports merge/dedupe but not tag mutation.",
-        "Does not claim that Local HTTP or direct SQLite can perform the tag write.",
-        "Stops without Web fallback because the user explicitly prohibited the Web API."
+        "Does not trigger the zot skill for citation-style teaching alone.",
+        "Answers the formatting question without inspecting the Zotero library.",
+        "Does not run Zotero commands or request library credentials."
       ]
     },
     {
       "id": 35,
-      "prompt": "这是升级前的老 profile，我从没 setup 或 pair 过 bridge。帮我判断 note add 默认会走哪里，以及缺什么。",
-      "expected_output": "解释旧 profile 缺省 backend 是 web，note add 仍走 Web credential gate，不静默选择 desktop。",
+      "prompt": "总结当前目录里的 report.pdf；它不是 Zotero 附件，也不需要建 workspace 或写回 Zotero。",
+      "expected_output": "这是非 Zotero PDF 处理请求，不应触发 zot skill，应直接使用普通 PDF 工作流。",
       "files": [],
       "expectations": [
-        "Explains that an old unpaired profile defaults to the Web write backend.",
-        "Checks Web API credentials for note add rather than claiming desktop note support.",
-        "Does not silently select, set up, or pair the desktop backend."
+        "Does not trigger the zot skill for a standalone non-Zotero PDF.",
+        "Does not import the PDF into Zotero or create a workspace without a request.",
+        "Uses the ordinary PDF reading workflow for the local file."
       ]
     }
   ]

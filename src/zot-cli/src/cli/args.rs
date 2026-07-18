@@ -12,7 +12,7 @@ use clap::{Args, Subcommand};
 
 use super::{
     AttachModeArg, CitationStyleArg, ConfigKeyArg, DuplicateMethodArg, HybridModeArg,
-    SortDirectionArg, SortFieldArg,
+    ItemImportFormatArg, SortDirectionArg, SortFieldArg,
 };
 
 #[derive(Subcommand)]
@@ -57,6 +57,7 @@ pub(crate) enum ItemCommand {
     AddUrl(AddByUrlArgs),
     AddFile(AddFromFileArgs),
     Merge(ItemMergeArgs),
+    Import(ItemImportArgs),
     Update(ItemUpdateArgs),
     Trash(ItemKeyArgs),
     Restore(ItemKeyArgs),
@@ -150,31 +151,6 @@ pub(crate) enum SyncCommand {
 #[derive(Subcommand)]
 pub(crate) enum McpCommand {
     Serve,
-}
-
-#[derive(Subcommand)]
-pub(crate) enum BridgeCommand {
-    Setup(BridgeSetupArgs),
-    Pair(BridgePairArgs),
-    Status,
-    Revoke(BridgeRevokeArgs),
-}
-
-#[derive(Args)]
-pub(crate) struct BridgeSetupArgs {
-    #[arg(long)]
-    pub(crate) output: Option<PathBuf>,
-}
-
-#[derive(Args)]
-pub(crate) struct BridgePairArgs {
-    pub(crate) code: String,
-}
-
-#[derive(Args)]
-pub(crate) struct BridgeRevokeArgs {
-    #[arg(long)]
-    pub(crate) local_only: bool,
 }
 
 #[derive(Subcommand)]
@@ -533,6 +509,21 @@ pub(crate) struct ItemMergeArgs {
     pub(crate) key2: String,
     #[arg(long)]
     pub(crate) keep: Option<String>,
+    #[arg(long)]
+    pub(crate) confirm: bool,
+}
+
+#[derive(Args)]
+pub(crate) struct ItemImportArgs {
+    /// Path to a BibTeX/RIS file to import.
+    #[arg(long, conflicts_with = "text", required_unless_present = "text")]
+    pub(crate) file: Option<PathBuf>,
+    /// Raw BibTeX/RIS text to import.
+    #[arg(long)]
+    pub(crate) text: Option<String>,
+    /// Override format detection instead of using the file extension or content.
+    #[arg(long)]
+    pub(crate) format: Option<ItemImportFormatArg>,
     #[arg(long)]
     pub(crate) confirm: bool,
 }

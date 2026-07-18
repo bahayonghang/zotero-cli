@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
-- **Last Active**: 2026-07-12
+- **Total Sessions**: 14
+- **Last Active**: 2026-07-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~348 | Active |
+| `journal-1.md` | ~478 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,10 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-07-18 | Finalize connector replacement parent | - | `dev` |
+| 13 | 2026-07-18 | Optimize zot connector skill | `7fd1938` | `dev` |
+| 12 | 2026-07-18 | Remove zot-bridge and desktop write backend | `bae3544` | `dev` |
+| 11 | 2026-07-18 | connector 本机导入路径(子任务 1) | `3bfee8e` | `dev` |
 | 10 | 2026-07-12 | 归档本机安全写入父任务 | - | `dev` |
 | 9 | 2026-07-12 | 完成本机写入 skill 与文档对齐 | `8d3affa`, `50f639e` | `dev` |
 | 8 | 2026-07-11 | 完成本机 merge 与 dedupe 闭环 | `52cdef8` | `dev` |

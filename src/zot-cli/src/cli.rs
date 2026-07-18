@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use zot_core::WriteBackend;
 use zot_local::{CitationStyle, DuplicateMatchMethod, HybridMode, SortDirection, SortField};
 
 pub(crate) mod args;
@@ -16,8 +15,6 @@ pub(crate) struct Cli {
     pub(crate) profile: Option<String>,
     #[arg(long, global = true, default_value = "user")]
     pub(crate) library: String,
-    #[arg(long, global = true)]
-    pub(crate) write_backend: Option<WriteBackendArg>,
     #[command(subcommand)]
     pub(crate) command: Commands,
 }
@@ -28,10 +25,6 @@ pub(crate) enum Commands {
     Config {
         #[command(subcommand)]
         command: ConfigCommand,
-    },
-    Bridge {
-        #[command(subcommand)]
-        command: BridgeCommand,
     },
     Library {
         #[command(subcommand)]
@@ -106,6 +99,12 @@ pub(crate) enum DuplicateMethodArg {
     Both,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub(crate) enum ItemImportFormatArg {
+    Bibtex,
+    Ris,
+}
+
 #[derive(Clone, Debug, Copy, ValueEnum)]
 pub(crate) enum ConfigKeyArg {
     DataDir,
@@ -118,22 +117,6 @@ pub(crate) enum ConfigKeyArg {
     OutputFormat,
     OutputLimit,
     ExportStyle,
-    WriteBackend,
-}
-
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub(crate) enum WriteBackendArg {
-    Web,
-    Desktop,
-}
-
-impl From<WriteBackendArg> for WriteBackend {
-    fn from(value: WriteBackendArg) -> Self {
-        match value {
-            WriteBackendArg::Web => WriteBackend::Web,
-            WriteBackendArg::Desktop => WriteBackend::Desktop,
-        }
-    }
 }
 
 impl From<SortFieldArg> for SortField {
@@ -196,11 +179,6 @@ mod tests {
     fn parses_new_library_and_item_command_surfaces() {
         for argv in [
             ["zot", "config", "show"].as_slice(),
-            ["zot", "config", "set", "write-backend", "desktop"].as_slice(),
-            ["zot", "bridge", "setup"].as_slice(),
-            ["zot", "bridge", "pair", "ABCDEFGH"].as_slice(),
-            ["zot", "bridge", "status"].as_slice(),
-            ["zot", "bridge", "revoke", "--local-only"].as_slice(),
             [
                 "zot",
                 "config",
@@ -265,6 +243,18 @@ mod tests {
                 "DUPE001",
                 "--keep",
                 "DUPE001",
+                "--confirm",
+            ]
+            .as_slice(),
+            ["zot", "item", "import", "--file", "refs.bib"].as_slice(),
+            [
+                "zot",
+                "item",
+                "import",
+                "--text",
+                "TY  - JOUR\nER  - \n",
+                "--format",
+                "ris",
                 "--confirm",
             ]
             .as_slice(),
