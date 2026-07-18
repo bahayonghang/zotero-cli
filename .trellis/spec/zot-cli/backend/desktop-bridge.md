@@ -4,10 +4,14 @@
 
 ### 1. Scope / Trigger
 
-Use this contract when changing `plugins/zot-bridge/`, `src/zot-desktop`, the
-`zot bridge` command family, bridge configuration, or doctor capability output.
-The bridge is a loopback-only, allowlisted write transport. It must never become
-a generic script, eval, or arbitrary field-update surface.
+Use this contract when changing `plugins/zot-bridge/`,
+`src/zot-desktop/src/client.rs` or `model.rs`, the `zot bridge` command
+family, bridge configuration, or the `desktop_write`/`local_http_read`
+doctor capabilities. The bridge is a loopback-only, allowlisted write
+transport. It must never become a generic script, eval, or arbitrary
+field-update surface. `zot-desktop` also hosts the separate, unauthenticated
+connector transport (`connector.rs`) — see `connector.md` for that contract;
+the two must not share internals.
 
 ### 2. Signatures
 
@@ -90,27 +94,27 @@ not run native merge twice.
 
 ### 4. Validation & Error Matrix
 
-| Condition | Required result |
-| --- | --- |
-| Missing, used, or expired displayed code | `401 bridge-pair-expired` |
-| Active displayed code does not match | `401 bridge-pair-code` |
-| Missing or wrong bearer token | `401 bridge-auth` |
-| Configured and running non-empty instance IDs differ | client `bridge-profile-mismatch` before protected request |
-| Legacy config has no instance ID | allow authenticated status, then persist observed ID only |
-| Browser `Origin` present | reject before operation (`bridge-origin` in handler tests) |
-| Host outside loopback allowlist | reject before operation (`bridge-host` in handler tests) |
-| Unknown JSON field | `400 bridge-unknown-field` |
-| Reused request ID with different payload/auth | `409 bridge-replay` |
-| Protocol mismatch | `409 bridge-protocol` or client `bridge-protocol` |
-| Endpoint absent while Zotero Local HTTP responds | `bridge-not-installed` |
-| Invalid success JSON | client `bridge-invalid-response` |
-| Response over 64 KiB | client `bridge-response-too-large` |
-| Missing/expired merge plan | `409 bridge-plan-expired` |
-| Item, version, field, relation, or direct-child drift | `409 bridge-item-changed` |
-| Read-only group/library | `403 bridge-library-readonly` |
-| Child, attachment, note, or annotation candidate | `400 bridge-invalid-child` |
-| Candidate resolves outside selected library | `400 bridge-cross-library` |
-| Native merge throws | `500 bridge-transaction`; DB rollback plus object-cache reload |
+| Condition                                             | Required result                                                |
+| ----------------------------------------------------- | -------------------------------------------------------------- |
+| Missing, used, or expired displayed code              | `401 bridge-pair-expired`                                      |
+| Active displayed code does not match                  | `401 bridge-pair-code`                                         |
+| Missing or wrong bearer token                         | `401 bridge-auth`                                              |
+| Configured and running non-empty instance IDs differ  | client `bridge-profile-mismatch` before protected request      |
+| Legacy config has no instance ID                      | allow authenticated status, then persist observed ID only      |
+| Browser `Origin` present                              | reject before operation (`bridge-origin` in handler tests)     |
+| Host outside loopback allowlist                       | reject before operation (`bridge-host` in handler tests)       |
+| Unknown JSON field                                    | `400 bridge-unknown-field`                                     |
+| Reused request ID with different payload/auth         | `409 bridge-replay`                                            |
+| Protocol mismatch                                     | `409 bridge-protocol` or client `bridge-protocol`              |
+| Endpoint absent while Zotero Local HTTP responds      | `bridge-not-installed`                                         |
+| Invalid success JSON                                  | client `bridge-invalid-response`                               |
+| Response over 64 KiB                                  | client `bridge-response-too-large`                             |
+| Missing/expired merge plan                            | `409 bridge-plan-expired`                                      |
+| Item, version, field, relation, or direct-child drift | `409 bridge-item-changed`                                      |
+| Read-only group/library                               | `403 bridge-library-readonly`                                  |
+| Child, attachment, note, or annotation candidate      | `400 bridge-invalid-child`                                     |
+| Candidate resolves outside selected library           | `400 bridge-cross-library`                                     |
+| Native merge throws                                   | `500 bridge-transaction`; DB rollback plus object-cache reload |
 
 ### 5. Good / Base / Bad Cases
 

@@ -106,6 +106,12 @@ pub(crate) enum DuplicateMethodArg {
     Both,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+pub(crate) enum ItemImportFormatArg {
+    Bibtex,
+    Ris,
+}
+
 #[derive(Clone, Debug, Copy, ValueEnum)]
 pub(crate) enum ConfigKeyArg {
     DataDir,
@@ -265,6 +271,18 @@ mod tests {
                 "DUPE001",
                 "--keep",
                 "DUPE001",
+                "--confirm",
+            ]
+            .as_slice(),
+            ["zot", "item", "import", "--file", "refs.bib"].as_slice(),
+            [
+                "zot",
+                "item",
+                "import",
+                "--text",
+                "TY  - JOUR\nER  - \n",
+                "--format",
+                "ris",
                 "--confirm",
             ]
             .as_slice(),

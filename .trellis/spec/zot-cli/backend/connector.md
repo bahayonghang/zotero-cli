@@ -1,0 +1,133 @@
+# Connector Import Contract
+
+Executable contract for `zot item import`, the unauthenticated local write
+path that talks to Zotero's own built-in connector HTTP server. Introduced by
+task `07-18-connector-local-write`.
+
+## Scenario: import BibTeX/RIS via the built-in connector server
+
+### 1. Scope / Trigger
+
+New command signature (`zot item import`), a new cross-layer HTTP contract
+(`zot-desktop` -> Zotero connector server), and a new `ZotError::Connector`
+variant — code-spec depth is mandatory. Use this before changing
+`zot-desktop/src/connector.rs`, `zot-cli/src/commands/item/import.rs`, or
+doctor's `connector_write` capability.
+
+Distinct from `desktop-bridge.md`: the connector talks to Zotero's own
+built-in server that exists with **no plugin installed and no auth** —
+import-only, and the target is whatever the Zotero UI currently has
+selected. It is not the authenticated `zot-bridge` plugin protocol. Both
+transports live in `zot-desktop`, but `connector.rs` must not import
+`client.rs`/`model.rs` (bridge) internals — bridge is scheduled for removal
+in a sibling task and the connector must not depend on code that will
+disappear.
+
+### 2. Signatures
+
+```text
+zot item import (--file <path> | --text <string>) [--format bibtex|ris] [--confirm]
+```
+
+```rust
+// zot-desktop/src/connector.rs
+impl ConnectorClient {
+    pub fn ping(&self) -> ZotResult<ConnectorPing>;
+    pub fn selected_target(&self) -> ZotResult<SelectedTarget>;
+    pub fn import(&self, session: &str, text: &str) -> ZotResult<ConnectorImportResult>;
+}
+```
+
+```text
+GET  /connector/ping
+POST /connector/getSelectedCollection
+POST /connector/import?session=<uuid>
+```
+
+### 3. Contracts
+
+- Base URL `http://127.0.0.1:23119`, override via `ZOT_CONNECTOR_BASE_URL`;
+  loopback-only, validated independently of bridge's `parse_loopback_url`
+  (that function is private to `client.rs` and bridge-flavored anyway).
+- Header `X-Zotero-Connector-API-Version: 3` on every request.
+- Timeouts: 5s connect / 30s request — longer than bridge's 10s because
+  importing a large `.bib` is slower than a health probe.
+- `SelectedTarget { id, name, editable, library_editable: Option<bool> }`;
+  writable iff `editable` and (when present) `library_editable` are both
+  true — see `SelectedTarget::is_writable()`. Never infer writability from
+  only one of the two fields.
+- `import` body is raw BibTeX/RIS text, `Content-Type: text/plain`. The
+  session id is minted by the CLI caller as `zot-<uuid>` and passed in —
+  mirrors `merge_apply(operation_id)`'s caller-minted-id precedent; the
+  client itself never generates one.
+- Dry-run envelope: `{ target, editable, entries, format, confirmed: false }`
+  — no `session`/`status` fields, because nothing was sent.
+- Confirmed envelope: `{ session, target, editable, entries, format, status }`.
+- Format resolution, in priority order: (1) explicit `--format` flag,
+  (2) file extension (`.bib`/`.ris`), (3) content sniff (`@\w+\s*\{` prefix
+  means bibtex, `^TY  - ` means ris), (4) `connector-import-format` error.
+- Entry counting: bibtex via `@\w+\s*\{` match count; RIS via `^TY  - ` line
+  count.
+
+### 4. Validation & Error Matrix
+
+| Condition                                                                  | Result                                                             |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Connector unreachable (Zotero not running / port closed)                   | `connector-unreachable`, hint to start Zotero                      |
+| Connection timeout                                                         | `connector-timeout`                                                |
+| Non-2xx HTTP response                                                      | `connector-http` with `status`                                     |
+| Format undetectable from flag/extension/content                            | `connector-import-format`; no network call made                    |
+| `--confirm` and (`editable == false` or `library_editable == Some(false)`) | `connector-target-readonly`; import request never sent             |
+| No `--confirm`                                                             | dry-run only — `ping` + `selected_target` run, `import` never sent |
+| `--file` and `--text` both given, or neither given                         | clap-level error (`conflicts_with` / `required_unless_present`)    |
+
+### 5. Good / Base / Bad Cases
+
+- Good: Zotero running, a writable collection selected, `--confirm` given ->
+  entries land in that collection, envelope reports `session`/`status`.
+- Base: no `--confirm` -> dry-run reports target/editable/entries/format,
+  zero network writes.
+- Bad: a read-only group/feed is selected and `--confirm` is given ->
+  `connector-target-readonly` before any import request leaves the process.
+- Bad: Zotero is closed -> `connector-unreachable`; no Web API fallback
+  under any connector failure, ever.
+
+### 6. Tests Required
+
+- `zot-desktop`: tiny_http fake-server tests for ping success/non-2xx/
+  timeout, selected-target writable/readonly/non-2xx, import success (JSON
+  and non-JSON response body)/non-2xx, and non-loopback base URL rejection.
+- `zot-cli`: format-sniff and entry-counting unit tests; a scripted fake
+  server that proves dry-run sends exactly `ping` + `selected_target` (a
+  stray `import` call hits connection-refused and fails the test, not just
+  a wrong output field); the same proof-by-absence shape for the
+  readonly-target gate; a confirmed-writable-target happy path asserting
+  the returned `session`/`status`.
+- `just ci` full gate (fmt / check / clippy `-D warnings` / test /
+  skills-check).
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong — reuses bridge's parse_loopback_url, coupling connector to code
+// that a sibling task will delete:
+use crate::client::parse_loopback_url;
+
+// Correct — connector validates its own loopback constraint locally, so it
+// has zero dependency on the bridge module:
+fn parse_connector_base_url(raw: &str) -> ZotResult<Url> { /* local copy */ }
+```
+
+```rust
+// Wrong — sends the import request, then inspects the response for
+// writability:
+let result = client.import(&session, &text)?;
+if !target.is_writable() { return Err(readonly_error()); }
+
+// Correct — the readonly gate runs before any import call, so a read-only
+// target never reaches the network:
+if !target.is_writable() {
+    return Err(readonly_error());
+}
+client.import(&session, &text)?;
+```

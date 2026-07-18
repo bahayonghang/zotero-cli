@@ -47,6 +47,14 @@ pub enum ZotError {
         status: Option<u16>,
     },
 
+    #[error("Connector error: {message}")]
+    Connector {
+        code: String,
+        message: String,
+        hint: Option<String>,
+        status: Option<u16>,
+    },
+
     #[error("PDF error: {message}")]
     Pdf {
         code: String,
@@ -117,6 +125,16 @@ impl ZotError {
                 message: message.clone(),
                 hint: hint.clone(),
             },
+            ZotError::Connector {
+                code,
+                message,
+                hint,
+                ..
+            } => ErrorPayload {
+                code: code.clone(),
+                message: message.clone(),
+                hint: hint.clone(),
+            },
             ZotError::Io { path, source } => ErrorPayload {
                 code: "io".to_string(),
                 message: format!("I/O error for {}: {source}", path.display()),
@@ -128,5 +146,30 @@ impl ZotError {
                 hint: None,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn connector_error_payload_drops_status_and_keeps_code_message_hint() {
+        let error = ZotError::Connector {
+            code: "connector-target-readonly".to_string(),
+            message: "The selected Zotero target is not writable".to_string(),
+            hint: Some("Select a writable collection in Zotero, then retry".to_string()),
+            status: Some(200),
+        };
+        let payload = error.payload();
+        assert_eq!(payload.code, "connector-target-readonly");
+        assert_eq!(
+            payload.message,
+            "The selected Zotero target is not writable"
+        );
+        assert_eq!(
+            payload.hint.as_deref(),
+            Some("Select a writable collection in Zotero, then retry")
+        );
     }
 }

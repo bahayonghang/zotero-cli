@@ -1,6 +1,8 @@
 use anyhow::Result;
 use zot_core::{AppConfig, ZotError, redact_secret};
-use zot_desktop::{BridgeHealth, BridgeStatus, LocalHttpStatus, ensure_matching_instance_id};
+use zot_desktop::{
+    BridgeHealth, BridgeStatus, ConnectorPing, LocalHttpStatus, ensure_matching_instance_id,
+};
 use zot_local::{PdfiumAvailability, PdfiumBackend};
 use zot_remote::BetterBibTexClient;
 
@@ -72,6 +74,8 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     } else {
         None
     };
+    let connector = ctx.connector()?;
+    let connector_ping = connector.ping().await;
     let local_sqlite_available = library.is_ok();
     let web_write_configured = ctx.config.write_credentials_configured();
     let pdf_available = pdf_status.available;
@@ -93,6 +97,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
                 &bridge_health,
                 bridge_status.as_ref(),
             ),
+            "connector_write": connector_write_capability(&connector_ping),
             "web_write": web_write_capability(&ctx.config),
         },
         "embedding": {
@@ -125,6 +130,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         &bridge_health,
         bridge_status.as_ref(),
     );
+    let connector_write_label = capability_label(&connector_ping);
     CommandOutput::new(ctx, payload, None, move |_| {
         println!("{DOCTOR_BANNER}");
         println!("Config: {}", AppConfig::config_file().display());
@@ -141,6 +147,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         );
         println!("Local HTTP read: {local_http_label}");
         println!("Desktop write: {desktop_write_label}");
+        println!("Connector write: {connector_write_label}");
         println!(
             "Web write: {}",
             if web_write_configured {
@@ -260,6 +267,23 @@ fn desktop_write_capability(
                 }
             }),
         },
+    }
+}
+
+fn connector_write_capability(ping: &zot_core::ZotResult<ConnectorPing>) -> serde_json::Value {
+    match ping {
+        Ok(_) => serde_json::json!({
+            "configured": true,
+            "available": true,
+            "scope": "import-only",
+        }),
+        Err(error) => serde_json::json!({
+            "configured": true,
+            "available": false,
+            "scope": "import-only",
+            "hint": "Start Zotero to enable local import",
+            "error": error.payload(),
+        }),
     }
 }
 
@@ -401,6 +425,39 @@ mod tests {
         assert_eq!(payload["configured"], false);
         assert_eq!(payload["available"], false);
         assert_eq!(payload["checked"], "credentials-only");
+    }
+
+    #[test]
+    fn connector_capability_reports_scope_and_availability() {
+        let available = Ok(ConnectorPing {
+            available: true,
+            zotero_version: Some("7.0.35".to_string()),
+        });
+        let payload = connector_write_capability(&available);
+        assert_eq!(payload["configured"], true);
+        assert_eq!(payload["available"], true);
+        assert_eq!(payload["scope"], "import-only");
+        assert!(payload.get("hint").is_none());
+        assert_eq!(capability_label(&available), "available");
+
+        let unavailable: zot_core::ZotResult<ConnectorPing> = Err(ZotError::Connector {
+            code: "connector-unreachable".to_string(),
+            message: "Could not connect to the Zotero connector server".to_string(),
+            hint: Some("Start Zotero, then retry".to_string()),
+            status: None,
+        });
+        let payload = connector_write_capability(&unavailable);
+        assert_eq!(payload["configured"], true);
+        assert_eq!(payload["available"], false);
+        assert_eq!(payload["scope"], "import-only");
+        assert_eq!(payload["hint"], "Start Zotero to enable local import");
+        assert!(
+            !payload["hint"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("bridge")
+        );
+        assert_eq!(capability_label(&unavailable), "unavailable");
     }
 
     #[test]

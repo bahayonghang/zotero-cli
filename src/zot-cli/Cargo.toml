@@ -35,4 +35,5 @@ zot-local.workspace = true
 zot-remote.workspace = true
 
 [dev-dependencies]
+zot-desktop = { workspace = true, features = ["test-support"] }
 zot-remote = { workspace = true, features = ["test-support"] }

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use zot_core::{AppConfig, LibraryScope, WriteBackend};
-use zot_desktop::DesktopClient;
+use zot_desktop::{ConnectorClient, DesktopClient};
 use zot_local::{LocalLibrary, PdfBackend, PdfiumBackend};
 use zot_remote::{HttpRuntime, ZoteroRemote};
 
@@ -91,6 +91,10 @@ impl AppContext {
 
     pub(crate) fn desktop(&self) -> zot_core::ZotResult<DesktopClient> {
         DesktopClient::new()
+    }
+
+    pub(crate) fn connector(&self) -> zot_core::ZotResult<ConnectorClient> {
+        ConnectorClient::new()
     }
 
     pub(crate) fn write_backend(&self) -> WriteBackend {

@@ -16,7 +16,12 @@ doctor diagnostics, and orchestration between `zot-core`, `zot-local`, and
 - Read [Quality Guidelines](./quality-guidelines.md) before changing command
   surfaces, tests, or workspace dependency manifests.
 - Read [Desktop Bridge Contract](./desktop-bridge.md) before changing the
-  bridge plugin, `zot-desktop`, bridge commands/config, or doctor integration.
+  bridge plugin, bridge commands/config, or the `desktop_write`/
+  `local_http_read` doctor capabilities.
+- Read [Connector Import Contract](./connector.md) before changing
+  `zot-desktop/src/connector.rs`, `item import`, or the `connector_write`
+  doctor capability. Both this and Desktop Bridge Contract cover
+  `zot-desktop` — they are separate transports and must not share internals.
 - Read [Merge & Dedupe Engine](./merge-dedupe.md) before touching `item merge`,
   `library duplicates-merge`, or `library dedupe` behavior.
 - Read [Logging Guidelines](./logging-guidelines.md) before adding output.
@@ -30,6 +35,7 @@ doctor diagnostics, and orchestration between `zot-core`, `zot-local`, and
 | [Error Handling](./error-handling.md)           | `anyhow` boundary, `ZotError`, and envelope errors                                   | Complete |
 | [Quality Guidelines](./quality-guidelines.md)   | CLI parse tests, JSON contract tests, and workspace manifest guard                   | Complete |
 | [Desktop Bridge Contract](./desktop-bridge.md)  | Authenticated loopback protocol, pairing, config, doctor, and lifecycle invariants   | Complete |
+| [Connector Import Contract](./connector.md)     | Unauthenticated built-in connector server, `item import`, format/entry rules         | Complete |
 | [Merge & Dedupe Engine](./merge-dedupe.md)      | Cross-type merge safety, dc:replaces citation protection, dedupe planning invariants | Complete |
 | [Logging Guidelines](./logging-guidelines.md)   | Human vs JSON output rules                                                           | Complete |
 
