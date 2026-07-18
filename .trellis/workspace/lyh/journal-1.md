@@ -346,3 +346,36 @@ D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: connector 本机导入路径(子任务 1)
+
+**Date**: 2026-07-18
+**Task**: connector 本机导入路径(子任务 1)
+**Branch**: `dev`
+
+### Summary
+
+在 zot-desktop 新增 connector client(ping/getSelectedCollection/import),wire zot item import 命令把 BibTeX/RIS 导入运行中 Zotero 当前选中 collection:格式自动判定、dry-run 复述目标与记录数、confirm 前强制 editable/library_editable 只读校验(只读目标绝不发 import),doctor 新增 connector_write 能力位(scope: import-only)。错误路径无 Web fallback,connector 模块不依赖 bridge 内部。just ci 全绿 217 测试;同步 executable spec(新增 connector.md,更新 error-handling/quality-guidelines/desktop-bridge/index)。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3bfee8e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
