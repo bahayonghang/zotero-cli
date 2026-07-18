@@ -1,6 +1,6 @@
 ---
 name: zot
-description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、desktop bridge setup/pair/status，以及无 Web API key 的本机 duplicate merge/dedupe 或明确授权的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。
+description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。
 ---
 
 # zot
@@ -12,8 +12,8 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 - 只要任务的真实目标是操作**已有的本地 Zotero 库**或**已有/将创建的 reading workspace**，就用本 skill，即使用户没说 `zot`。
 - 用户在 Claude Code、Codex 里应该直接说需求，不应该先背命令。skill 负责把需求翻成运行时动作。
 - `zot` 是唯一执行面。`ref/` 里的旧 Python 参考实现和 `zot mcp serve` 都不是当前主路径。
-- 本地 SQLite 和 Zotero Local HTTP 都是只读路径；本机写入走经过配对的 desktop bridge，远程写入走 Zotero Web API。三个边界不能混用。
-- 选定的写后端拥有本次操作的成功和失败；任何错误都不能自动 fallback 到另一个后端。
+- 本地 SQLite 和 Zotero Local HTTP 都是只读路径；connector 只负责向 Zotero UI 当前选中的目标新增 BibTeX/RIS 条目；其他 mutation 全部走 Zotero Web API。三个边界不能混用。
+- 每条写路径拥有本次操作的成功和失败；connector 或 Web API 出错时不能自动 fallback 到另一条路径。
 - 回答先给结论、证据、变更或失败原因。不要先把 raw JSON 倒给用户。
 
 ## 先按意图分桶
@@ -125,7 +125,27 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 - 不要把附件下载伪装成 `item attach`
 - 不要把上传和下载混成一个动作
 
-### 6. 安全写入
+### 6. 导入文献到 Zotero
+
+用户通常会说：
+
+- “把这个 bib 导入 Zotero”
+- “把这几条 RIS 存进我当前的 collection”
+
+唯一写入路由是 `item import`：
+
+- 文件输入：`item import --file <path>`；原始文本输入：`item import --text <text>`
+- 只在自动识别不可靠时显式加 `--format bibtex|ris`
+- 不带 `--confirm` 先 dry-run，读取并复述 Zotero UI 当前选中的目标 collection/library、目标可写性、记录数和格式
+- 用户确认上述目标与记录数后，才用同一输入执行 `item import ... --confirm`
+
+边界：
+
+- connector 只会新增 BibTeX/RIS 条目，不支持 update、tag、note、collection mutation 或 merge/dedupe
+- 目标由 Zotero UI 当前选择决定，不能在命令里指定 collection
+- Zotero 未运行、connector 不可达或目标只读时停止；不要改走 Web API
+
+### 7. 安全写入
 
 用户通常会说：
 
@@ -142,24 +162,24 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 | 路径 | 当前能力 | 凭据 / 运行条件 |
 | --- | --- | --- |
 | local SQLite / Local HTTP | 只读查询、提取和 dedupe planning | 本地 Zotero 数据；不能写 |
-| desktop bridge | `item merge`、`library duplicates-merge`、`library dedupe` | Zotero 9 正在运行、插件已安装并配对、目标库可写 |
-| Zotero Web API | 现有 note/tag/collection/import/update/annotation/sync 等 mutation，也可 merge/dedupe | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
+| connector 本机导入 | 仅 `item import` 新增 BibTeX/RIS 条目 | Zotero 正在运行、connector 可达、UI 当前目标可写 |
+| Zotero Web API | 除 connector 导入外的全部 mutation，含 merge/dedupe | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
 
 写入决策顺序：
 
-1. 先跑 `zot --json doctor`，读取 `capabilities` 和 `selected_write_backend`。
-2. 用户明确说 desktop / 本机时，使用 `--write-backend desktop`；明确说 remote / Web 时，使用 `--write-backend web`。未明确时使用 effective profile 的 `selected_write_backend`。
-3. 检查所选后端是否支持目标命令。所选后端不可用或不支持时停止，说明原后端、错误和恢复动作；不要自行改走另一个后端。
-4. 对 merge/dedupe 先跑不带 `--confirm` 的 preview，复述 keeper、sources、backend、confidence 和跳过项，得到用户确认后才执行同一后端的 `--confirm`。
+1. 先跑 `zot --json doctor`，读取 `capabilities.connector_write`、`capabilities.web_write` 和 `write_credentials`。
+2. BibTeX/RIS 新增导入只走 connector：先不带 `--confirm` 预览目标、可写性、记录数和格式，复述后取得确认，再执行 `item import ... --confirm`。
+3. 其他 mutation 全部走 Web API。缺少 `ZOT_LIBRARY_ID` 或 `ZOT_API_KEY` 时停止并点名缺失凭据；不要尝试 connector。
+4. 对 merge/dedupe 先跑不带 `--confirm` 的本地 preview，复述 keeper、sources、confidence 和跳过项；执行 `--confirm` 前再检查 Web 凭据。
 
 命令路由：
 
-- desktop 当前只支持手工合并 `item merge`、单组 `library duplicates-merge` 和批量 `library dedupe`。
-- Web API 写：`item note add/update/delete`、`item tag add/remove/batch`、`item update`、`item add-doi/add-url/add-file`、collection mutation、saved-search mutation、annotation creation、`sync update-status --apply`，以及显式选择 Web 的 merge/dedupe。
+- connector 写：仅 `item import`。
+- Web API 写：`item create/add-doi/add-url/add-file/update/trash/restore/attach`、`item note add/update/delete`、`item tag add/remove/batch`、collection mutation、saved-search mutation、annotation creation、`sync update-status --apply` 和 merge/dedupe。
 - `library dedupe --confirm` 默认只执行 normal-confidence 组；low-confidence 组保留在 `skipped_low_confidence`。普通 confirm 不等于 low-confidence 授权；只有用户看过 preview 后另行、明确接受这部分风险，才可追加 `--include-low-confidence`。
-- 不要宣称 desktop 已支持 tag、note、collection、import、attachment、annotation、saved-search 或 status-sync mutation。若用户需要这些操作，说明当前 desktop 限制；只有用户明确选择 Web 后才进入 Web credential gate。
+- 不要宣称 connector 能执行 tag、note、collection、attachment、annotation、saved-search、status-sync 或 merge/dedupe mutation。
 
-### 7. 配置排障
+### 8. 配置排障
 
 用户通常会说：
 
@@ -172,16 +192,10 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 
 - 诊断：`doctor`
 - 配置：`config show` / `init` / `set` / `profiles list` / `profiles use`
-- desktop bridge：`bridge setup` / `pair` / `status` / `revoke`
 
-bridge 生命周期：
+connector 不需要 API key 或插件配置。`doctor` 显示 `connector_write` 不可用时，先检查 Zotero 是否正在运行以及本机 connector 是否可达；不要通过修改 profile 把 connector 扩成通用写后端。
 
-1. `zot --json bridge setup` 只生成 XPI 并打开所在目录，不会静默安装插件或修改 Zotero profile。
-2. 用户手动安装 XPI 并重启 Zotero。配对码只能由 Zotero UI 显示，五分钟过期且单次使用；不要把真实 code/token 放进 prompt、日志或 issue。
-3. 用 `zot --json bridge pair PAIR-CODE` 配对。成功后当前配置目标选择 desktop；长期 token 只保存在配置和插件授权状态中，不应出现在 envelope。
-4. 用 `zot --json bridge status` 核对连接和可写库；用 `zot --json bridge revoke` 撤销。Zotero 未运行、插件未安装、未配对、鉴权或协议失败时都停在 desktop 错误，不 fallback 到 Web。
-
-### 8. 撤稿与引用质量（Scite）
+### 9. 撤稿与引用质量（Scite）
 
 用户通常会说：
 
@@ -200,7 +214,7 @@ bridge 生命周期：
 - Scite 报告依赖外部 Scite 服务；外部网络不可用时直说，不要伪造结果
 - `item scite report` 必须给 `--item-key` 或 `--doi` 之一
 
-### 9. 同步与增量
+### 10. 同步与增量
 
 用户通常会说：
 
@@ -261,10 +275,9 @@ cargo run -q -p zot-cli -- --json doctor
 - `db_exists`
 - `capabilities.local_sqlite_read`
 - `capabilities.local_http_read`
-- `capabilities.desktop_write`
+- `capabilities.connector_write`（仅表示本机 BibTeX/RIS import 能力）
 - `capabilities.web_write`
-- `selected_write_backend`
-- `write_credentials.configured`（只表示 Web API credential，不是 desktop 写入能力）
+- `write_credentials.configured`（只表示 Web API credential，不是 connector 导入能力）
 - `pdf_backend.available`
 - `better_bibtex.available`
 - `libraries.feeds_available`
@@ -287,9 +300,9 @@ cargo run -q -p zot-cli -- --json doctor
 - `library saved-search create --conditions` 必须是 JSON 数组，每项形如 `{"condition": "...", "operator": "...", "value": "..."}`，至少一条；空数组直接报 `saved-search-conditions`
 - Pdfium 路径覆盖：`ZOT_PDFIUM_LIB_PATH` / `PDFIUM_LIB_PATH` 指向 lib，`ZOT_PDFIUM_CACHE_DIR` 覆盖自动下载缓存目录
 - 永远不要直接修改 `zotero.sqlite`
-- Zotero Local HTTP API 只读；它不是 desktop 写通道，也不能替代 bridge 插件
-- desktop bridge 第一阶段只支持 merge/dedupe，不支持任意脚本、字段写入或其他 mutation
-- pair code、desktop token、API key 和 raw merge plan token 不得进入输出、日志、fixture、文档示例或 eval
+- Zotero Local HTTP API 只读；本机唯一写路径是 connector 的 `item import`
+- connector 无鉴权但仅监听 loopback，只支持向 Zotero UI 当前选中目标新增 BibTeX/RIS 条目；不能用于 merge/dedupe 或其他 mutation
+- API key 和 raw merge plan token 不得进入输出、日志、fixture、文档示例或 eval
 
 ## 安全门
 
@@ -299,6 +312,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `item add-doi`
 - `item add-url`
 - `item add-file`
+- `item import --confirm`
 - `item update`
 - `item trash`
 - `item restore`
@@ -345,14 +359,16 @@ cargo run -q -p zot-cli -- --json doctor
    - `sync update-status --apply`
 
    层 C，批量写（影响一组条目，必须先在小范围试，再放开）：
+   - `item import --confirm`（先 dry-run 复述目标可写性、记录数和格式）
    - `item tag batch --add-tag/--remove-tag`
    - `library duplicates-merge`（多源 → 单 keeper）
    - `library dedupe --confirm`（整库/整 collection 多组批量合并，先用 `--collection` 圈小范围、复查 low-confidence 组）
 
 4. `item merge` / `library duplicates-merge` / `library dedupe` / `sync update-status` 不带 `--confirm` / `--apply` 时本身就是 dry-run preview；要把 preview 当成“还没改”，不要错说成“已经合并 / 已经写回”。
-5. merge/dedupe 的 preview 和 confirm 必须保持同一 selected backend；desktop 失败不能重试为 Web，Web 失败也不能改走 desktop。
-6. `library dedupe` 的 low-confidence 组默认跳过。不要把普通 confirm 当作授权，也不要自行追加 `--include-low-confidence`；必须先单独展示这些组，再取得一次明确的风险授权。
-7. 写权限缺失或所选后端不支持目标 mutation 时停在只读分析，不要假装成功。
+5. connector import 的 preview 与 confirm 必须保持同一输入和格式，并在 confirm 前重新检查当前目标可写性；connector 失败不能改走 Web。
+6. merge/dedupe 的 preview 是本地只读规划，confirm 只走 Web API；缺少 Web 凭据时保留 preview 结果并停止，不能改走 connector。
+7. `library dedupe` 的 low-confidence 组默认跳过。不要把普通 confirm 当作授权，也不要自行追加 `--include-low-confidence`；必须先单独展示这些组，再取得一次明确的风险授权。
+8. 写权限缺失或目标路径不支持该 mutation 时停在只读分析，不要假装成功。
 
 ## 常见语义差异
 
@@ -393,17 +409,26 @@ cargo run -q -p zot-cli -- --json doctor
 - “用浏览器打开 ATTN001 的 DOI 看看”  
   走 `item open ATTN001 --url`
 
-- “先预览再合并 KEEP001 和 DUPE001，确认后再真的合并”  
-  先 `doctor` 确认 selected backend，再 `item merge KEEP001 DUPE001`；复述 preview 并确认后，用同一 backend 执行 `item merge ... --confirm`
+- “把这个 bib 导入 Zotero”
+  先 `item import --file <path>` dry-run，复述当前目标、可写性、记录数和格式；用户确认后才执行同一命令并追加 `--confirm`
 
-- “我没有 API key，用正在运行的 Zotero 把重复条目清一下”
-  先看 `capabilities.desktop_write` 和 `bridge status`，再跑不带 `--confirm` 的 `library dedupe`；默认跳过 low-confidence，确认后才用 desktop apply
+- “把这几条 RIS 存进我当前的 collection”
+  先 `item import --text <ris> --format ris` dry-run；确认 Zotero UI 当前选中的 collection 正确且可写后，才追加 `--confirm`
+
+- “把 citation key 为 vaswani_attention_2023 的文献插进草稿，并维护 references.bib”
+  先 `library citekey vaswani_attention_2023` 解析 Zotero item key（如 `PXW99EKT`），再用 `item cite PXW99EKT --style apa` 获取显示引用、`item export PXW99EKT --format bibtex` 获取 BibTeX；agent 用导出的 BibTeX 条目更新 `references.bib`，并把 BibTeX citation key 插入草稿。CLI 不直接编辑草稿或 `.bib` 文件
+
+- “先预览再合并 KEEP001 和 DUPE001，确认后再真的合并”  
+  先 `item merge KEEP001 DUPE001` 做本地 preview；复述结果并确认后，检查 Web 凭据，再执行 `item merge ... --confirm`
+
+- “我没有 API key，想在本机把重复条目清一下”
+  可以运行不带 `--confirm` 的 `library dedupe` 生成本地只读计划，但必须明确说明实际合并已不支持无凭据本机执行；`--confirm` 需要 `ZOT_LIBRARY_ID` + `ZOT_API_KEY`，connector 不能 merge
 
 - “这次明确走 Zotero Web API 合并”
-  先确认 `capabilities.web_write`，再对 preview 和 confirm 都显式使用 `--write-backend web`；Web 失败不 fallback 到 desktop
+  先生成 merge preview，再确认 `capabilities.web_write` 和 Web 凭据；用户确认后执行 `--confirm`，Web 失败不 fallback 到 connector
 
 - “帮我直接 UPDATE zotero.sqlite”
-  拒绝直接 SQLite 写；说明 local SQLite / Local HTTP 只读，并转到已实现、经用户选择的 desktop 或 Web 命令
+  拒绝直接 SQLite 写；说明 local SQLite / Local HTTP 只读。BibTeX/RIS 新增导入可走 connector，其他 mutation 只能转到已实现的 Web 命令
 
 - “我库里这些跟 attention 有关的条目，挨个查一下 Scite 报告”  
   走 `item scite search "attention"`
@@ -480,11 +505,10 @@ cargo run -q -p zot-cli -- --json doctor
 ## 失败时的 fallback
 
 - 没有 `zot`：开发仓库里退回 `cargo run -q -p zot-cli -- ...`
-- desktop 未安装：停下并提示 `bridge setup`、手动安装 XPI、重启和配对；不改走 Web
-- Zotero 未运行：停下并请用户启动 Zotero 后重试原 desktop 操作；不改走 Web
-- desktop 未配对、auth/protocol/profile 不匹配：停下并根据结构化 hint 走 `bridge status`、重新配对或修复版本；不得暴露 token
-- Web 写不可用：明确告诉用户缺 `ZOT_API_KEY` / `ZOT_LIBRARY_ID`；不改走 desktop
-- 所选后端不支持目标 mutation：说明能力边界；只有用户明确选择另一个后端后才重新进入对应诊断门
+- Zotero 未运行或 connector 不可达：停下并请用户启动 Zotero、确认本机 connector 可达后重试原 import；不改走 Web
+- connector 目标只读：点名当前目标不可写，请用户在 Zotero UI 选择可写 collection/library 后重新 dry-run；不改走 Web
+- Web 写不可用：明确告诉用户缺 `ZOT_API_KEY` / `ZOT_LIBRARY_ID`；connector 不能替代其他 mutation
+- 目标路径不支持该 mutation：说明能力边界并停止，不要暗示 connector 可以 merge、dedupe、tag 或 update
 - 没有 Better BibTeX：`library citekey` 只走 Extra fallback
 - 没有 Pdfium：不要承诺 fulltext / outline / annotation / PDF 下载后的文本处理
 - 没有 embedding：semantic 检索说明会降级；workspace 问答改用 `--mode bm25`
@@ -496,7 +520,8 @@ cargo run -q -p zot-cli -- --json doctor
 
 - 先回答用户真正的问题，而不是先贴命令
 - 再给关键证据、已执行动作或失败原因
-- 如果失败，明确告诉用户缺什么、下一步是什么
+- 明确区分 Zotero item key（如 `PXW99EKT`，供 `item get/cite/export` 使用）与 BibTeX citation key（如 `vaswani_attention_2023`，供 LaTeX/Markdown 引用使用），不能把两者混作同一个 key
+- 如果失败，点名具体门和下一步：Zotero 未运行、connector 不可达、目标只读、Web 凭据缺失、无匹配条目或写未确认
 - 默认不要倾倒 raw JSON；先读 envelope，再转述有效信息
 - 优先复述 envelope 里 `data` / `meta` 的关键字段，把 raw JSON 当二级证据，必要时再贴
 

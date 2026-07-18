@@ -131,28 +131,28 @@
   },
   {
     "id": 27,
-    "prompt": "我没有 Zotero API key，但 Zotero 桌面端和 bridge 都已经配好了。帮我清理 user library 里的重复条目，先给计划，确认前不要写入。",
-    "expected": "先确认 desktop capability，再跑 dedupe preview；不要求 Web key、不包含 low-confidence，等待确认。"
+    "prompt": "我没有 Zotero API key，想直接在本机把 user library 的重复条目清掉。先给我计划，确认前不要写入。",
+    "expected": "可以先跑本地只读 dedupe preview，但必须说明实际 merge/dedupe 已不能无凭据本机执行，confirm 需要 Zotero Web API 凭据。"
   },
   {
     "id": 28,
-    "prompt": "这次不要走本机插件。我明确要求用 Zotero Web API 预览合并 KEEP001 和 DUPE001，确认后也继续用 Web。",
-    "expected": "显式选择 web，检查 Web credential，preview/confirm 保持同一后端且不 fallback。"
+    "prompt": "把 downloads/new-papers.bib 导入 Zotero 当前选中的 collection。先告诉我目标和条目数，确认后再写。",
+    "expected": "走 connector 的 item import --file dry-run，复述当前目标、可写性、条目数和格式；用户确认后才追加 --confirm。"
   },
   {
     "id": 29,
-    "prompt": "我想在本机合并重复文献，但 doctor 说 desktop_write installed=false。你直接帮我处理到能继续的下一步，别改走云端。",
-    "expected": "说明 setup 只生成 XPI，要求手动安装、重启、配对和 status；不 fallback 到 Web。"
+    "prompt": "把这几条 RIS 存进 Zotero 当前的 group collection；dry-run 显示这个目标是只读的，别换到别的库。",
+    "expected": "点名 connector 目标只读并停止，要求用户在 Zotero UI 选择可写目标后重新预览；不得发送 import 或 fallback 到 Web。"
   },
   {
     "id": 30,
-    "prompt": "Zotero 现在没开，desktop bridge 连不上。我还是想清理重复项，你先继续做能安全做的部分。",
-    "expected": "允许本地只读 preview，但停止 confirm，要求启动 Zotero 后重试且不 fallback。"
+    "prompt": "我有 BibTeX key vaswani_attention_2023。帮我找到 Zotero 条目，把引用插进 draft.tex，并维护 references.bib；顺便解释为什么又出现 PXW99EKT。",
+    "expected": "先用 library citekey 把 BibTeX citation key 解析成 Zotero item key，再用 item cite/item export 取数据，由 agent 更新草稿和 references.bib，并解释双 key 区别。"
   },
   {
     "id": 31,
-    "prompt": "只帮我在本地 Zotero 库里搜 title 含 reward model 的条目，不要改任何东西，也不要折腾插件或 API key。",
-    "expected": "走本地只读 library search，不要求 bridge pairing 或 Web credentials。"
+    "prompt": "帮我去网上找 2026 年最新的 reward model 论文，我没有说要查 Zotero，也不需要写进文献库。",
+    "expected": "这是通用找论文请求，不应触发 zot skill，也不应把范围擅自收缩到本地 Zotero 库。"
   },
   {
     "id": 32,
@@ -166,12 +166,12 @@
   },
   {
     "id": 34,
-    "prompt": "desktop bridge 已配对。现在请用本机通道给 ATTN001 加 priority tag；不要访问 Web API。",
-    "expected": "说明 desktop 尚不支持 tag mutation，停止且不 fallback，不虚构支持。"
+    "prompt": "APA 7 的三位作者文内引用应该怎么写？只讲格式规则，不要访问或修改我的 Zotero。",
+    "expected": "这是通用引用格式教学，不应触发 zot skill，也不应访问 Zotero。"
   },
   {
     "id": 35,
-    "prompt": "这是升级前的老 profile，我从没 setup 或 pair 过 bridge。帮我判断 note add 默认会走哪里，以及缺什么。",
-    "expected": "说明旧 profile 默认 web，note add 检查 Web credential，不静默选择 desktop。"
+    "prompt": "总结当前目录里的 report.pdf；它不是 Zotero 附件，也不需要建 workspace 或写回 Zotero。",
+    "expected": "这是非 Zotero PDF 处理请求，不应触发 zot skill，应直接使用普通 PDF 工作流。"
   }
 ]
