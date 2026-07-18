@@ -1,9 +1,8 @@
 //! Loopback-only client for Zotero's built-in connector HTTP server
-//! (`/connector/*`). This is distinct from [`crate::client::DesktopClient`],
-//! which speaks the authenticated `zot-bridge` plugin protocol: the
-//! connector server ships with Zotero itself and needs no plugin or
-//! pairing, but it only supports importing new records into whatever
-//! library/collection the user currently has selected in the Zotero UI.
+//! (`/connector/*`) plus the adjacent read-only local API (`/api/*`). Both
+//! servers ship with Zotero itself and need no plugin or pairing. Connector
+//! writes are limited to importing new records into the library/collection
+//! currently selected in the Zotero UI.
 
 use std::fmt;
 use std::time::Duration;
@@ -28,6 +27,15 @@ pub struct ConnectorPing {
     pub available: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zotero_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LocalHttpStatus {
+    pub available: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zotero_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connector_api_version: Option<String>,
 }
 
 /// Result of `POST /connector/getSelectedCollection`: the library/collection
@@ -137,6 +145,27 @@ impl ConnectorClient {
         Ok(ConnectorPing {
             available: true,
             zotero_version: header_value(&response, "x-zotero-version"),
+        })
+    }
+
+    /// Probe Zotero's built-in read-only local API. This shares the connector
+    /// server's loopback-only client but does not perform a write.
+    pub async fn probe_local_http(&self) -> ZotResult<LocalHttpStatus> {
+        let url = self.join("api/")?;
+        let response = self
+            .client
+            .get(url)
+            .timeout(CONNECT_TIMEOUT)
+            .send()
+            .await
+            .map_err(map_request_error)?;
+        if !response.status().is_success() {
+            return Err(status_error(response.status()));
+        }
+        Ok(LocalHttpStatus {
+            available: true,
+            zotero_version: header_value(&response, "x-zotero-version"),
+            connector_api_version: header_value(&response, "x-zotero-connector-api-version"),
         })
     }
 
@@ -361,6 +390,29 @@ mod tests {
             captured[0].header("x-zotero-connector-api-version"),
             Some("3")
         );
+    }
+
+    #[tokio::test]
+    async fn local_http_probe_decodes_zotero_headers() {
+        let (base, handle) = spawn_server(vec![(
+            200,
+            "Nothing to see here".to_string(),
+            vec![
+                ("X-Zotero-Version", "9.0.6"),
+                ("X-Zotero-Connector-API-Version", "3"),
+            ],
+        )]);
+        let client = ConnectorClient::with_base_url_for_tests(&base, Duration::from_secs(1))
+            .expect("client");
+
+        let status = client.probe_local_http().await.expect("local HTTP probe");
+        assert!(status.available);
+        assert_eq!(status.zotero_version.as_deref(), Some("9.0.6"));
+        assert_eq!(status.connector_api_version.as_deref(), Some("3"));
+
+        let captured = handle.join().expect("join server");
+        assert_eq!(captured[0].method, "GET");
+        assert_eq!(captured[0].url, "/api/");
     }
 
     #[tokio::test]

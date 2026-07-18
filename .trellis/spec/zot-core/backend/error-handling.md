@@ -14,13 +14,9 @@ machine-readable codes.
   `zot-local`.
 - `ZotError::Remote` is for Zotero Web API, enrichment APIs, and embedding
   service failures from `zot-remote`.
-- `ZotError::DesktopBridge` is for the authenticated `zot-bridge` plugin
-  transport (loopback, bearer token) from `zot-desktop`. See
-  `zot-cli/backend/desktop-bridge.md`.
 - `ZotError::Connector` is for Zotero's built-in unauthenticated connector
-  server transport (import-only, no plugin) from `zot-desktop`. Deliberately
-  separate from `DesktopBridge` — never reuse one for the other's failures.
-  See `zot-cli/backend/connector.md`.
+  server transport (import-only plus the adjacent read-only local API probe,
+  no plugin) from `zot-desktop`. See `zot-cli/backend/connector.md`.
 - `ZotError::Pdf` is for PDF extraction, Pdfium setup, and annotation geometry.
 - `ZotError::Unsupported` is for deliberately unavailable features such as
   command surfaces that are scaffolded but not implemented.

@@ -172,7 +172,7 @@
 
 约束：
 
-- 这组 import 能力继续只走 Zotero Web API；desktop bridge 不扩展成任意条目创建器
+- 这组 Web import 能力继续走 Zotero Web API；本机 connector 只负责 BibTeX/RIS 新增导入，不能更新已有条目
 - 保持现有 JSON envelope
 
 验证：

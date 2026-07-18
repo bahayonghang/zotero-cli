@@ -172,7 +172,7 @@ Main work:
 
 Constraints:
 
-- keep these import writes on the Zotero Web API; do not expand the desktop bridge into a generic item creator
+- keep these Web import writes on the Zotero Web API; the local connector only imports new BibTeX/RIS records and cannot update existing items
 - keep the current JSON envelope
 
 Verification:

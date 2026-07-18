@@ -14,14 +14,10 @@ variant — code-spec depth is mandatory. Use this before changing
 `zot-desktop/src/connector.rs`, `zot-cli/src/commands/item/import.rs`, or
 doctor's `connector_write` capability.
 
-Distinct from `desktop-bridge.md`: the connector talks to Zotero's own
-built-in server that exists with **no plugin installed and no auth** —
-import-only, and the target is whatever the Zotero UI currently has
-selected. It is not the authenticated `zot-bridge` plugin protocol. Both
-transports live in `zot-desktop`, but `connector.rs` must not import
-`client.rs`/`model.rs` (bridge) internals — bridge is scheduled for removal
-in a sibling task and the connector must not depend on code that will
-disappear.
+The connector talks to Zotero's own built-in server with **no plugin installed
+and no auth**. It is import-only, and the target is whatever the Zotero UI
+currently has selected. `connector.rs` is the sole module in `zot-desktop` and
+also owns the adjacent read-only `/api/` readiness probe.
 
 ### 2. Signatures
 
@@ -33,6 +29,7 @@ zot item import (--file <path> | --text <string>) [--format bibtex|ris] [--confi
 // zot-desktop/src/connector.rs
 impl ConnectorClient {
     pub fn ping(&self) -> ZotResult<ConnectorPing>;
+    pub fn probe_local_http(&self) -> ZotResult<LocalHttpStatus>;
     pub fn selected_target(&self) -> ZotResult<SelectedTarget>;
     pub fn import(&self, session: &str, text: &str) -> ZotResult<ConnectorImportResult>;
 }
@@ -40,6 +37,7 @@ impl ConnectorClient {
 
 ```text
 GET  /connector/ping
+GET  /api/
 POST /connector/getSelectedCollection
 POST /connector/import?session=<uuid>
 ```
@@ -47,11 +45,10 @@ POST /connector/import?session=<uuid>
 ### 3. Contracts
 
 - Base URL `http://127.0.0.1:23119`, override via `ZOT_CONNECTOR_BASE_URL`;
-  loopback-only, validated independently of bridge's `parse_loopback_url`
-  (that function is private to `client.rs` and bridge-flavored anyway).
-- Header `X-Zotero-Connector-API-Version: 3` on every request.
-- Timeouts: 5s connect / 30s request — longer than bridge's 10s because
-  importing a large `.bib` is slower than a health probe.
+  loopback-only and validated inside `connector.rs`.
+- Header `X-Zotero-Connector-API-Version: 3` on connector requests.
+- Timeouts: 5s connect / 30s connector request; `/api/` readiness probes use
+  the 5s timeout.
 - `SelectedTarget { id, name, editable, library_editable: Option<bool> }`;
   writable iff `editable` and (when present) `library_editable` are both
   true — see `SelectedTarget::is_writable()`. Never infer writability from
@@ -109,12 +106,11 @@ POST /connector/import?session=<uuid>
 ### 7. Wrong vs Correct
 
 ```rust
-// Wrong — reuses bridge's parse_loopback_url, coupling connector to code
-// that a sibling task will delete:
-use crate::client::parse_loopback_url;
+// Wrong — accepts an arbitrary remote base URL for a local unauthenticated
+// write transport:
+let base_url = Url::parse(raw)?;
 
-// Correct — connector validates its own loopback constraint locally, so it
-// has zero dependency on the bridge module:
+// Correct — connector owns and enforces the loopback constraint:
 fn parse_connector_base_url(raw: &str) -> ZotResult<Url> { /* local copy */ }
 ```
 

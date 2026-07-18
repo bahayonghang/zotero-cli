@@ -30,10 +30,10 @@
 - 明确说“保存条件”“以后还要反复用”：优先理解成 saved search
 - 明确说“下载附件”“导出文件”：优先理解成附件面
 - 明确说“先预览再合并”：优先理解成 `item merge`，不是直接 `duplicates-merge`
-- 本地只读请求：不启动 bridge，也不要求 Web key
-- 任何写入：先过 doctor，再按 explicit override 或 effective `selected_write_backend` 选择一个后端
-- desktop 当前只支持 merge/dedupe；tag/note/collection 等请求不能虚构本机写能力
-- backend 错误不自动 fallback；low-confidence 默认 skip，不自行追加 `--include-low-confidence`
+- 本地只读请求：不要求 Web key
+- 任何写入：先过 doctor；只有 BibTeX/RIS 新增导入可走 connector，其余 mutation 走 Web API
+- connector 不能更新或 merge 已有条目；tag/note/collection 等请求不能虚构本机写能力
+- low-confidence 默认 skip，不自行追加 `--include-low-confidence`
 - 任何“为什么不工作”：先过 doctor / config
 
 ## 什么时候先跑 doctor
@@ -48,7 +48,7 @@
 - 配置排障
 - 用户反馈“为什么不工作”
 
-重点看 `capabilities.local_sqlite_read`、`local_http_read`、`desktop_write`、`web_write` 和 `selected_write_backend`，不要只看 Web `write_credentials`。
+重点看 `capabilities.local_sqlite_read`、`local_http_read`、`connector_write` 和 `web_write`，不要只看 Web `write_credentials`。
 
 ## skills 页和 CLI 页的分工
 

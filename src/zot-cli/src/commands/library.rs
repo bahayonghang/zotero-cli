@@ -202,12 +202,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 args.collection.as_deref(),
                 args.limit,
             )?;
-            let plan = build_dedupe_plan(
-                &library,
-                &groups,
-                ctx.write_backend(),
-                args.include_low_confidence,
-            )?;
+            let plan = build_dedupe_plan(&library, &groups, args.include_low_confidence)?;
             if args.confirm {
                 // Only the apply path needs write credentials; the default
                 // dry-run stays fully local.

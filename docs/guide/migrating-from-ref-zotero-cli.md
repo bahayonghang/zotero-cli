@@ -98,7 +98,7 @@ zot completions powershell
 Rust 版不是 connector 的平铺包装层。它的边界已经写死了：
 
 - 本地读取来自 `zotero.sqlite` 和附件目录
-- merge/dedupe 可走配对后的 desktop bridge 或显式 Web backend；其他 mutation 仍走 Zotero Web API
+- merge/dedupe 与其他已有条目 mutation 走 Zotero Web API；本机 connector 只负责新增导入 BibTeX/RIS
 - 输出优先稳定 JSON envelope
 - 主心智是 `library` / `item` / `collection` / `workspace` / `sync`
 

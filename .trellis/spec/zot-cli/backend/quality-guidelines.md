@@ -7,7 +7,7 @@ stability, and safety around writes matter more than clever abstractions.
 
 - Add clap parse coverage for new command surfaces in
   `cli.rs::parses_new_library_and_item_command_surfaces`.
-- Keep global flags (`--json`, `--profile`, `--library`, `--write-backend`) on the root `Cli`.
+- Keep global flags (`--json`, `--profile`, `--library`) on the root `Cli`.
   `--library` only accepts `user` or `group:<id>` through `parse_library_scope`.
 - Return `CommandOutput` from handlers for JSON success payloads.
   `CommandOutput::new` assembles the envelope, adding `count`, `total`,
@@ -87,7 +87,7 @@ CommandOutput::new(ctx, items, seed, |items| print_items(items))
 - Does the JSON path emit a standard envelope and useful meta?
 - Does the human path avoid raw JSON unless explicitly exporting JSON?
 - Are command parse tests and focused behavior tests updated?
-- Does the command respect local-read, selected desktop merge/dedupe, and Web
-  mutation boundaries without fallback?
+- Does the command respect local-read, connector-import, and Web mutation
+  boundaries without fallback?
 - If `skills/zot` changed, were mirrors regenerated and `just skills-check`
   run instead of editing mirror files directly?

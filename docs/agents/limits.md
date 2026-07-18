@@ -78,6 +78,8 @@ libraries. Keep it accurate as the implementation evolves.
 - `zot --json ...` always returns the standard envelope from
   `zot-core::CliEnvelope`. Success payloads now carry
   `meta.profile == "<active>"` and `meta.api_version == 1` regardless of
-  which command produced the output. Treat `api_version` as the cut-off
-  marker for the 0.5.0 contract; if it is absent or larger, expect schema
+  which command produced the output. `api_version == 1` identifies the
+  envelope family, but individual command payload fields may be added or
+  removed during the 0.x release line. Consumers must also follow
+  `CHANGELOG.md`; if `api_version` is absent or larger, expect broader schema
   drift.

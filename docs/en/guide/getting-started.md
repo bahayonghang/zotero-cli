@@ -49,26 +49,20 @@ cargo run -q -p zot-cli -- --json doctor
 
 Pick one invocation path and keep it consistent for the session.
 
-`doctor` reports `local_sqlite_read`, `local_http_read`, `desktop_write`, `web_write`, and `selected_write_backend` independently. Missing `write_credentials` means Web writes are unavailable; it does not block local reads or paired desktop merge/dedupe.
+`doctor` reports `local_sqlite_read`, `local_http_read`, `connector_write`, and `web_write` independently. Missing `write_credentials` means Web writes are unavailable; it does not block local reads or connector imports.
 
 If `doctor` shows `pdf_backend.available=false` on a supported platform, `zot` will auto-download a managed Pdfium binary the first time a local PDF read actually needs it. `doctor` itself does not trigger the download.
 
-### 4. Install and pair the bridge for local merge/dedupe
+### 4. Use Zotero's built-in connector for local imports
 
 ```bash
-zot --json bridge setup
+zot --json item import --file references.bib
+zot --json item import --file references.bib --confirm
 ```
 
-This only generates the XPI and opens its folder. Install it manually in Zotero, restart Zotero, then use the five-minute, single-use code shown by Zotero UI:
+No plugin or pairing is required. Zotero must be running, and its UI must have a writable library or collection selected. Without `--confirm`, no import request is sent.
 
-```bash
-zot --json bridge pair PAIR-CODE
-zot --json bridge status
-```
-
-The first desktop release supports only `item merge`, `library duplicates-merge`, and `library dedupe`. Zotero Local HTTP and `zotero.sqlite` remain read-only and cannot replace the bridge.
-
-### 5. Configure Web writes and saved-search support when needed
+### 5. Configure merge/dedupe, other Web writes, and saved-search support when needed
 
 If you plan to:
 
@@ -136,9 +130,8 @@ Pay special attention to:
 - `db_exists`
 - `capabilities.local_sqlite_read`
 - `capabilities.local_http_read`
-- `capabilities.desktop_write`
+- `capabilities.connector_write`
 - `capabilities.web_write`
-- `selected_write_backend`
 - `write_credentials.configured` (Web writes only)
 - `pdf_backend.available`
 - `better_bibtex.available`

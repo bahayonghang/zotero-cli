@@ -13,8 +13,7 @@ use std::collections::BTreeSet;
 use anyhow::Result;
 use zot_core::{
     DedupeApplyReport, DedupeConfidence, DedupeGroupFailure, DedupeGroupPlan, DedupeItemRef,
-    DedupePlan, DuplicateGroup, Item, MergeApplyResult, MergeOperation, WriteBackend, ZotError,
-    ZotResult,
+    DedupePlan, DuplicateGroup, Item, MergeApplyResult, MergeOperation, ZotError, ZotResult,
 };
 use zot_local::AttachmentSource;
 
@@ -30,7 +29,6 @@ use crate::commands::item::merge::{MergeWriter, merge_item_set};
 pub(crate) fn build_dedupe_plan(
     library: &impl AttachmentSource,
     groups: &[DuplicateGroup],
-    write_backend: WriteBackend,
     include_low_confidence: bool,
 ) -> ZotResult<DedupePlan> {
     let mut plans = Vec::new();
@@ -68,7 +66,6 @@ pub(crate) fn build_dedupe_plan(
         });
     }
     Ok(DedupePlan {
-        write_backend,
         include_low_confidence,
         total_groups: plans.len(),
         groups: plans,
@@ -215,7 +212,6 @@ pub(crate) async fn apply_dedupe_plan<M: GroupMerger>(
         }
     }
     DedupeApplyReport {
-        write_backend: plan.write_backend,
         total_groups: plan.groups.len(),
         eligible_groups: plan.groups.len() - skipped_low_confidence.len(),
         applied_groups: applied.len(),
@@ -480,7 +476,7 @@ mod tests {
         library: &impl AttachmentSource,
         groups: &[DuplicateGroup],
     ) -> ZotResult<DedupePlan> {
-        build_dedupe_plan(library, groups, WriteBackend::Web, false)
+        build_dedupe_plan(library, groups, false)
     }
 
     /// Attachment counts per item key; the planner only calls
@@ -763,7 +759,6 @@ mod tests {
         .expect("build plan");
         let json = serde_json::to_value(&plan).expect("serialize plan");
 
-        assert_eq!(json["write_backend"], "web");
         assert_eq!(json["include_low_confidence"], false);
         assert_eq!(json["total_groups"], 2);
         assert_eq!(json["confirm_required"], true);
@@ -823,7 +818,6 @@ mod tests {
                 .into());
             }
             Ok(MergeApplyResult {
-                write_backend: WriteBackend::Web,
                 already_applied: false,
                 keeper_key: keeper_key.to_string(),
                 source_keys_trashed: source_keys.to_vec(),
@@ -860,7 +854,6 @@ mod tests {
     #[tokio::test]
     async fn apply_continues_after_single_group_failure() {
         let plan = DedupePlan {
-            write_backend: WriteBackend::Web,
             include_low_confidence: false,
             groups: vec![
                 group_plan("KEEP0001", "DUPE0001"),
@@ -909,7 +902,6 @@ mod tests {
         low.confidence = DedupeConfidence::Low;
         low.confidence_note = Some("differing DOIs".to_string());
         let plan = DedupePlan {
-            write_backend: WriteBackend::Desktop,
             include_low_confidence: false,
             groups: vec![group_plan("KEEP0001", "DUPE0001"), low],
             total_groups: 2,
@@ -923,7 +915,6 @@ mod tests {
         let report = apply_dedupe_plan(&merger, &plan).await;
 
         assert_eq!(*merger.calls.borrow(), vec!["KEEP0001"]);
-        assert_eq!(report.write_backend, WriteBackend::Desktop);
         assert_eq!(report.total_groups, 2);
         assert_eq!(report.eligible_groups, 1);
         assert_eq!(report.applied_groups, 1);
@@ -938,7 +929,6 @@ mod tests {
         low.confidence = DedupeConfidence::Low;
         low.confidence_note = Some("differing DOIs".to_string());
         let plan = DedupePlan {
-            write_backend: WriteBackend::Desktop,
             include_low_confidence: true,
             groups: vec![group_plan("KEEP0001", "DUPE0001"), low],
             total_groups: 2,

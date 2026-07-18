@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file. Dates use
 `YYYY-MM-DD`. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- `item merge`, `library duplicates-merge`, and `library dedupe` now use the
+  Zotero Web API exclusively. Configure `library_id` and `api_key` before
+  confirming these operations.
+- Zotero Desktop's built-in connector is now the only local write path and is
+  limited to importing new BibTeX/RIS records into the selected writable target.
+- JSON payloads no longer include `write_backend`,
+  `selected_write_backend`, or `capabilities.desktop_write`. This breaking
+  schema change keeps `meta.api_version = 1`; consumers must follow the
+  changelog for field additions and removals within the 0.x release line.
+
+### Removed
+
+- Removed the bundled `zot-bridge` XPI, `zot bridge ...`, the global
+  `--write-backend` flag, and `zot config set write-backend`.
+
+### Migration
+
+- Uninstall Zot Bridge from Zotero and remove legacy `desktop_bridge` and
+  `write_backend` entries from `~/.config/zot/config.toml`. Old entries remain
+  load-compatible and `zot --json doctor` reports one migration hint without
+  exposing stored token values.
+
 ## [0.5.0] - 2026-05-10
 
 This release closes 16 findings from the internal `CODE_REVIEW.md` audit,

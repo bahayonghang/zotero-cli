@@ -49,26 +49,20 @@ cargo run -q -p zot-cli -- --json doctor
 
 同一轮任务固定一种调用路径，不要混用。
 
-`doctor` 会独立报告 `local_sqlite_read`、`local_http_read`、`desktop_write`、`web_write` 和 `selected_write_backend`。`write_credentials` 缺失只表示 Web 写不可用，不阻塞本地读取或已配对的 desktop merge/dedupe。
+`doctor` 会独立报告 `local_sqlite_read`、`local_http_read`、`connector_write` 和 `web_write`。`write_credentials` 缺失只表示 Web 写不可用，不阻塞本地读取或 connector 导入。
 
 如果 `doctor` 里 `pdf_backend.available=false`，但平台受支持，`zot` 会在第一次真正需要 Pdfium 的本地 PDF 读取时自动下载受管 Pdfium；`doctor` 本身不会触发下载。
 
-### 4. 本机 merge/dedupe 先安装并配对 bridge
+### 4. 本机导入使用 Zotero 内置 connector
 
 ```bash
-zot --json bridge setup
+zot --json item import --file references.bib
+zot --json item import --file references.bib --confirm
 ```
 
-这条命令只生成 XPI 并打开所在目录。接下来需要手动安装到 Zotero、重启 Zotero，再使用 Zotero UI 显示的五分钟单次配对码：
+无需安装插件或配对。Zotero 必须正在运行，且其 UI 当前选中的 library / collection 必须可写；不加 `--confirm` 时不会发送导入记录。
 
-```bash
-zot --json bridge pair PAIR-CODE
-zot --json bridge status
-```
-
-desktop 第一阶段只支持 `item merge`、`library duplicates-merge`、`library dedupe`。Zotero Local HTTP 和 `zotero.sqlite` 都只读，不能替代 bridge。
-
-### 5. 需要其他远端写入或保存查询时，先配 Web config
+### 5. merge/dedupe、其他远端写入或保存查询使用 Web config
 
 如果你后面要做这些事：
 
@@ -136,9 +130,8 @@ zot --json workspace query llm-safety "主要的失败模式有哪些？" --mode
 - `db_exists`
 - `capabilities.local_sqlite_read`
 - `capabilities.local_http_read`
-- `capabilities.desktop_write`
+- `capabilities.connector_write`
 - `capabilities.web_write`
-- `selected_write_backend`
 - `write_credentials.configured`（只表示 Web 写凭据）
 - `pdf_backend.available`
 - `better_bibtex.available`

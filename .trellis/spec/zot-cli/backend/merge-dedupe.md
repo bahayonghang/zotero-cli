@@ -27,7 +27,7 @@ fn build_merge_execution_plan(keeper, sources, keeper_children, source_children,
                               source_uris) -> Result<MergeExecutionPlan>; // pure, zero IO
 
 // zot-cli/src/commands/library_dedupe.rs
-fn build_dedupe_plan(..., write_backend, include_low_confidence) -> Result<DedupePlan>;
+fn build_dedupe_plan(..., include_low_confidence) -> Result<DedupePlan>;
 async fn apply_dedupe_plan(merger: &impl GroupMerger, ...) -> DedupeApplyReport;
 
 // zot-remote/src/zotero.rs
@@ -37,16 +37,16 @@ pub fn item_uri(&self, key: &str) -> String; // http://zotero.org/users|groups/{
 CLI: `zot library dedupe [--method both|doi|title] [--collection <id>] [--limit N]
 [--confirm] [--include-low-confidence]`
 — dry-run by default; dry-run is pure local and must not construct the remote
-or desktop writer (selected writer construction occurs only in `--confirm`).
+writer (writer construction occurs only in `--confirm`).
 
 ### 3. Contracts
 
 - `MergePreview` / `MergeApplyResult` carry `skipped_incompatible_fields:
 [{field, source_key}]` and `relations_to_add: [uri]`. JSON envelope grows
   additively only.
-- Merge/dedupe preview and apply models carry lower-case `write_backend`.
-  Desktop preview may add a redacted `plan_id`; raw plan tokens never enter
-  `zot-core`. Apply adds `already_applied` (false for Web).
+- Merge/dedupe preview and apply models do not carry a backend selector;
+  these commands are Web-only. Apply includes `already_applied` (currently
+  false for Web).
 - The keeper PATCH payload **is** `plan.merged_keeper`; `sanitize_flat_item_value`
   strips only `key`/`version`, so `relations` rides through unchanged. Tests
   may therefore assert on the plan object as the wire payload.
@@ -59,8 +59,8 @@ or desktop writer (selected writer construction occurs only in `--confirm`).
 - `DedupeApplyReport`: `applied[]`, `failed[{keeper, sources, error}]`,
   `skipped_low_confidence[]`, `total_groups`, `eligible_groups`,
   `applied_groups`, `failed_groups`, and `skipped_low_confidence_groups`.
-- Backend selection is exact. Desktop configuration/auth/protocol/transaction
-  failures remain desktop errors and never construct or call a Web writer.
+- `selected_merge_writer(ctx)` directly constructs `WebMergeWriter` through
+  `ctx.remote()?`; missing credentials fail before any mutation.
 
 ### 4. Validation & Error Matrix
 
@@ -72,7 +72,7 @@ or desktop writer (selected writer construction occurs only in `--confirm`).
 | One group fails during `--confirm` apply                  | recorded in `failed[]` as `code: message`; loop continues                                                    |
 | Low-confidence group without include flag                | copied to `skipped_low_confidence[]`; writer is never called                                                |
 | `--include-low-confidence` with confirm                   | low and normal groups enter the same serial writer loop                                                     |
-| Desktop selected but unpaired                             | `bridge-unpaired`; Web credentials are not consulted                                                        |
+| Web credentials missing                                  | `write-credentials`; no writer or mutation is attempted                                                     |
 
 ### 5. Good / Base / Bad Cases (field fill decision)
 
@@ -80,13 +80,12 @@ or desktop writer (selected writer construction occurs only in `--confirm`).
 - Base: keeper key exists with a value → keep keeper's value, no fill.
 - Bad (forbidden): keeper key absent → filling it sends a type-invalid field
   and the whole PATCH 400s.
-- Desktop good: plugin runtime base-field mapping fills a compatible empty
-  keeper field, then native `mergeItems()` owns structural merge in one
-  transaction.
-- Desktop base: preview signs the current candidate fingerprint and does not
-  write the library.
-- Desktop bad: plugin drift or transaction failure returns a bridge error;
-  CLI does not fall back to Web.
+- Web good: preview gathers the complete item templates and builds the exact
+  keeper PATCH plus source trash operations.
+- Web base: dry-run returns the plan without constructing a remote writer for
+  batch dedupe.
+- Web bad: missing credentials or a failed request returns a structured error;
+  no alternate local merge path exists.
 
 The Bad case is safe only because Web API `GET /items/{key}` returns the
 **complete field template** for the item's type with `""` for unset fields
@@ -106,13 +105,11 @@ against `GET /itemTypeFields?itemType=X`.
   bridging third group folding two components); apply-loop continuation past
   an injected single-group failure via a fake `GroupMerger`.
 - Writer conformance: empty sources fail before preview, candidate keys pass
-  unchanged, preview never calls apply, and results expose the writer backend.
+  unchanged, and preview never calls apply.
 - Web writer loopback regression asserts the legacy seven-request order,
   version preconditions, keeper `dc:replaces`, and source `{deleted:1}`.
 - Dedupe gate tests assert default low groups produce zero writer calls and
   explicit include applies them; counts/lists must agree.
-- Desktop protocol tests are owned by `desktop-bridge.md` and must stay green
-  with `just xpi-check`.
 
 ### 7. Wrong vs Correct
 
@@ -129,14 +126,11 @@ match keeper.get(field) {
 ```
 
 ```rust
-// Wrong — a desktop failure silently changes trust boundary:
-desktop.preview(...).await.or_else(|_| web.preview(...).await)
+// Wrong — consults removed backend config and invents a local merge path:
+match ctx.config.zotero.write_backend { /* ... */ }
 
-// Correct — selected backend owns success and failure for the entire call:
-match ctx.write_backend() {
-    WriteBackend::Desktop => DesktopMergeWriter::new(...),
-    WriteBackend::Web => WebMergeWriter::new(...),
-}
+// Correct — every confirmed merge uses the Web writer:
+WebMergeWriter::new(ctx.remote()?)
 ```
 
 ## Invariants (all three entry points)

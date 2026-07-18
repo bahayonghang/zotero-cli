@@ -110,8 +110,7 @@ zot --json library duplicates --method title
 zot --json library duplicates --method doi
 
 zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002
-zot --json --write-backend desktop library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
-zot --json --write-backend web library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
+zot --json library duplicates-merge --keeper KEEP001 --duplicate DUPE001 --duplicate DUPE002 --confirm
 ```
 
 `duplicates-merge` is dry-run by default. Only `--confirm` performs the actual merge:
@@ -130,8 +129,8 @@ Notes:
 - items of different types can be merged; the keeper keeps its own type, and only fields valid for that type are filled
 - source fields the keeper's type does not support are skipped and reported as `skipped_incompatible_fields` (field + source key) in both preview and applied output
 - the `dc:replaces` URIs appear as `relations_to_add` in the same output
-- without an override the effective profile's `write_backend` is used; preview and confirm stay on one backend, with no automatic fallback
-- desktop uses Zotero's native transaction; the Web backend retains its existing multi-request write semantics
+- preview and confirm both use the Zotero Web API; configure `library_id` and `api_key` before confirmation
+- the Web API retains its multi-request, non-transactional write semantics
 
 If you already have two explicit item keys rather than a duplicate-candidate set, switch to `item merge` on the [item](/en/cli/item) page. To clean the whole library in one pass, use `library dedupe` below.
 
@@ -143,8 +142,7 @@ If you already have two explicit item keys rather than a duplicate-candidate set
 zot --json library dedupe
 zot --json library dedupe --method doi --limit 100
 zot --json library dedupe --collection COLL001
-zot --json --write-backend desktop library dedupe --collection COLL001 --confirm
-zot --json --write-backend web library dedupe --collection COLL001 --confirm
+zot --json library dedupe --collection COLL001 --confirm
 ```
 
 Available options:

@@ -1,15 +1,14 @@
 # Database Guidelines
 
-`zot-cli` does not write SQL directly. It chooses the exact read or selected
-write backend and delegates work to the owning crate.
+`zot-cli` does not write SQL directly. It chooses the exact supported read or
+write transport and delegates work to the owning crate.
 
 ## Access Boundaries
 
 - Use `ctx.local_library()?` for local Zotero reads through `zot-local`.
 - Use `ctx.remote()?` for Zotero Web API writes through `zot-remote`.
-- Use `ctx.desktop()?` only after `ctx.write_backend()` selects desktop for an
-  implemented bridge operation. A desktop construction or operation failure
-  must never fall back to `ctx.remote()`.
+- Use `ctx.connector()?` only for built-in connector import and `/api/`
+  readiness probes. Connector errors never fall back to `ctx.remote()`.
 - Use workspace stores from `zot-local` for workspace TOML/index operations.
 - Use `ctx.library_index_path()` for the library-wide semantic index path.
 - Use `ctx.pdf_backend()` (`Arc<dyn PdfBackend>`) for PDF extraction; only
@@ -53,19 +52,19 @@ cargo run -q -p zot-cli -- --json doctor
 
 Use one invocation path consistently during an agent session.
 
-Doctor reports `local_sqlite_read`, `local_http_read`, `desktop_write`, and
-`web_write` independently plus `selected_write_backend`. Web credentials do
-not represent desktop capability, and Local HTTP remains read-only.
+Doctor reports `local_sqlite_read`, `local_http_read`, `connector_write`, and
+`web_write` independently. Web credentials do not represent connector import
+capability, and Local HTTP remains read-only.
 
 ## Write Boundaries
 
 Command handlers can orchestrate two distinct write paths:
 
-- `item merge`, `library duplicates-merge`, and `library dedupe` select a
-  `MergeWriter` from `ctx.write_backend()`. Desktop uses `zot-desktop`; Web
-  uses `zot-remote`. Preview and confirm keep the same backend.
-- Other current mutations use the Web API, and remote mutation logic belongs
-  in `zot-remote`.
+- `item import` is the only connector write. Dry-run validates the selected
+  target; confirm rechecks writability immediately before import.
+- `item merge`, `library duplicates-merge`, `library dedupe`, and all other
+  current mutations use the Web API. Remote mutation logic belongs in
+  `zot-remote`.
 
 Examples:
 
@@ -95,8 +94,7 @@ if self.config.zotero.api_key.is_empty() {
 
 - Do not touch `zotero.sqlite` for writes.
 - Do not describe Zotero Local HTTP as a write transport.
-- Do not add automatic desktop/Web fallback around writer construction or
-  operation errors.
+- Do not add automatic connector/Web fallback around import errors.
 - Do not make `--json` subcommand-local. It is a global flag and must be
   parsed before the subcommand.
 - Do not treat saved searches as result snapshots; they are remote query

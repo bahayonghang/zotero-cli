@@ -9,7 +9,6 @@
 | `--json` | 返回标准 JSON envelope，适合脚本和 Agent |
 | `--profile <name>` | 选择配置 profile |
 | `--library <scope>` | 选择库范围，只支持 `user` 或 `group:<id>` |
-| `--write-backend <web|desktop>` | 只覆盖当前调用的写后端，不修改 config |
 
 ## 顶层命令
 
@@ -17,7 +16,6 @@
 
 - `doctor`
 - `config`
-- `bridge`
 - `library`
 - `item`
 - `collection`
@@ -43,7 +41,7 @@
 ## 推荐运行习惯
 
 1. 新环境先跑 `doctor`
-2. 写操作前确认四类 capability、`selected_write_backend` 和对应 backend 前置
+2. 写操作前确认四类 capability，并区分 connector import 与 Web API mutation
 3. 自动化场景优先加 `--json`
 4. 整轮任务只选一种调用路径：`zot ...` 或 `cargo run -q -p zot-cli -- ...`
 5. feed 不走全局 `--library` 切换，而是显式用 `library feeds` / `library feed-items`
@@ -53,7 +51,6 @@
 ```bash
 zot --json doctor
 zot --json config show
-zot --json bridge status
 zot --json library search "attention" --tag transformer --creator Vaswani --year 2017
 zot --json library recent --count 10
 zot --json library citekey Smith2024
@@ -69,8 +66,7 @@ zot completions powershell
 
 ## 命令分工
 
-- `config`：查看和修改运行时配置、profile、write backend 和 Web 写凭据
-- `bridge`：生成 XPI、配对、查看状态和撤销 desktop merge/dedupe 授权
+- `config`：查看和修改运行时配置、profile 和 Web 写凭据
 - `library`：默认只读入口；负责搜索、枚举、semantic、feeds、duplicates
 - `item`：单条目读取、大多数写操作、附件下载、annotation、Scite
 - `collection`：维护真实 Zotero collection，也负责 collection 细粒度读取
