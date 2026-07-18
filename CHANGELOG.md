@@ -3,7 +3,33 @@
 All notable changes to this project will be documented in this file. Dates use
 `YYYY-MM-DD`. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0] - 2026-07-18
+
+### Added
+
+- **Knowledge graph**: `zot graph build` constructs a local co-authorship,
+  citation, and tag-similarity graph from the local SQLite library;
+  `zot graph serve` starts a local web UI for interactive graph exploration.
+  (`7ab712a`, `d4caef1`)
+- **`zot-brainstorm` skill**: new agent skill that turns Zotero references into
+  traceable research-brainstorming reports (gap analysis, innovation directions,
+  limitation analysis). (`f1a34a1`)
+- **`zot-desktop` crate**: a new workspace crate encapsulating connector-based
+  local import paths, replacing the removed `zot-bridge` plugin.
+- **`CommandOutput` module**: uniform command output layer migrated across all
+  7 command groups (graph → annotation/tag/scite/doctor/sync → note/config/write
+  → collection/read → library → workspace/mcp). Handlers now return typed
+  `CommandOutput` values instead of ad-hoc printing. (`ddbc0b2`–`73b87c9`)
+- **pure plan functions**: write/sync/scite command handlers now follow the
+  merge.rs pattern of extracting pure plan functions, separating business logic
+  from CLI concerns. (`98e7b73`)
+- **`require_*` error constructors**: repetitive error construction across the
+  CLI layer is replaced by named constructors (`require_item`,
+  `require_collection`, etc.). (`d52c55b`)
+- **`CliEnvelope::err()` constructor**: unified error envelope creation
+  replacing the `ErrorPayload`/`EnvelopeError` dualism. (`bb35df6`)
+- **Connector local import**: `zot import <file>` accepts BibTeX/RIS via
+  Zotero Desktop's built-in connector. (`3bfee8e`)
 
 ### Changed
 
@@ -12,15 +38,63 @@ All notable changes to this project will be documented in this file. Dates use
   confirming these operations.
 - Zotero Desktop's built-in connector is now the only local write path and is
   limited to importing new BibTeX/RIS records into the selected writable target.
+- **Narrow trait decomposition**: five data-domain traits
+  (`ItemData`, `CollectionData`, `NoteData`, `TagData`, `SearchData`) extracted
+  in `zot-local`; `LocalLibrary` becomes a thin delegator. (`a05e48a`)
+- **`rag_engine` orchestrator**: unified indexing logic extracted from the
+  dual RAG facade, centralising embedding dispatch and index lifecycle.
+  (`7dce14f`)
+- **Shared transport layer**: six remote clients (Zotero API, CrossRef, etc.)
+  converge on a shared `http.rs` transport with consistent error handling and
+  testability. (`9d930a3`)
+- **`PdfBackend` replaceability**: `AppContext` accepts a trait-object
+  `PdfBackend` for test substitution; construction is centralized in the
+  composition root. (`1d11647`)
+- **Config consolidation**: four separate config-setting functions replaced by
+  a single `apply_setting` path. (`cafe241`)
 - JSON payloads no longer include `write_backend`,
   `selected_write_backend`, or `capabilities.desktop_write`. This breaking
   schema change keeps `meta.api_version = 1`; consumers must follow the
   changelog for field additions and removals within the 0.x release line.
+- **Skill renamed**: `zotero` agent skill renamed to `zot` to match the CLI
+  binary name. (`3d15e02`)
+
+### Fixed
+
+- **PDF download timeout**: `pdf.rs` aligns its download URL with the shared
+  network constants and adds the missing request timeout. (`91aa183`)
+- **Related-score unification**: the related-item scorer is consolidated to a
+  single `graph.rs` implementation; fixes a SQL placeholder bug (`?` vs `$1`)
+  that caused incorrect related-item results. (`14a2850`)
 
 ### Removed
 
 - Removed the bundled `zot-bridge` XPI, `zot bridge ...`, the global
   `--write-backend` flag, and `zot config set write-backend`.
+
+### Testing
+
+- Semantic-search dimension-validation regression tests aligned to spec.
+  (`1052918`)
+- Collection/note fake-data tests exercising the `require_*` generic
+  helpers. (`c0adb62`)
+- Remote-layer `tiny_http` fake adapter; all base URLs are now overridable
+  in tests. (`8af6f8b`)
+
+### Documentation
+
+- `docs/agents/skills/zot/SKILL.md` updated for connector-based local import
+  workflows. (`8d3affa`)
+- `docs/spec/graph.md` records the responsibility boundary between `graph.rs`
+  and `db.rs`. (`a0a11ee`)
+- `.trellis/spec/` populated with project development guidelines. (`7feeb3b`)
+- `skills/zot-brainstorm/SKILL.md` usage entry added. (`a5c8007`)
+
+### Build
+
+- `just` commands adapted for PowerShell execution on Windows. (`f60a8f1`)
+- Rust source formatting unified across the workspace. (`2c07623`)
+- Workspace version bumped to `0.6.0`. (`dd36072`)
 
 ### Migration
 
