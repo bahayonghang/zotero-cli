@@ -379,3 +379,36 @@ D1-D6 全按推荐定案(D6 被 rag-engine 落地自然消解:直接复用 RagLi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Remove zot-bridge and desktop write backend
+
+**Date**: 2026-07-18
+**Task**: Remove zot-bridge and desktop write backend
+**Branch**: `dev`
+
+### Summary
+
+Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy JSON fields; merge/dedupe now use Web API only. Added root/profile legacy-config migration detection, moved local HTTP probing into ConnectorClient, and synchronized bilingual docs/specs. Verified just ci (217 tests), VitePress build, live read-only doctor, no-credential merge, and removed clap surfaces. Real credentialed merge --confirm remains unrun because this environment has no Web credentials and no real-library write authorization.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bae3544` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
