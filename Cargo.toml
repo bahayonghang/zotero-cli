@@ -57,6 +57,7 @@ zot-remote = { path = "src/zot-remote" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+linker_messages = "allow"
 
 [workspace.lints.clippy]
 dbg_macro = "deny"
