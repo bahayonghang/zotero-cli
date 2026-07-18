@@ -16,4 +16,4 @@ thiserror.workspace = true
 toml.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.55.0"
+winreg = "0.56.0"
