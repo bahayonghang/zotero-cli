@@ -445,3 +445,34 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: Finalize connector replacement parent
+
+**Date**: 2026-07-18
+**Task**: Finalize connector replacement parent
+**Branch**: `dev`
+
+### Summary
+
+完成 07-18-connector-replace-bridge 父任务最终集成复核：just ci、VitePress build、skills-check、diff check、live doctor 与 connector dry-run 通过；真实 item import --confirm/只读实库目标和带 Web 凭据的 merge --confirm 仍为 missing evidence，未改写为通过且未写真实库。归档父任务，三个子任务记录保持完整。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+(No commits - planning session)
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
