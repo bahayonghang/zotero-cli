@@ -1,0 +1,30 @@
+{
+  "id": "connector-replace-bridge",
+  "name": "connector-replace-bridge",
+  "title": "Replace zot-bridge plugin with Zotero built-in connector/local API",
+  "description": "Parent 任务:用 Zotero 内置的 /connector/* 与 /api/* HTTP 面替换自研 zot-bridge XPI 插件,对齐 Codex 官方 zotero skill(只需 Zotero 运行、无需装/配对插件)。承担需求集、任务地图与最终集成验收。已知 tradeoff:本机 merge/dedupe 改走 Web API。含 3 个子任务:connector-local-write、remove-bridge-plugin、zot-skill-connector-update。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "lyh",
+  "assignee": "lyh",
+  "createdAt": "2026-07-18",
+  "completedAt": "2026-07-18",
+  "branch": null,
+  "base_branch": "dev",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-18-connector-local-write",
+    "07-18-remove-bridge-plugin",
+    "07-18-zot-skill-connector-update"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
