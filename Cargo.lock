@@ -2918,7 +2918,7 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "zot-cli"
-version = "0.6.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2943,7 +2943,7 @@ dependencies = [
 
 [[package]]
 name = "zot-core"
-version = "0.6.0"
+version = "1.0.0"
 dependencies = [
  "dirs",
  "regex",
@@ -2955,7 +2955,7 @@ dependencies = [
 
 [[package]]
 name = "zot-desktop"
-version = "0.6.0"
+version = "1.0.0"
 dependencies = [
  "reqwest",
  "serde",
@@ -2967,7 +2967,7 @@ dependencies = [
 
 [[package]]
 name = "zot-local"
-version = "0.6.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "dirs",
@@ -2989,7 +2989,7 @@ dependencies = [
 
 [[package]]
 name = "zot-remote"
-version = "0.6.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "md5",
