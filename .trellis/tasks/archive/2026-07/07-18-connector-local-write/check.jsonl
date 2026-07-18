@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "验收:命令面质量与测试要求"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "验收:connector 错误路径不得 fallback,hint 结构化"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "验收:cli/desktop/core 跨层数据流一致性"}

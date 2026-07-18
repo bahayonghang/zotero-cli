@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/zot-cli/backend/index.md", "reason": "zot-cli 后端命令组织与约定总览"}
+{"file": ".trellis/spec/zot-cli/backend/directory-structure.md", "reason": "新 item import 命令与 connector 模块的落点约定"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "ZotError::Connector 变体需对齐既有错误模型"}
+{"file": ".trellis/spec/zot-core/backend/error-handling.md", "reason": "zot-core 错误码与 hint 约定"}
+{"file": "ref/zotero/skills/zotero/references/local-api-routes.md", "reason": "connector server 路由清单(ping/getSelectedCollection/import)"}
