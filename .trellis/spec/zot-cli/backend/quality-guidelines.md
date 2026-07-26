@@ -34,7 +34,9 @@ stability, and safety around writes matter more than clever abstractions.
   never hand-edit generated mirrors.
 - Keep `just ci` and `ci-check` pure. Generation belongs to explicit
   `version-sync`/`skills-sync` recipes; check recipes must fail on drift rather
-  than repairing it.
+  than repairing it. Because generated mirrors are gitignored, a clean checkout
+  may skip mirror comparison only when both default mirrors are absent; a partial
+  install or any drift in installed mirrors must still fail.
 - Every workspace member must declare `[lints] workspace = true`. Extend the
   root member list only together with the manifest guard.
 - Keep locked stable checks compatible with workspace MSRV 1.85. Dependency
@@ -50,8 +52,8 @@ stability, and safety around writes matter more than clever abstractions.
 - Run `just ci` before finishing broad changes; it runs the pure fmt, locked
   check, clippy, test, version, and `skills-check` gates.
 - Run `just skills-check` after canonical skill edits. It compares relative
-  file sets and bytes for both mirrors and runs drift fixtures covering
-  content, missing-file, and extra-file failures.
+  file sets and bytes for installed mirrors and runs fixtures covering content,
+  missing-file, extra-file, clean-checkout, and partial-install behavior.
 - Add targeted tests close to behavior: parse tests in `cli.rs`, output
   envelope tests in `format.rs`, helper tests in `util.rs`, command logic tests
   in the owning command module.
@@ -87,6 +89,9 @@ workspace = true
 
 - `ci`/`ci-check`, `version-check`, and `skills-check` are read-only. Only explicit
   `version-sync` and `skills-sync` recipes may rewrite source or mirrors.
+- `skills-check` validates both default mirrors when either is installed. When both
+  gitignored mirrors are absent, as in a hosted clean checkout, it validates the
+  canonical tree and skips only the local mirror comparison.
 - Stable CI runs `just ci-check` on Linux, Windows, and macOS, then requires a clean diff.
 - MSRV CI uses Rust 1.85.0 with the committed lockfile; unused-dependency analysis uses only
   the fixed nightly shown above and does not change the workspace toolchain contract.
@@ -100,6 +105,8 @@ workspace = true
 | Condition | Required result |
 |---|---|
 | canonical skill and mirror differ | `skills-check` fails without repairing either tree |
+| both generated mirrors are absent | canonical tree is validated; mirror comparison is skipped |
+| only one generated mirror is absent | `skills-check` fails as a partial install |
 | member omits lint inheritance | `workspace_version_guard` fails with the member path |
 | current workspace version lacks CHANGELOG heading | version guard fails |
 | lockfile needs resolution at Rust 1.85 | MSRV job fails |
@@ -112,13 +119,16 @@ workspace = true
 - Good: intentionally run a sync recipe, commit the generated result, then run all checks on
   the committed lockfile without further modifications.
 - Base: a source-only change passes `just ci` locally and the same `ci-check` on all three OSes.
+- Base: a hosted clean checkout has neither gitignored mirror and still runs canonical skill tests.
 - Bad: put a generator in `ci`, use floating nightly for udeps, lift the MSRV to solve a lock
   failure, or restore a global `RUSTFLAGS=-D warnings` that promotes toolchain linker messages.
+- Bad: skip mirror comparison when only one mirror exists, which hides an incomplete local install.
 
 ### 6. Tests Required
 
 - Run the workspace version guard after every member/version/CHANGELOG edit.
 - Exercise a temporary skill mirror drift and assert `just skills-check` fails, then remove it.
+- Assert all-absent mirrors can be skipped while a partial mirror install still fails.
 - Run `cargo +1.85.0 check --workspace --locked`, audit, deny, machete, and fixed-nightly udeps.
 - Run `just ci`, compare tracked hashes before/after when changing check recipes, and finish with
   `git diff --check`.
