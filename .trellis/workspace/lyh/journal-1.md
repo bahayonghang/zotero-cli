@@ -476,3 +476,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 完成 P0 Pdfium CWD 动态库劫持修复
+
+**Date**: 2026-07-26
+**Task**: 完成 P0 Pdfium CWD 动态库劫持修复
+**Branch**: `dev`
+
+### Summary
+
+完成 07-26-fix-pdfium-cwd-rce：删除隐式 CWD 候选及 pdfium-render 裸库名 system fallback，改为可信来源回归测试，补齐 zot-local 可执行安全契约；聚焦测试、clippy 与 just ci 全部通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `982c012` | (see git log) |
+| `c1e2d96` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

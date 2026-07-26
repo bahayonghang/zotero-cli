@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
-- **Last Active**: 2026-07-18
+- **Total Sessions**: 15
+- **Last Active**: 2026-07-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~478 | Active |
+| `journal-1.md` | ~512 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-07-26 | 完成 P0 Pdfium CWD 动态库劫持修复 | `982c012`, `c1e2d96` | `dev` |
 | 14 | 2026-07-18 | Finalize connector replacement parent | - | `dev` |
 | 13 | 2026-07-18 | Optimize zot connector skill | `7fd1938` | `dev` |
 | 12 | 2026-07-18 | Remove zot-bridge and desktop write backend | `bae3544` | `dev` |
