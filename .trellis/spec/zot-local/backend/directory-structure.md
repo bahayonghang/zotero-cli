@@ -65,7 +65,10 @@ src/zot-local/tests/
   crate. Timeout and User-Agent come from `zot_core::net`
   (`CONNECT_TIMEOUT`/`REQUEST_TIMEOUT`/`USER_AGENT`), shared with zot-remote's
   `HttpRuntime`, so the two stacks cannot drift. Do not re-raise unifying the
-  stacks; do not hardcode timeouts or UA strings here.
+  stacks; do not hardcode timeouts or UA strings here. Native library discovery
+  (`candidate_library_paths`) is a trust policy, not a convenience path list:
+  env overrides, executable-adjacent, and managed cache only — never CWD
+  (decision 2026-07-26, task 07-26-fix-pdfium-cwd-rce).
 - `workspace.rs` owns durable workspace TOML files and the generic `RagIndex`
   schema used by both library and workspace search.
 - `rag_engine.rs` owns the single indexing orchestration shared by both RAG

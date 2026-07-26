@@ -17,6 +17,16 @@ regressions. Add narrow tests around the behavior being changed.
   embedding counts/dimensions before writeback.
 - Keep heavy PDF work behind the `PdfBackend` trait so CLI code can offload it
   and tests can use focused fakes.
+- Pdfium native-library discovery is a trust boundary. `candidate_library_paths`
+  may only include: explicit `ZOT_PDFIUM_LIB_PATH` / `PDFIUM_LIB_PATH`, the
+  executable-adjacent directory, and the managed cache under
+  `ZOT_PDFIUM_CACHE_DIR` (or the system cache). **Never** add
+  `env::current_dir()` as a load candidate — CWD is untrusted project content
+  and enables dynamic-library hijacking via `zot doctor` / any Pdfium probe
+  (P0-01, task `07-26-fix-pdfium-cwd-rce`). Do not reintroduce CWD “for
+  convenience”; operators who need a custom path must set an env override.
+  Download integrity (checksum / atomic install) is a separate contract owned
+  by download-verify work, not a reason to widen discovery trust.
 
 ## Testing Requirements
 
@@ -27,6 +37,10 @@ regressions. Add narrow tests around the behavior being changed.
   `workspace.rs` tests for index schema, migration, and query behavior.
 - Add PDF-specific unit tests in `pdf.rs` when changing Pdfium setup, cache
   paths, archive extraction, page range behavior, or annotation geometry.
+- When touching Pdfium discovery, keep
+  `candidate_library_paths_never_includes_cwd` green (or an equivalent
+  regression that asserts CWD is absent from the candidate list with env
+  overrides cleared).
 
 ## Code Example
 

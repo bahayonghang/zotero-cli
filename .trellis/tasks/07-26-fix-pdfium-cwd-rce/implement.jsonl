@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/zot-local/backend/index.md", "reason": "zot-local pre-dev checklist and PDF ownership"}
+{"file": ".trellis/spec/zot-local/backend/error-handling.md", "reason": "Pdf/ZotError mapping for pdfium-unavailable paths"}
+{"file": ".trellis/spec/zot-local/backend/quality-guidelines.md", "reason": "Test invariants for local PDF behavior"}

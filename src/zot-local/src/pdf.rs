@@ -618,11 +618,15 @@ fn candidate_library_paths(library_name: &Path) -> Vec<PathBuf> {
 
     /*
      * ========================================================================
-     * 步骤2：收集本地常见落点
+     * 步骤2：收集受信任的本地落点
      * ========================================================================
      * 目标：
      * 1) 兼容与可执行文件同目录部署的 Pdfium
-     * 2) 兼容当前工作目录和受管缓存目录
+     * 2) 兼容受管缓存目录
+     *
+     * 安全约束：绝不把 current_dir() 纳入候选。CWD 对 CLI/agent 是不可信边界
+     * （任意第三方仓库可放置同名 pdfium.dll/.so/.dylib 造成动态库劫持 RCE）。
+     * 需要自定义路径时请显式设置 ZOT_PDFIUM_LIB_PATH / PDFIUM_LIB_PATH。
      */
 
     // 2.1 尝试可执行文件同目录
@@ -633,12 +637,7 @@ fn candidate_library_paths(library_name: &Path) -> Vec<PathBuf> {
         push_candidate_path(&mut paths, executable_dir.join(library_name));
     }
 
-    // 2.2 尝试当前工作目录
-    if let Ok(current_dir) = env::current_dir() {
-        push_candidate_path(&mut paths, current_dir.join(library_name));
-    }
-
-    // 2.3 尝试受管缓存目录
+    // 2.2 尝试受管缓存目录
     if let Some(cache_path) = managed_cache_library_path() {
         push_candidate_path(&mut paths, cache_path);
     }
@@ -995,6 +994,55 @@ mod tests {
         );
 
         eprintln!("Pdfium 显式路径候选生成校验完成");
+    }
+
+    #[test]
+    fn candidate_library_paths_never_includes_cwd() {
+        // Security regression (P0-01 / QW-01): never add current_dir() as an
+        // implicit native-library load candidate. A same-named decoy in an
+        // untrusted project directory must not enter the bind path unless the
+        // operator explicitly opts in via ZOT_PDFIUM_LIB_PATH / PDFIUM_LIB_PATH.
+        let library_name = pdfium_library_name();
+        let cwd = env::current_dir().expect("cwd");
+        let cwd_candidate = cwd.join(&library_name);
+
+        // Clear explicit overrides for the duration of this assertion so an
+        // operator-set env path that happens to equal CWD cannot masquerade as
+        // the removed implicit candidate.
+        let saved_zot = env::var_os(ZOT_PDFIUM_LIB_PATH);
+        let saved_generic = env::var_os(PDFIUM_LIB_PATH);
+        unsafe {
+            env::remove_var(ZOT_PDFIUM_LIB_PATH);
+            env::remove_var(PDFIUM_LIB_PATH);
+        }
+
+        let candidates = candidate_library_paths(&library_name);
+
+        unsafe {
+            match saved_zot {
+                Some(value) => env::set_var(ZOT_PDFIUM_LIB_PATH, value),
+                None => env::remove_var(ZOT_PDFIUM_LIB_PATH),
+            }
+            match saved_generic {
+                Some(value) => env::set_var(PDFIUM_LIB_PATH, value),
+                None => env::remove_var(PDFIUM_LIB_PATH),
+            }
+        }
+
+        // Executable-adjacent deploy is still trusted. If the binary itself
+        // lives in CWD, that path may appear — via current_exe, not current_dir.
+        let exe_adjacent = env::current_exe().ok().and_then(|path| {
+            path.parent()
+                .map(|parent| parent.join(&library_name))
+        });
+        if exe_adjacent.as_ref() == Some(&cwd_candidate) {
+            return;
+        }
+
+        assert!(
+            !candidates.iter().any(|path| path == &cwd_candidate),
+            "CWD must not be an implicit Pdfium load candidate; got {candidates:?}"
+        );
     }
 
     #[test]

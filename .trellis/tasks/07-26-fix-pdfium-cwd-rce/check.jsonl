@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/zot-local/backend/index.md", "reason": "Quality check entry for zot-local"}
+{"file": ".trellis/spec/zot-local/backend/quality-guidelines.md", "reason": "Verify tests and local quality rules"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "doctor CLI consumes local Pdfium status across layers"}
