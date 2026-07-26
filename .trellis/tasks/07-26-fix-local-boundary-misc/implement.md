@@ -2,44 +2,44 @@
 
 ## 1. 附件下载
 
-- [ ] 在 `ItemDownloadArgs` 添加 `--force` 并更新 CLI parse fixture。
-- [ ] 在 `item/read.rs` 添加跨平台 basename 验证和 typed `attachment-exists`。
-- [ ] 用 `OpenOptions + io::copy` 实现 default create-new / explicit overwrite。
-- [ ] 补路径与 no-clobber/force helper 测试。
+- [x] 在 `ItemDownloadArgs` 添加 `--force` 并更新 CLI parse fixture。
+- [x] 在 `item/read.rs` 添加跨平台 basename 验证和 typed `attachment-exists`。
+- [x] 用 `OpenOptions + io::copy` 实现 default create-new / explicit overwrite。
+- [x] 补路径与 no-clobber/force helper 测试。
 
 ## 2. 区域标注
 
-- [ ] 在 `zot-local/pdf.rs` 增加共享纯验证函数与边界表测试，并从 `lib.rs` 导出。
-- [ ] CLI 在 local/PDF/remote I/O 前调用验证；Pdfium backend 加防御性复验。
+- [x] 在 `zot-local/pdf.rs` 增加共享纯验证函数与边界表测试，并从 `lib.rs` 导出。
+- [x] CLI 在 local/PDF/remote I/O 前调用验证；Pdfium backend 加防御性复验。
 
 ## 3. Graph viewer
 
-- [ ] 将 detail、tag、legend 的 graph-derived HTML 改为 DOM API。
-- [ ] 添加 HTTP(S)-only URL helper、固定 DOI/Zotero link 与 `_blank` rel。
-- [ ] server 为所有 route 加 CSP/nosniff/referrer policy，并补 route header/status 测试。
+- [x] 将 detail、tag、legend 的 graph-derived HTML 改为 DOM API。
+- [x] 添加 HTTP(S)-only URL helper、固定 DOI/Zotero link 与 `_blank` rel。
+- [x] server 为所有 route 加 CSP/nosniff/referrer policy，并补 route header/status 测试。
 
 ## 4. PDF cache sidecar
 
-- [ ] `PdfCache::new` 设置 WAL、5000 ms busy timeout、schema user_version 与未来版本拒绝。
-- [ ] 将 cache key 改为流式 SHA-256 内容指纹和算法前缀。
-- [ ] 补 reopen PRAGMA、正常命中、固定 mtime/length 替换失效及 future schema 测试。
+- [x] `PdfCache::new` 设置 WAL、5000 ms busy timeout、schema user_version 与未来版本拒绝。
+- [x] 将 cache key 改为流式 SHA-256 内容指纹和算法前缀。
+- [x] 补 reopen PRAGMA、正常命中、固定 mtime/length 替换失效及 future schema 测试。
 
 ## 5. Connector target
 
-- [ ] `SelectedTarget` 保留 `libraryID` 并更新解析测试/规范。
-- [ ] confirm 分支第二次读取并比较完整 target fingerprint，变化/readonly 均在 import 前失败。
-- [ ] 调整 scripted fake-server 请求数，补跨 library/collection/writability 变化零写入测试。
+- [x] `SelectedTarget` 保留 `libraryID` 并更新解析测试/规范。
+- [x] confirm 分支第二次读取并比较完整 target fingerprint，变化/readonly 均在 import 前失败。
+- [x] 调整 scripted fake-server 请求数，补跨 library/collection/writability 变化零写入测试。
 
 ## 6. 契约与验证
 
-- [ ] 更新 `.trellis/spec/zot-local` 的 PDF cache/annotation 契约。
-- [ ] 更新 `.trellis/spec/zot-cli` 的 download/graph/connector 契约及必要 operator limits。
-- [ ] 运行 `cargo fmt --all`。
-- [ ] 先运行 `cargo test -p zot-local`、`cargo test -p zot-desktop`、聚焦
+- [x] 更新 `.trellis/spec/zot-local` 的 PDF cache/annotation 契约。
+- [x] 更新 `.trellis/spec/zot-cli` 的 download/graph/connector 契约及必要 operator limits。
+- [x] 运行 `cargo fmt --all`。
+- [x] 先运行 `cargo test -p zot-local`、`cargo test -p zot-desktop`、聚焦
       `cargo test -p zot-cli` 与 clippy。
-- [ ] 运行 `python ./.trellis/scripts/task.py validate ...`、`git diff --check` 和真实门禁
+- [x] 运行 `python ./.trellis/scripts/task.py validate ...`、`git diff --check` 和真实门禁
       `just ci`。
-- [ ] 逐项勾选 PRD acceptance，按中文 emoji `[AI]` 原子提交，归档并记录 journal。
+- [x] 逐项勾选 PRD acceptance，按中文 emoji `[AI]` 原子提交，归档并记录 journal。
 
 ## Risk / Rollback Points
 

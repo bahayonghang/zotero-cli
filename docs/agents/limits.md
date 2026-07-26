@@ -105,6 +105,19 @@ libraries. Keep it accurate as the implementation evolves.
   applicable) `more_occurrences`, which makes it straightforward to chain
   follow-up calls.
 
+## Local attachment and PDF sidecar boundaries
+
+- `zot item download` treats an attachment metadata filename as an untrusted
+  basename. It rejects traversal/separators and does not overwrite an existing
+  destination unless `--force` is explicit.
+- Area annotation coordinates must be finite and remain inside the normalized
+  unit page: `0 <= x,y < 1`, positive width/height, and endpoints at most 1.
+- PDF text caches use WAL, a 5-second SQLite busy timeout, schema version 1,
+  and streamed SHA-256 content fingerprints. Workspace indexing keeps the
+  existing shared `.md_cache.sqlite` path.
+- `graph serve` renders graph fields with DOM APIs, permits clickable item URLs
+  only for HTTP(S), and applies CSP plus `nosniff` to every route.
+
 ## CrossRef polite-pool contact email
 
 - CrossRef and Unpaywall requests both include a `mailto:` contact in the

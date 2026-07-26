@@ -384,7 +384,8 @@ cargo run -q -p zot-cli -- --json doctor
 - `item add-doi` / `item add-url` / `item create --doi|--url|--pdf` 支持 `--attach-mode`
 - `item add-file` 可以带 `--doi` 补元数据，但不接受 `--attach-mode`
 - feeds 不通过 `--library group:<id>` 访问，而是用 `library feeds` / `feed-items`
-- `item download` 下载本地附件文件，`item attach` 上传新附件
+- `item download` 下载本地附件文件，默认不覆盖已有目标；只有复核现有文件后才加
+  `--force`。`item attach` 上传新附件
 - `item merge` 是手工选 keeper/source 的通用合并，`library duplicates-merge` 是先找重复、再按 keeper 合并
 - `library dedupe` 是整库/整 collection 自动选 keeper 的批量清理，`library duplicates-merge` 是单组手工指定 keeper 的合并
 - `config show` 是看有效配置，`config profiles use` 是切换默认 profile
@@ -410,16 +411,16 @@ cargo run -q -p zot-cli -- --json doctor
   走 `library saved-search create`
 
 - “把附件 ATCH005 下载出来”  
-  走 `item download`
+  走 `item download`；目标已存在时先报告冲突，不要自行追加 `--force`
 
 - “用浏览器打开 ATTN001 的 DOI 看看”  
   走 `item open ATTN001 --url`
 
 - “把这个 bib 导入 Zotero”
-  先 `item import --file <path>` dry-run，复述当前目标、可写性、记录数和格式；用户确认后才执行同一命令并追加 `--confirm`
+  先 `item import --file <path>` dry-run，复述当前目标、可写性、记录数和格式；用户确认后才执行同一命令并追加 `--confirm`。确认分支会再次读取 target，变化时中止，需重新 preview
 
 - “把这几条 RIS 存进我当前的 collection”
-  先 `item import --text <ris> --format ris` dry-run；确认 Zotero UI 当前选中的 collection 正确且可写后，才追加 `--confirm`
+  先 `item import --text <ris> --format ris` dry-run；确认 Zotero UI 当前选中的 collection 正确且可写后，才追加 `--confirm`；若 target 变化则重新 preview
 
 - “把 citation key 为 vaswani_attention_2023 的文献插进草稿，并维护 references.bib”
   先 `library citekey vaswani_attention_2023` 解析 Zotero item key（如 `PXW99EKT`），再用 `item cite PXW99EKT --style apa` 获取显示引用、`item export PXW99EKT --format bibtex` 获取 BibTeX；agent 用导出的 BibTeX 条目更新 `references.bib`，并把 BibTeX citation key 插入草稿。CLI 不直接编辑草稿或 `.bib` 文件

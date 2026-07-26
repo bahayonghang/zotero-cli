@@ -18,6 +18,7 @@ pub use library_traits::{
 };
 pub use pdf::{
     PdfAreaPosition, PdfBackend, PdfCache, PdfMatchPosition, PdfiumAvailability, PdfiumBackend,
+    validate_area_coordinates,
 };
 pub use rag_engine::{PendingEmbedding, RagLibrary, ReindexStats};
 pub use semantic::{ReindexOpts, SemanticStore};

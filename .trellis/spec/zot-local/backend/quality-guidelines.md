@@ -266,6 +266,78 @@ let name = WorkspaceName::parse(raw)?;
 let rag = WorkspaceRagStore::open(&store, &name)?;
 ```
 
+## Scenario: PDF annotation geometry and text-cache sidecar
+
+### 1. Scope / Trigger
+
+This contract applies when changing area annotation coordinates, `PdfCache`,
+cache paths, or PDF text-cache schema/fingerprints. Both the CLI and direct
+`PdfBackend` callers must reject invalid geometry, while every cache connection
+must tolerate concurrent CLI processes without accepting stale same-metadata
+content.
+
+### 2. Signatures
+
+- `validate_area_coordinates(x, y, width, height) -> ZotResult<()>`
+- `PdfiumBackend::build_area_position(...) -> ZotResult<PdfAreaPosition>`
+- `PdfCache::new(path: Option<PathBuf>) -> ZotResult<PdfCache>`
+- SQLite: `cache(cache_key TEXT PRIMARY KEY, content TEXT NOT NULL)`,
+  `PRAGMA user_version = 1`.
+
+### 3. Contracts
+
+- Coordinates are finite, `0 <= x,y < 1`, `width,height > 0`, and both rectangle
+  endpoints are at most 1. CLI orchestration calls the shared validator before
+  local/PDF/remote I/O; Pdfium calls it again before loading a document.
+- File-backed PDF caches use WAL, a 5000 ms busy timeout, and explicit
+  `user_version` on every open. Version 0 upgrades in place; versions newer than
+  the binary fail closed.
+- Cache keys are `sha256:<full-content-hex>`, streamed through the existing
+  SHA-256 reader. Do not return to path/mtime/length fingerprints.
+- Default, library semantic, and workspace shared `.md_cache.sqlite` paths stay
+  compatible. Old MD5 rows naturally miss; no destructive migration is needed.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| NaN/Inf, negative origin, non-positive size, or endpoint above 1 | `invalid-annotation-area` before PDF/remote I/O |
+| cache open failure | `pdf-cache-open` |
+| PRAGMA/table/version migration failure | `pdf-cache-schema` |
+| `user_version > 1` | `pdf-cache-schema-version` |
+| PDF file read/hash failure | typed `Io` at the PDF path |
+| cache lookup/write failure | `pdf-cache-get` / `pdf-cache-put` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: replace a PDF with different bytes while preserving path, length, and
+  mtime; the old text is not returned.
+- Base: reopen an existing unversioned cache, retain compatible rows, and
+  operate in WAL mode with a 5-second busy timeout.
+- Bad: validate only in clap/CLI, use MD5 over metadata, silently open a future
+  schema, or move the shared cache as part of a behavior fix.
+
+### 6. Tests Required
+
+- Table-test finite/unit-rectangle boundaries, including full-page and
+  edge-aligned valid rectangles.
+- Reopen a file cache and assert `journal_mode=wal`, `busy_timeout=5000`,
+  current `user_version`, and normal put/get.
+- Fix mtime and length across a content replacement and assert a miss.
+- Create a future-version DB and assert `pdf-cache-schema-version`.
+- Run `cargo test -p zot-local`, workspace clippy, and `just ci`.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: metadata can be preserved across a byte-for-byte replacement.
+let key = md5(format!("{path}:{mtime}:{len}"));
+
+// Correct: content owns cache identity; every backend caller shares validation.
+validate_area_coordinates(x, y, width, height)?;
+let key = format!("sha256:{}", sha256_reader(File::open(path)?)?.0);
+```
+
 ## Review Checklist
 
 - Does the change keep Zotero's main database read-only?

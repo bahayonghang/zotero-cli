@@ -60,7 +60,10 @@ zot --json item import --file references.bib
 zot --json item import --file references.bib --confirm
 ```
 
-No plugin or pairing is required. Zotero must be running, and its UI must have a writable library or collection selected. Without `--confirm`, no import request is sent.
+No plugin or pairing is required. Zotero must be running, and its UI must have
+a writable library or collection selected. Without `--confirm`, no import
+request is sent. The confirmed branch reads the target again immediately before
+the write and aborts without importing if its identity or writability changed.
 
 ### 5. Configure merge/dedupe, other Web writes, and saved-search support when needed
 

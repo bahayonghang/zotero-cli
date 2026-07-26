@@ -351,6 +351,16 @@ mod tests {
             ]
             .as_slice(),
             ["zot", "item", "download", "ATCH005"].as_slice(),
+            [
+                "zot",
+                "item",
+                "download",
+                "ATCH005",
+                "--output",
+                "paper.pdf",
+                "--force",
+            ]
+            .as_slice(),
             ["zot", "item", "merge", "KEEP001", "DUPE001"].as_slice(),
             [
                 "zot",

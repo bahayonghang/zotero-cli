@@ -18,6 +18,7 @@ use crate::util::{open_target, run_local};
 const INDEX_HTML: &str = include_str!("../../../assets/graph/index.html");
 const APP_JS: &str = include_str!("../../../assets/graph/app.js");
 const CYTOSCAPE_JS: &str = include_str!("../../../assets/graph/cytoscape.min.js");
+const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'";
 
 pub(crate) async fn run(ctx: &AppContext, args: GraphServeArgs) -> Result<()> {
     let edge_budget = super::validate_edge_budget(args.edge_budget)?;
@@ -80,13 +81,13 @@ fn serve_loop(server: &Server, graph_json: &str) {
 }
 
 fn route(path: &str, graph_json: &str) -> Response<Cursor<Vec<u8>>> {
-    match path {
+    secure_response(match path {
         "/" => asset(INDEX_HTML, "text/html; charset=utf-8"),
         "/app.js" => asset(APP_JS, "application/javascript; charset=utf-8"),
         "/cytoscape.min.js" => asset(CYTOSCAPE_JS, "application/javascript; charset=utf-8"),
         "/graph.json" => asset(graph_json, "application/json; charset=utf-8"),
         _ => Response::from_string("Not found").with_status_code(404),
-    }
+    })
 }
 
 fn asset(body: &str, content_type: &'static str) -> Response<Cursor<Vec<u8>>> {
@@ -95,4 +96,63 @@ fn asset(body: &str, content_type: &'static str) -> Response<Cursor<Vec<u8>>> {
         response = response.with_header(header);
     }
     response
+}
+
+fn secure_response(mut response: Response<Cursor<Vec<u8>>>) -> Response<Cursor<Vec<u8>>> {
+    for (name, value) in [
+        ("Content-Security-Policy", CONTENT_SECURITY_POLICY),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Referrer-Policy", "no-referrer"),
+    ] {
+        if let Ok(header) = Header::from_bytes(name.as_bytes(), value.as_bytes()) {
+            response = response.with_header(header);
+        }
+    }
+    response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn header<'a>(response: &'a Response<Cursor<Vec<u8>>>, name: &str) -> Option<&'a str> {
+        response
+            .headers()
+            .iter()
+            .find(|header| header.field.as_str().as_str().eq_ignore_ascii_case(name))
+            .map(|header| header.value.as_str())
+    }
+
+    #[test]
+    fn every_graph_route_has_browser_security_headers() {
+        for path in [
+            "/",
+            "/app.js",
+            "/cytoscape.min.js",
+            "/graph.json",
+            "/missing",
+        ] {
+            let response = route(path, r#"{"nodes":[]}"#);
+            assert_eq!(header(&response, "X-Content-Type-Options"), Some("nosniff"));
+            assert_eq!(header(&response, "Referrer-Policy"), Some("no-referrer"));
+            let csp = header(&response, "Content-Security-Policy").expect("CSP header");
+            assert!(csp.contains("default-src 'self'"));
+            assert!(csp.contains("script-src 'self'"));
+            assert!(csp.contains("object-src 'none'"));
+        }
+        assert_eq!(route("/missing", "{}").status_code().0, 404);
+        assert!(
+            header(&route("/graph.json", "{}"), "Content-Type")
+                .is_some_and(|value| value.starts_with("application/json"))
+        );
+    }
+
+    #[test]
+    fn embedded_graph_script_uses_dom_and_http_url_policy() {
+        assert!(!APP_JS.contains("innerHTML"));
+        assert!(APP_JS.contains("safeWebUrl"));
+        assert!(APP_JS.contains("url.protocol === \"http:\""));
+        assert!(APP_JS.contains("url.protocol === \"https:\""));
+        assert!(APP_JS.contains("noopener noreferrer"));
+    }
 }

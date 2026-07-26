@@ -3,7 +3,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::UNIX_EPOCH;
+use std::time::Duration;
 
 use flate2::read::GzDecoder;
 use pdfium_render::prelude::*;
@@ -66,6 +66,28 @@ const PDFIUM_INSTALL_LOCK_FILE: &str = ".install.lock";
 const ZOT_PDFIUM_LIB_PATH: &str = "ZOT_PDFIUM_LIB_PATH";
 const ZOT_PDFIUM_CACHE_DIR: &str = "ZOT_PDFIUM_CACHE_DIR";
 const PDFIUM_LIB_PATH: &str = "PDFIUM_LIB_PATH";
+const PDF_CACHE_SCHEMA_VERSION: i32 = 1;
+const PDF_CACHE_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+
+pub fn validate_area_coordinates(x: f32, y: f32, width: f32, height: f32) -> ZotResult<()> {
+    let finite = [x, y, width, height].into_iter().all(f32::is_finite);
+    let within_unit_page = (0.0..1.0).contains(&x)
+        && (0.0..1.0).contains(&y)
+        && width > 0.0
+        && height > 0.0
+        && x + width <= 1.0
+        && y + height <= 1.0;
+    if finite && within_unit_page {
+        return Ok(());
+    }
+    Err(ZotError::InvalidInput {
+        code: "invalid-annotation-area".to_string(),
+        message: "Annotation area must be a finite rectangle within the unit page".to_string(),
+        hint: Some(
+            "Use 0 <= x,y < 1, positive width/height, and keep x+width/y+height <= 1".to_string(),
+        ),
+    })
+}
 
 pub trait PdfBackend {
     fn availability_hint(&self) -> ZotResult<()>;
@@ -429,6 +451,7 @@ impl PdfBackend for PdfiumBackend {
         width: f32,
         height: f32,
     ) -> ZotResult<PdfAreaPosition> {
+        validate_area_coordinates(x, y, width, height)?;
         let pdfium = self.pdfium(PdfiumLoadMode::AllowDownload)?;
         let document = pdfium
             .load_pdf_from_file(pdf_path, None)
@@ -492,6 +515,34 @@ impl PdfCache {
             message: err.to_string(),
             hint: None,
         })?;
+        conn.busy_timeout(PDF_CACHE_BUSY_TIMEOUT)
+            .map_err(|err| ZotError::Database {
+                code: "pdf-cache-schema".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
+        conn.execute_batch("PRAGMA journal_mode=WAL;")
+            .map_err(|err| ZotError::Database {
+                code: "pdf-cache-schema".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
+        let schema_version = conn
+            .pragma_query_value(None, "user_version", |row| row.get::<_, i32>(0))
+            .map_err(|err| ZotError::Database {
+                code: "pdf-cache-schema".to_string(),
+                message: err.to_string(),
+                hint: None,
+            })?;
+        if schema_version > PDF_CACHE_SCHEMA_VERSION {
+            return Err(ZotError::Database {
+                code: "pdf-cache-schema-version".to_string(),
+                message: format!(
+                    "PDF cache schema version {schema_version} is newer than supported version {PDF_CACHE_SCHEMA_VERSION}"
+                ),
+                hint: Some("Upgrade zot before opening this PDF cache".to_string()),
+            });
+        }
         conn.execute(
             "CREATE TABLE IF NOT EXISTS cache (cache_key TEXT PRIMARY KEY, content TEXT NOT NULL)",
             [],
@@ -501,6 +552,14 @@ impl PdfCache {
             message: err.to_string(),
             hint: None,
         })?;
+        if schema_version < PDF_CACHE_SCHEMA_VERSION {
+            conn.pragma_update(None, "user_version", PDF_CACHE_SCHEMA_VERSION)
+                .map_err(|err| ZotError::Database {
+                    code: "pdf-cache-schema".to_string(),
+                    message: err.to_string(),
+                    hint: None,
+                })?;
+        }
         Ok(Self { _path: path, conn })
     }
 
@@ -1111,27 +1170,25 @@ fn sync_cache_directory(_cache_dir: &Path) -> ZotResult<()> {
 }
 
 fn cache_key_for(pdf_path: &Path) -> ZotResult<String> {
-    let metadata = std::fs::metadata(pdf_path).map_err(|source| ZotError::Io {
+    let file = File::open(pdf_path).map_err(|source| ZotError::Io {
         path: pdf_path.to_path_buf(),
         source,
     })?;
-    let modified = metadata
-        .modified()
-        .ok()
-        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-        .map(|duration| duration.as_millis())
-        .unwrap_or_default();
-    let raw = format!("{}:{modified}:{}", pdf_path.display(), metadata.len());
-    Ok(format!("{:x}", md5::compute(raw)))
+    let (digest, _) = sha256_reader(file).map_err(|source| ZotError::Io {
+        path: pdf_path.to_path_buf(),
+        source,
+    })?;
+    Ok(format!("sha256:{digest}"))
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs::FileTimes;
     use std::io::Cursor;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier, Mutex};
     use std::thread;
-    use std::time::Duration;
+    use std::time::{Duration, SystemTime};
 
     use super::*;
     use flate2::Compression;
@@ -1142,6 +1199,102 @@ mod tests {
 
     fn sha256_bytes(bytes: &[u8]) -> String {
         sha256_reader(Cursor::new(bytes)).expect("hash bytes").0
+    }
+
+    #[test]
+    fn annotation_area_validation_enforces_finite_unit_rectangle() {
+        for (x, y, width, height) in [
+            (f32::NAN, 0.0, 0.1, 0.1),
+            (0.0, f32::INFINITY, 0.1, 0.1),
+            (0.0, 0.0, f32::NEG_INFINITY, 0.1),
+            (-0.1, 0.0, 0.1, 0.1),
+            (0.0, -0.1, 0.1, 0.1),
+            (1.0, 0.0, 0.1, 0.1),
+            (0.0, 1.0, 0.1, 0.1),
+            (0.0, 0.0, 0.0, 0.1),
+            (0.0, 0.0, 0.1, -0.1),
+            (0.9, 0.0, 0.2, 0.1),
+            (0.0, 0.9, 0.1, 0.2),
+        ] {
+            let err = validate_area_coordinates(x, y, width, height)
+                .expect_err("invalid annotation area");
+            assert_eq!(err.payload().code, "invalid-annotation-area");
+        }
+        validate_area_coordinates(0.0, 0.0, 1.0, 1.0).expect("full page");
+        validate_area_coordinates(0.25, 0.5, 0.75, 0.5).expect("edge aligned");
+    }
+
+    #[test]
+    fn pdf_cache_reopens_with_wal_timeout_and_schema_version() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let cache_path = tempdir.path().join("cache.sqlite");
+        let pdf_path = tempdir.path().join("paper.pdf");
+        std::fs::write(&pdf_path, b"pdf bytes").expect("pdf fixture");
+
+        let cache = PdfCache::new(Some(cache_path.clone())).expect("cache");
+        let journal_mode: String = cache
+            .conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .expect("journal mode");
+        let busy_timeout: i64 = cache
+            .conn
+            .query_row("PRAGMA busy_timeout", [], |row| row.get(0))
+            .expect("busy timeout");
+        let schema_version: i32 = cache
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .expect("schema version");
+        assert_eq!(journal_mode, "wal");
+        assert_eq!(busy_timeout, 5000);
+        assert_eq!(schema_version, PDF_CACHE_SCHEMA_VERSION);
+        cache.put(&pdf_path, "cached text").expect("put");
+        drop(cache);
+
+        let reopened = PdfCache::new(Some(cache_path)).expect("reopen");
+        assert_eq!(
+            reopened.get(&pdf_path).expect("get").as_deref(),
+            Some("cached text")
+        );
+    }
+
+    #[test]
+    fn pdf_cache_content_fingerprint_rejects_same_metadata_replacement() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let pdf_path = tempdir.path().join("paper.pdf");
+        let fixed_time = SystemTime::UNIX_EPOCH + Duration::from_secs(1_700_000_000);
+        std::fs::write(&pdf_path, b"AAAA").expect("first content");
+        File::options()
+            .write(true)
+            .open(&pdf_path)
+            .expect("open first")
+            .set_times(FileTimes::new().set_modified(fixed_time))
+            .expect("set first mtime");
+        let cache = PdfCache::new(Some(tempdir.path().join("cache.sqlite"))).expect("cache");
+        cache.put(&pdf_path, "first text").expect("put first");
+
+        std::fs::write(&pdf_path, b"BBBB").expect("replacement content");
+        File::options()
+            .write(true)
+            .open(&pdf_path)
+            .expect("open replacement")
+            .set_times(FileTimes::new().set_modified(fixed_time))
+            .expect("set replacement mtime");
+        assert_eq!(cache.get(&pdf_path).expect("lookup replacement"), None);
+    }
+
+    #[test]
+    fn pdf_cache_rejects_future_schema_version() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let cache_path = tempdir.path().join("cache.sqlite");
+        let conn = Connection::open(&cache_path).expect("future cache");
+        conn.pragma_update(None, "user_version", PDF_CACHE_SCHEMA_VERSION + 1)
+            .expect("future version");
+        drop(conn);
+
+        let err = PdfCache::new(Some(cache_path))
+            .err()
+            .expect("future schema must fail");
+        assert_eq!(err.payload().code, "pdf-cache-schema-version");
     }
 
     fn regular_archive(path: &str, payload: &[u8]) -> Vec<u8> {

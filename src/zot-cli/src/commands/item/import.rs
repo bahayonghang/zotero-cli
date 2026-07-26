@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use anyhow::Result;
 use regex::Regex;
 use zot_core::{ZotError, ZotResult};
-use zot_desktop::ConnectorClient;
+use zot_desktop::{ConnectorClient, SelectedTarget};
 
 use crate::cli::{ItemImportArgs, ItemImportFormatArg};
 use crate::context::AppContext;
@@ -54,16 +54,36 @@ async fn build_import_payload(
         }));
     }
 
+    let confirmed_target = client.selected_target().await?;
+    if !confirmed_target.is_writable() {
+        return Err(readonly_target_error().into());
+    }
+    if target_fingerprint(&confirmed_target) != target_fingerprint(&target) {
+        return Err(changed_target_error().into());
+    }
+
     let session = format!("zot-{}", uuid::Uuid::new_v4());
     let result = client.import(&session, &text).await?;
     Ok(serde_json::json!({
         "session": result.session,
-        "target": target,
-        "editable": editable,
+        "target": confirmed_target,
+        "editable": true,
         "entries": entries,
         "format": format_label(format),
         "status": result.status,
     }))
+}
+
+fn target_fingerprint(
+    target: &SelectedTarget,
+) -> (Option<i64>, Option<i64>, Option<&str>, bool, Option<bool>) {
+    (
+        target.library_id,
+        target.id,
+        target.name.as_deref(),
+        target.editable,
+        target.library_editable,
+    )
 }
 
 fn read_import_text(args: &ItemImportArgs) -> ZotResult<String> {
@@ -144,6 +164,17 @@ fn readonly_target_error() -> ZotError {
         code: "connector-target-readonly".to_string(),
         message: "The selected Zotero target is not writable".to_string(),
         hint: Some("Select a writable collection in Zotero, then retry".to_string()),
+        status: None,
+    }
+}
+
+fn changed_target_error() -> ZotError {
+    ZotError::Connector {
+        code: "connector-target-changed".to_string(),
+        message: "The selected Zotero target changed before import".to_string(),
+        hint: Some(
+            "Review the current Zotero selection, then run preview and --confirm again".to_string(),
+        ),
         status: None,
     }
 }
@@ -271,11 +302,22 @@ mod tests {
     }
 
     fn selected_target_body(editable: bool, library_editable: bool) -> (u16, String) {
+        selected_target_body_for(1, 1, "Reading List", editable, library_editable)
+    }
+
+    fn selected_target_body_for(
+        library_id: i64,
+        id: i64,
+        name: &str,
+        editable: bool,
+        library_editable: bool,
+    ) -> (u16, String) {
         (
             200,
             serde_json::json!({
-                "id": 1,
-                "name": "Reading List",
+                "id": id,
+                "libraryID": library_id,
+                "name": name,
                 "editable": editable,
                 "libraryEditable": library_editable,
             })
@@ -340,6 +382,7 @@ mod tests {
         let (base, handle) = spawn_connector(vec![
             ping_ok(),
             selected_target_body(true, true),
+            selected_target_body(true, true),
             (200, serde_json::json!([{ "key": "ABCD1234" }]).to_string()),
         ]);
         let client = ConnectorClient::with_base_url_for_tests(&base, Duration::from_secs(2))
@@ -359,11 +402,64 @@ mod tests {
         );
 
         let captured = handle.join().expect("join server");
-        assert_eq!(captured.len(), 3);
+        assert_eq!(captured.len(), 4);
+        assert_eq!(captured[2].path, "/connector/getSelectedCollection");
         assert!(
-            captured[2]
+            captured[3]
                 .path
                 .starts_with("/connector/import?session=zot-")
+        );
+    }
+
+    #[tokio::test]
+    async fn changed_target_aborts_before_import() {
+        let (base, handle) = spawn_connector(vec![
+            ping_ok(),
+            selected_target_body_for(1, 1, "Reading List", true, true),
+            selected_target_body_for(2, 1, "Reading List", true, true),
+        ]);
+        let client = ConnectorClient::with_base_url_for_tests(&base, Duration::from_secs(2))
+            .expect("client");
+        let args = args(None, Some("@article{key1,\n}\n"), true);
+
+        let err = build_import_payload(&client, &args)
+            .await
+            .expect_err("changed target must fail");
+        let err = err.downcast_ref::<ZotError>().expect("zot error");
+        assert_eq!(err.payload().code, "connector-target-changed");
+
+        let captured = handle.join().expect("join server");
+        assert_eq!(captured.len(), 3);
+        assert!(
+            captured
+                .iter()
+                .all(|entry| entry.path != "/connector/import")
+        );
+    }
+
+    #[tokio::test]
+    async fn target_becoming_readonly_aborts_before_import() {
+        let (base, handle) = spawn_connector(vec![
+            ping_ok(),
+            selected_target_body(true, true),
+            selected_target_body(false, true),
+        ]);
+        let client = ConnectorClient::with_base_url_for_tests(&base, Duration::from_secs(2))
+            .expect("client");
+        let args = args(None, Some("@article{key1,\n}\n"), true);
+
+        let err = build_import_payload(&client, &args)
+            .await
+            .expect_err("readonly recheck must fail");
+        let err = err.downcast_ref::<ZotError>().expect("zot error");
+        assert_eq!(err.payload().code, "connector-target-readonly");
+
+        let captured = handle.join().expect("join server");
+        assert_eq!(captured.len(), 3);
+        assert!(
+            captured
+                .iter()
+                .all(|entry| entry.path != "/connector/import")
         );
     }
 }

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use zot_local::PdfBackend;
+use zot_local::{PdfBackend, validate_area_coordinates};
 
 use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand, resolved_output_limit};
 use crate::context::AppContext;
@@ -141,6 +141,7 @@ async fn create_area_annotation(
     ctx: &AppContext,
     args: &AnnotationCreateAreaArgs,
 ) -> Result<serde_json::Value> {
+    validate_area_coordinates(args.x, args.y, args.width, args.height)?;
     let library = ctx.local_library()?;
     let attachment = require_pdf_attachment(&library, &args.attachment_key)?;
     let pdf_path = library.pdf_path(&attachment);

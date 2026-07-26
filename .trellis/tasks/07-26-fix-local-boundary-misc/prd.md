@@ -89,21 +89,21 @@ connector import 在当前 Zotero UI target 上的 TOCTOU 窗口。
 
 ## Acceptance Criteria
 
-- [ ] 路径测试覆盖 `../`、absolute、Windows separator/prefix/ADS、空 basename 与正常
+- [x] 路径测试覆盖 `../`、absolute、Windows separator/prefix/ADS、空 basename 与正常
       filename；显式 output file 不受元数据 filename 影响。
-- [ ] 下载测试证明默认已存在目标返回 `attachment-exists` 且原内容不变，`--force`
+- [x] 下载测试证明默认已存在目标返回 `attachment-exists` 且原内容不变，`--force`
       才覆盖；CLI parse 覆盖新 flag。
-- [ ] 区域验证覆盖 NaN、正负 infinity、负坐标、零/负宽高、起点/终点越界与合法边界，
+- [x] 区域验证覆盖 NaN、正负 infinity、负坐标、零/负宽高、起点/终点越界与合法边界，
       invalid case 在 PDF/remote I/O 前失败。
-- [ ] graph asset 不再用 `innerHTML` 渲染不可信 graph 字段；URL policy 覆盖
+- [x] graph asset 不再用 `innerHTML` 渲染不可信 graph 字段；URL policy 覆盖
       `javascript:`、relative、http/https，所有外部链接带 `noopener noreferrer`。
-- [ ] graph server route 测试断言 HTML/JS/JSON/404 均有 CSP 与 nosniff，资源 MIME
+- [x] graph server route 测试断言 HTML/JS/JSON/404 均有 CSP 与 nosniff，资源 MIME
       与既有状态码保持正确。
-- [ ] PdfCache reopen 测试断言 WAL、5000 ms busy timeout、schema version；固定同一
+- [x] PdfCache reopen 测试断言 WAL、5000 ms busy timeout、schema version；固定同一
       mtime/length 后替换内容不命中旧 cache，正常 put/get 仍通过。
-- [ ] connector fake server 证明 dry-run 仍为两次总请求，confirm 使用两次 target read；
+- [x] connector fake server 证明 dry-run 仍为两次总请求，confirm 使用两次 target read；
       library/collection/writability 变化时零 import，稳定 target 才成功。
-- [ ] `cargo test -p zot-local`、`cargo test -p zot-desktop`、相关
+- [x] `cargo test -p zot-local`、`cargo test -p zot-desktop`、相关
       `cargo test -p zot-cli`、`task.py validate` 与最终 `just ci` 全部通过；可复用契约
       同步到 `.trellis/spec/` 和必要的 operator limits/docs。
 

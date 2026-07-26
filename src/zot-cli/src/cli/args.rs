@@ -424,6 +424,8 @@ pub(crate) struct ItemDownloadArgs {
     pub(crate) key: String,
     #[arg(long)]
     pub(crate) output: Option<PathBuf>,
+    #[arg(long)]
+    pub(crate) force: bool,
 }
 
 #[derive(Args)]

@@ -60,7 +60,7 @@ zot --json item import --file references.bib
 zot --json item import --file references.bib --confirm
 ```
 
-无需安装插件或配对。Zotero 必须正在运行，且其 UI 当前选中的 library / collection 必须可写；不加 `--confirm` 时不会发送导入记录。
+无需安装插件或配对。Zotero 必须正在运行，且其 UI 当前选中的 library / collection 必须可写；不加 `--confirm` 时不会发送导入记录。确认分支会在写入前再次读取 target；选择或可写性发生变化时会中止，不发送 import。
 
 ### 5. merge/dedupe、其他远端写入或保存查询使用 Web config
 

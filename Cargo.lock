@@ -3065,7 +3065,6 @@ dependencies = [
  "dirs",
  "flate2",
  "fs4",
- "md5",
  "pdfium-render",
  "regex",
  "reqwest",

@@ -162,6 +162,83 @@ plan.enforce_max_affected()?;
 apply_all_and_record(&writer, plan).await
 ```
 
+## Scenario: attachment download and graph-viewer browser boundary
+
+### 1. Scope / Trigger
+
+This contract applies when changing `item download`, graph browser assets, or
+the localhost graph server. Zotero attachment filenames and graph node fields
+are untrusted data even though their source database and HTTP origin are local.
+
+### 2. Signatures
+
+```text
+zot item download <attachment-key> [--output <path>] [--force]
+GET / | /app.js | /cytoscape.min.js | /graph.json
+```
+
+- `safe_attachment_basename(filename) -> ZotResult<PathBuf>`
+- `copy_attachment(source, destination, force) -> ZotResult<()>`
+
+### 3. Contracts
+
+- Metadata filenames are used only for missing/directory `--output` and must be
+  one non-empty basename with no absolute path, separator, Windows prefix/ADS
+  colon, `.` or `..`. An explicit output file is operator-owned.
+- Default download opens with `create_new`; only explicit `--force` may
+  truncate/overwrite. Force still rejects symlink destinations and a destination
+  resolving to the source attachment. Do not reintroduce an exists-check
+  followed by `fs::copy`.
+- Graph-derived text/tags/links use DOM APIs, never HTML string interpolation.
+  `node.url` is clickable only for absolute HTTP(S); DOI/Zotero links use fixed
+  code-owned schemes. Every `_blank` link has `noopener noreferrer`.
+- Every graph response, including 404, sends CSP with `default-src 'self'` and
+  self-only scripts, plus `X-Content-Type-Options: nosniff`. Inline permission
+  is limited to existing styles, never scripts/eval.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| unsafe metadata filename used for implicit/directory output | `attachment-filename` before destination open |
+| destination exists without `--force` | `attachment-exists`; original bytes unchanged |
+| force destination is a symlink or resolves to source | `attachment-destination-symlink` / `attachment-source-destination`; source/target unchanged |
+| explicit output file | metadata filename is ignored |
+| graph URL is `javascript:`, relative, invalid, or another scheme | visible plain text, no clickable anchor |
+| unknown graph route | 404 with the same CSP/nosniff headers |
+
+### 5. Good / Base / Bad Cases
+
+- Good: download to a reviewed explicit path, or use `--force` after inspecting
+  the existing destination.
+- Base: safe metadata basename downloads into the current/existing output
+  directory without clobbering.
+- Bad: join raw metadata into a directory, pre-check `exists()`, interpolate
+  graph fields into `innerHTML`, or add CSP only to index HTML.
+
+### 6. Tests Required
+
+- Table-test traversal, absolute, Windows separator/prefix/ADS, empty, and
+  normal basenames; prove explicit output ignores metadata.
+- Prove no-clobber leaves original bytes and force replaces them; keep clap
+  parse coverage for `--force`.
+- Assert embedded `app.js` has no `innerHTML`, contains HTTP(S) policy and
+  `noopener noreferrer`.
+- Assert HTML/JS/JSON/404 response headers and MIME/status behavior.
+- Run `cargo test -p zot-cli`, workspace clippy, and `just ci`.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: traversal plus racy/default overwrite.
+let destination = output_dir.join(attachment.filename);
+std::fs::copy(source, destination)?;
+
+// Correct: validate metadata and make no-clobber one OS open operation.
+let destination = output_dir.join(safe_attachment_basename(filename)?);
+OpenOptions::new().write(true).create_new(true).open(destination)?;
+```
+
 ## Review Checklist
 
 - Does the command belong under existing `library`, `item`, `collection`,

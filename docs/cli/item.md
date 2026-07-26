@@ -78,7 +78,7 @@ zot --json item attach ATTN001 --file supplement.pdf
 zot --json item download ATCH005 --output downloads/
 ```
 
-这些命令会改库，当前走 Zotero Web API。执行前应先确认：
+`update`、`trash`、`restore` 和 `attach` 会改库，当前走 Zotero Web API。执行前应先确认：
 
 1. `doctor` 已通过
 2. 已配置 `ZOT_API_KEY`
@@ -87,7 +87,8 @@ zot --json item download ATCH005 --output downloads/
 注意：
 
 - `item attach` 是上传新附件
-- `item download` 是下载已有附件
+- `item download` 是只读的本地文件复制，不需要 Web API 凭据。默认不覆盖已有目标；
+  复核现有文件后才能显式追加 `--force`
 
 ## merge
 
@@ -152,7 +153,8 @@ zot --json item annotation create-area ATCH005 --page 1 --x 0.10 --y 0.20 --widt
 
 - annotation 创建首期只支持本地可读的 PDF attachment
 - `create` 用 phrase 定位文本
-- `create-area` 用归一化坐标创建区域批注
+- `create-area` 用归一化坐标创建区域批注：坐标必须有限，`x/y` 位于 `[0,1)`，宽高为
+  正，且矩形不能超出单位页面
 
 ### Scite
 
