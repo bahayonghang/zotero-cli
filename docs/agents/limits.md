@@ -75,10 +75,15 @@ libraries. Keep it accurate as the implementation evolves.
 
 ## JSON envelope contract
 
-- `zot --json ...` always returns the standard envelope from
-  `zot-core::CliEnvelope`. Success payloads now carry
-  `meta.profile == "<active>"` and `meta.api_version == 1` regardless of
-  which command produced the output. `api_version == 1` identifies the
+- Executed one-shot `zot --json ...` commands always return exactly one standard envelope from
+  `zot-core::CliEnvelope`, including failures from generic runtime errors and CLI parsing.
+  Success and error payloads carry `meta.api_version == 1`; `meta.profile == "<active>"` is
+  included when a profile is known. Stable generic codes are `runtime-error`,
+  `json-serialization`, and `cli-parse`.
+- `graph serve` is a long-running human protocol and `completions` emits a raw shell script;
+  both reject `--json` with `json-protocol-unsupported`. Clap help/version remain native
+  documentation output rather than command envelopes.
+- `api_version == 1` identifies the
   envelope family, but individual command payload fields may be added or
   removed during the 0.x release line. Consumers must also follow
   `CHANGELOG.md`; if `api_version` is absent or larger, expect broader schema

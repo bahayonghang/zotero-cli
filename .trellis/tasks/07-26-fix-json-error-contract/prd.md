@@ -65,17 +65,17 @@ full error chains are exposed only when the caller explicitly passes `--verbose`
 
 ## Acceptance Criteria
 
-- [ ] Byte-exact golden tests cover domain, generic runtime, JSON serialization, and CLI parse
+- [x] Byte-exact golden tests cover domain, generic runtime, JSON serialization, and CLI parse
       errors; every error envelope contains `meta.api_version: 1`.
-- [ ] Integration tests force a failure through each top-level command group (`doctor`, `config`,
+- [x] Integration tests force a failure through each top-level command group (`doctor`, `config`,
       `library`, `item`, `collection`, `graph`, `workspace`, `sync`, `mcp`, `completions`) and
       prove stdout parses once as one JSON value, contains no trailing document/text, and has a
       stable code.
-- [ ] `--json graph serve` and `--json completions` fail before long-running/raw output begins;
+- [x] `--json graph serve` and `--json completions` fail before long-running/raw output begins;
       human invocations retain their declared protocols.
-- [ ] Default error output omits source-chain diagnostics; `--verbose` emits chain context only
+- [x] Default error output omits source-chain diagnostics; `--verbose` emits chain context only
       on stderr while stdout remains the same single JSON document.
-- [ ] Focused `zot-cli`/`zot-core` tests and final `just ci` pass; final diff contains no changes
+- [x] Focused `zot-cli`/`zot-core` tests and final `just ci` pass; final diff contains no changes
       from later audit-remediation children.
 
 ## Out Of Scope

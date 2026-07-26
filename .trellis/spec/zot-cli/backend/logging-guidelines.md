@@ -11,8 +11,18 @@ envelope for agents or concise human-readable text for terminal users.
 - `CommandOutput::new` is the single json-vs-human decision point and the single
   place the success envelope + meta are assembled. Do not reintroduce
   `if ctx.json` branches in command modules.
-- Error output goes through `print_error`, driven from `main.rs`.
+- Error output goes through `AppError` and `print_error`, driven from `main.rs`.
+- One-shot JSON errors include `meta.api_version == 1` and stdout contains one document.
+- `--verbose` source chains go only to stderr and never change the JSON document.
 - Do not mix progress text into JSON mode; it breaks the envelope contract.
+
+## Independent Output Protocols
+
+- `graph serve` owns a long-running human protocol; it rejects `--json` with
+  `json-protocol-unsupported` before database or listener I/O.
+- `completions` owns a raw shell-script protocol; it rejects `--json` before writing bytes.
+- New streaming/raw commands must declare their protocol and validate it before side effects;
+  do not return `CommandOutput::silent()` after already mixing text into JSON mode.
 
 ## Text Export Formats
 
@@ -32,7 +42,7 @@ contract:
   `print_query_chunks`. Pass them as the `CommandOutput::new` human closure.
 - Command-specific one-line confirmations are acceptable only in non-JSON
   mode, as seen in workspace and library indexing commands.
-- Generic errors should be printed once by `main.rs`, not by every command.
+- Generic errors should be classified and printed once by `main.rs`, not by every command.
 
 ## Doctor Output
 

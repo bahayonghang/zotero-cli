@@ -12,6 +12,8 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) json: bool,
     #[arg(long, global = true)]
+    pub(crate) verbose: bool,
+    #[arg(long, global = true)]
     pub(crate) profile: Option<String>,
     #[arg(long, global = true, default_value = "user")]
     pub(crate) library: String,
@@ -117,6 +119,33 @@ pub(crate) enum ConfigKeyArg {
     OutputFormat,
     OutputLimit,
     ExportStyle,
+}
+
+impl Cli {
+    pub(crate) fn validate_output_protocol(&self) -> Result<(), zot_core::ZotError> {
+        if !self.json {
+            return Ok(());
+        }
+
+        let unsupported = match &self.command {
+            Commands::Graph(args) if matches!(args.command, Some(GraphCommand::Serve(_))) => {
+                Some("`graph serve` uses a long-running human output protocol")
+            }
+            Commands::Completions { .. } => {
+                Some("`completions` writes a raw shell completion script")
+            }
+            _ => None,
+        };
+
+        match unsupported {
+            Some(message) => Err(zot_core::ZotError::Unsupported {
+                code: "json-protocol-unsupported".to_string(),
+                message: message.to_string(),
+                hint: Some("Omit `--json` for this command".to_string()),
+            }),
+            None => Ok(()),
+        }
+    }
 }
 
 impl From<SortFieldArg> for SortField {
@@ -279,6 +308,7 @@ mod tests {
             ["zot", "graph"].as_slice(),
             ["zot", "graph", "--collection", "COLTR02"].as_slice(),
             ["zot", "--json", "graph", "--collection", "COLTR02"].as_slice(),
+            ["zot", "--verbose", "doctor"].as_slice(),
             ["zot", "graph", "serve"].as_slice(),
             ["zot", "graph", "serve", "--no-open", "--port", "7901"].as_slice(),
             [

@@ -1,7 +1,9 @@
 use zot_core::{
-    Attachment, CliEnvelope, Collection, Item, KnowledgeGraph, LibraryStats, Note, QueryChunk,
-    Workspace, ZotError,
+    Attachment, CliEnvelope, Collection, EnvelopeMeta, Item, KnowledgeGraph, LibraryStats, Note,
+    QueryChunk, Workspace,
 };
+
+use crate::app_error::AppError;
 
 pub const ENVELOPE_API_VERSION: u32 = 1;
 
@@ -15,18 +17,39 @@ pub fn to_pretty_json<T: serde::Serialize>(value: &T) -> anyhow::Result<String> 
     Ok(serde_json::to_string_pretty(value)?)
 }
 
-pub fn print_json<T: serde::Serialize>(value: &T) -> anyhow::Result<()> {
-    println!("{}", to_pretty_json(value)?);
-    Ok(())
+pub fn render_error_json(err: &AppError, profile: Option<&str>) -> anyhow::Result<String> {
+    to_pretty_json(&CliEnvelope::<serde_json::Value>::err_payload_with_meta(
+        err.payload(),
+        EnvelopeMeta {
+            count: None,
+            total: None,
+            profile: profile.map(str::to_string),
+            api_version: Some(ENVELOPE_API_VERSION),
+        },
+    ))
 }
 
-pub fn print_error(err: &ZotError, json: bool) -> anyhow::Result<()> {
+pub fn print_error(
+    err: &AppError,
+    json: bool,
+    verbose: bool,
+    profile: Option<&str>,
+) -> anyhow::Result<()> {
     if json {
-        print_json(&CliEnvelope::<serde_json::Value>::err(err))?;
+        println!("{}", render_error_json(err, profile)?);
     } else {
-        eprintln!("Error: {}", err);
+        eprintln!("Error: {}", err.human_message());
         if let Some(hint) = err.payload().hint {
             eprintln!("Hint: {hint}");
+        }
+    }
+    if verbose {
+        let diagnostics = err.verbose_diagnostics();
+        if !diagnostics.is_empty() {
+            eprintln!("Caused by:");
+            for diagnostic in diagnostics {
+                eprintln!("  {diagnostic}");
+            }
         }
     }
     Ok(())
@@ -166,9 +189,12 @@ pub fn print_query_chunks(chunks: &[QueryChunk]) {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::anyhow;
     use zot_core::CliEnvelope;
 
-    use super::to_pretty_json;
+    use crate::app_error::AppError;
+
+    use super::{render_error_json, to_pretty_json};
 
     #[test]
     fn serializes_success_envelope_with_meta() {
@@ -238,5 +264,33 @@ mod tests {
             json,
             "{\n  \"ok\": false,\n  \"error\": {\n    \"code\": \"db\",\n    \"message\": \"locked\"\n  }\n}"
         );
+    }
+
+    #[test]
+    fn serializes_domain_error_with_versioned_meta_byte_exact() {
+        let error = AppError::runtime(
+            zot_core::ZotError::InvalidInput {
+                code: "invalid-library".to_string(),
+                message: "Invalid library scope: invalid".to_string(),
+                hint: Some("Use 'user' or 'group:<id>'".to_string()),
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            render_error_json(&error, Some("work")).expect("serialize error"),
+            "{\n  \"ok\": false,\n  \"error\": {\n    \"code\": \"invalid-library\",\n    \"message\": \"Invalid library scope: invalid\",\n    \"hint\": \"Use 'user' or 'group:<id>'\"\n  },\n  \"meta\": {\n    \"profile\": \"work\",\n    \"api_version\": 1\n  }\n}"
+        );
+    }
+
+    #[test]
+    fn serializes_generic_error_without_verbose_chain() {
+        let error = AppError::runtime(anyhow!("socket closed").context("request failed"));
+        let json = render_error_json(&error, None).expect("serialize error");
+
+        assert!(json.contains("\"code\": \"runtime-error\""));
+        assert!(json.contains("\"message\": \"request failed\""));
+        assert!(!json.contains("socket closed"));
+        assert!(json.contains("\"api_version\": 1"));
     }
 }
