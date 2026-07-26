@@ -120,6 +120,70 @@ Keep this atomic-save style for workspace TOML updates.
   and workspace indexing.
 - Workspace names must match `^[a-z0-9]+(-[a-z0-9]+)*$`.
 
+## Scenario: Validated workspace path boundary
+
+### 1. Scope / Trigger
+
+This contract applies whenever workspace TOML or workspace RAG sidecar paths
+are created, read, deleted, or opened. Raw workspace strings must not reach a
+filesystem or SQLite path sink.
+
+### 2. Signatures
+
+- `WorkspaceName::parse(name: &str) -> ZotResult<WorkspaceName>`
+- `WorkspaceStore::{create, load, delete, exists}(&WorkspaceName, ...)`
+- `WorkspaceStore::save(workspace: &Workspace) -> ZotResult<()>`
+- `WorkspaceRagStore::open(store: &WorkspaceStore, name: &WorkspaceName)`
+
+### 3. Contracts
+
+- `WorkspaceName` accepts only `^[a-z0-9]+(-[a-z0-9]+)*$`; path construction
+  consumes the validated type rather than `&str`.
+- `save()` reparses the public `Workspace.name` field before writing so manual
+  struct construction cannot bypass validation.
+- TOML and `<name>.idx.sqlite` targets have a canonical parent equal to the
+  canonical workspace root. An existing symlink/reparse target resolving outside
+  that root fails closed.
+- Atomic TOML persistence and the shared `.md_cache.sqlite` layout stay unchanged.
+
+### 4. Validation & Error Matrix
+
+- Empty, traversal, separator, absolute, Windows prefix, uppercase, or malformed
+  kebab-case name -> `InvalidInput` code `invalid-workspace-name` before I/O.
+- Canonical target outside workspace root -> `InvalidInput` code
+  `workspace-path-boundary` before read/open/delete.
+- Missing valid file -> normal `Io` error at the requested in-root path.
+- Valid name and in-root target -> preserve existing store/RAG behavior.
+
+### 5. Good / Base / Bad Cases
+
+- Good: parse `llm-safety`, then create `llm-safety.toml` and
+  `llm-safety.idx.sqlite` under the configured root.
+- Base: `list()` ignores malformed legacy filenames and returns valid workspaces
+  in deterministic name order.
+- Bad: call `root.join(format!("{raw}.toml"))`, or open an existing workspace
+  symlink whose target is outside the canonical root.
+
+### 6. Tests Required
+
+- Table-test valid kebab-case and traversal, separators, absolute/drive/UNC,
+  uppercase, and malformed dash inputs.
+- Prove `save()` rejects a manually constructed invalid `Workspace.name` without
+  creating a root-external file.
+- On platforms with testable symlinks, prove TOML load and RAG open reject targets
+  outside the root; keep valid round-trip and sidecar-layout tests green.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: a raw name owns path semantics at every caller.
+let path = store.root().join(format!("{name}.idx.sqlite"));
+
+// Correct: parse once and let WorkspaceStore enforce the path boundary.
+let name = WorkspaceName::parse(raw)?;
+let rag = WorkspaceRagStore::open(&store, &name)?;
+```
+
 ## Review Checklist
 
 - Does the change keep Zotero's main database read-only?

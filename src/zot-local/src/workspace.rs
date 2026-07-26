@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
@@ -22,6 +24,45 @@ struct WorkspaceFile {
     items: Vec<WorkspaceItem>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct WorkspaceName(String);
+
+impl WorkspaceName {
+    pub fn parse(name: &str) -> ZotResult<Self> {
+        static WORKSPACE_NAME_RE: std::sync::LazyLock<regex::Regex> =
+            std::sync::LazyLock::new(|| {
+                regex::Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").expect("valid workspace-name regex")
+            });
+        if WORKSPACE_NAME_RE.is_match(name) {
+            Ok(Self(name.to_string()))
+        } else {
+            Err(ZotError::InvalidInput {
+                code: "invalid-workspace-name".to_string(),
+                message: format!("Invalid workspace name: {name}"),
+                hint: Some("Use kebab-case such as llm-safety".to_string()),
+            })
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl FromStr for WorkspaceName {
+    type Err = ZotError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Self::parse(value)
+    }
+}
+
+impl fmt::Display for WorkspaceName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 pub struct WorkspaceStore {
     root: PathBuf,
 }
@@ -37,18 +78,17 @@ impl WorkspaceStore {
         &self.root
     }
 
-    pub fn exists(&self, name: &str) -> bool {
+    pub fn exists(&self, name: &WorkspaceName) -> bool {
         self.path_for(name).exists()
     }
 
-    pub fn path_for(&self, name: &str) -> PathBuf {
-        self.root.join(format!("{name}.toml"))
+    fn path_for(&self, name: &WorkspaceName) -> PathBuf {
+        self.root.join(format!("{}.toml", name.as_str()))
     }
 
-    pub fn create(&self, name: &str, description: &str) -> ZotResult<Workspace> {
-        ensure_workspace_name(name)?;
+    pub fn create(&self, name: &WorkspaceName, description: &str) -> ZotResult<Workspace> {
         let ws = Workspace {
-            name: name.to_string(),
+            name: name.as_str().to_string(),
             created: Utc::now().to_rfc3339(),
             description: description.to_string(),
             items: Vec::new(),
@@ -58,10 +98,8 @@ impl WorkspaceStore {
     }
 
     pub fn save(&self, workspace: &Workspace) -> ZotResult<()> {
-        std::fs::create_dir_all(&self.root).map_err(|source| ZotError::Io {
-            path: self.root.clone(),
-            source,
-        })?;
+        let name = WorkspaceName::parse(&workspace.name)?;
+        self.ensure_root()?;
         let data = WorkspaceFile {
             created: workspace.created.clone(),
             description: workspace.description.clone(),
@@ -72,7 +110,8 @@ impl WorkspaceStore {
             message: err.to_string(),
             hint: None,
         })?;
-        let path = self.path_for(&workspace.name);
+        let path = self.path_for(&name);
+        self.ensure_contained(&path)?;
         let mut temp =
             tempfile::NamedTempFile::new_in(&self.root).map_err(|source| ZotError::Io {
                 path: self.root.clone(),
@@ -103,8 +142,9 @@ impl WorkspaceStore {
         Ok(())
     }
 
-    pub fn load(&self, name: &str) -> ZotResult<Workspace> {
+    pub fn load(&self, name: &WorkspaceName) -> ZotResult<Workspace> {
         let path = self.path_for(name);
+        self.ensure_contained_if_root_exists(&path)?;
         let raw = std::fs::read_to_string(&path).map_err(|source| ZotError::Io {
             path: path.clone(),
             source,
@@ -115,15 +155,16 @@ impl WorkspaceStore {
             hint: None,
         })?;
         Ok(Workspace {
-            name: name.to_string(),
+            name: name.as_str().to_string(),
             created: parsed.created,
             description: parsed.description,
             items: parsed.items,
         })
     }
 
-    pub fn delete(&self, name: &str) -> ZotResult<()> {
+    pub fn delete(&self, name: &WorkspaceName) -> ZotResult<()> {
         let path = self.path_for(name);
+        self.ensure_contained_if_root_exists(&path)?;
         std::fs::remove_file(&path).map_err(|source| ZotError::Io { path, source })
     }
 
@@ -143,13 +184,60 @@ impl WorkspaceStore {
             let path = entry.path();
             if path.extension().and_then(|ext| ext.to_str()) == Some("toml")
                 && let Some(name) = path.file_stem().and_then(|stem| stem.to_str())
-                && let Ok(workspace) = self.load(name)
+                && let Ok(name) = WorkspaceName::parse(name)
+                && let Ok(workspace) = self.load(&name)
             {
                 workspaces.push(workspace);
             }
         }
         workspaces.sort_by(|left, right| left.name.cmp(&right.name));
         Ok(workspaces)
+    }
+
+    pub(crate) fn rag_index_path(&self, name: &WorkspaceName) -> ZotResult<PathBuf> {
+        self.ensure_root()?;
+        let path = self.root.join(format!("{}.idx.sqlite", name.as_str()));
+        self.ensure_contained(&path)?;
+        Ok(path)
+    }
+
+    fn ensure_root(&self) -> ZotResult<()> {
+        std::fs::create_dir_all(&self.root).map_err(|source| ZotError::Io {
+            path: self.root.clone(),
+            source,
+        })
+    }
+
+    fn ensure_contained_if_root_exists(&self, path: &Path) -> ZotResult<()> {
+        if self.root.exists() {
+            self.ensure_contained(path)?;
+        }
+        Ok(())
+    }
+
+    fn ensure_contained(&self, path: &Path) -> ZotResult<()> {
+        let canonical_root = std::fs::canonicalize(&self.root).map_err(|source| ZotError::Io {
+            path: self.root.clone(),
+            source,
+        })?;
+        let parent = path.parent().ok_or_else(|| workspace_path_boundary(path))?;
+        let canonical_parent = std::fs::canonicalize(parent).map_err(|source| ZotError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+        if canonical_parent != canonical_root {
+            return Err(workspace_path_boundary(path));
+        }
+        if path.exists() {
+            let canonical_path = std::fs::canonicalize(path).map_err(|source| ZotError::Io {
+                path: path.to_path_buf(),
+                source,
+            })?;
+            if canonical_path.parent() != Some(canonical_root.as_path()) {
+                return Err(workspace_path_boundary(path));
+            }
+        }
+        Ok(())
     }
 
     pub fn add_items(&self, workspace: &mut Workspace, items: &[Item]) -> usize {
@@ -967,18 +1055,16 @@ fn repeat_placeholders(count: usize) -> String {
         .join(",")
 }
 
-fn ensure_workspace_name(name: &str) -> ZotResult<()> {
-    static WORKSPACE_NAME_RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-        regex::Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").expect("valid workspace-name regex")
-    });
-    if WORKSPACE_NAME_RE.is_match(name) {
-        Ok(())
-    } else {
-        Err(ZotError::InvalidInput {
-            code: "invalid-workspace-name".to_string(),
-            message: format!("Invalid workspace name: {name}"),
-            hint: Some("Use kebab-case such as llm-safety".to_string()),
-        })
+fn workspace_path_boundary(path: &Path) -> ZotError {
+    ZotError::InvalidInput {
+        code: "workspace-path-boundary".to_string(),
+        message: format!(
+            "Workspace path resolves outside the configured root: {}",
+            path.display()
+        ),
+        hint: Some(
+            "Remove workspace symlinks or reparse points that leave the workspace root".to_string(),
+        ),
     }
 }
 
@@ -1074,8 +1160,8 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        HybridMode, RagIndex, WorkspaceStore, build_metadata_chunk, compute_term_frequencies,
-        tokenize,
+        HybridMode, RagIndex, WorkspaceName, WorkspaceStore, build_metadata_chunk,
+        compute_term_frequencies, tokenize,
     };
     use zot_core::{Creator, Item, Workspace, WorkspaceItem};
 
@@ -1099,9 +1185,79 @@ mod tests {
         });
         store.save(&workspace).expect("overwrite save");
 
-        let loaded = store.load("llm-safety").expect("load workspace");
+        let name = WorkspaceName::parse("llm-safety").expect("valid name");
+        let loaded = store.load(&name).expect("load workspace");
         assert_eq!(loaded.description, "updated");
         assert_eq!(loaded.items.len(), 1);
+    }
+
+    #[test]
+    fn workspace_name_accepts_only_kebab_case() {
+        for valid in ["a", "llm-safety", "workspace-2026"] {
+            assert!(
+                WorkspaceName::parse(valid).is_ok(),
+                "expected valid: {valid}"
+            );
+        }
+        for invalid in [
+            "",
+            ".",
+            "..",
+            "../escape",
+            "folder/name",
+            r"folder\name",
+            "/absolute",
+            r"C:\absolute",
+            r"C:relative",
+            r"\\server\share",
+            "UpperCase",
+            "two--dashes",
+            "trailing-",
+        ] {
+            let err = WorkspaceName::parse(invalid).expect_err("expected invalid name");
+            assert_eq!(
+                err.payload().code,
+                "invalid-workspace-name",
+                "input: {invalid}"
+            );
+        }
+    }
+
+    #[test]
+    fn save_rejects_unvalidated_workspace_name() {
+        let dir = tempdir().expect("tempdir");
+        let store = WorkspaceStore::new(Some(dir.path().to_path_buf()));
+        let workspace = Workspace {
+            name: "../escape".to_string(),
+            created: "2026-01-01T00:00:00Z".to_string(),
+            description: String::new(),
+            items: Vec::new(),
+        };
+
+        let err = store.save(&workspace).expect_err("invalid name must fail");
+        assert_eq!(err.payload().code, "invalid-workspace-name");
+        assert!(!dir.path().join("escape.toml").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_rejects_workspace_symlink_outside_root() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempdir().expect("workspace root");
+        let outside = tempdir().expect("outside root");
+        let outside_file = outside.path().join("outside.toml");
+        std::fs::write(
+            &outside_file,
+            "created = 'x'\ndescription = ''\nitems = []\n",
+        )
+        .expect("write outside file");
+        symlink(&outside_file, root.path().join("demo.toml")).expect("create symlink");
+        let store = WorkspaceStore::new(Some(root.path().to_path_buf()));
+        let name = WorkspaceName::parse("demo").expect("valid name");
+
+        let err = store.load(&name).expect_err("external symlink must fail");
+        assert_eq!(err.payload().code, "workspace-path-boundary");
     }
 
     #[test]

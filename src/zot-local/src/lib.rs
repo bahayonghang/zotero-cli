@@ -19,7 +19,7 @@ pub use pdf::{
 pub use rag_engine::{PendingEmbedding, RagLibrary, ReindexStats};
 pub use semantic::{ReindexOpts, SemanticStore};
 pub use workspace::{
-    HybridMode, RagIndex, WorkspaceStore, build_metadata_chunk, chunk_text,
+    HybridMode, RagIndex, WorkspaceName, WorkspaceStore, build_metadata_chunk, chunk_text,
     compute_term_frequencies, tokenize,
 };
 pub use workspace_rag::{WorkspaceRagStore, WorkspaceReindexOpts};
