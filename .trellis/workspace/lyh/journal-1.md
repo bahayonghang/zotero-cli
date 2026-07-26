@@ -613,3 +613,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 19: 完成 JSON 错误协议统一
+
+**Date**: 2026-07-26
+**Task**: 完成 JSON 错误协议统一
+**Branch**: `dev`
+
+### Summary
+
+统一 CLI 顶层 AppError 分类与 versioned error envelope，补齐 --verbose、Clap parse、graph serve/completions 独立协议和十个命令组单文档回归测试，并通过 just ci。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1dc7e0b` | (see git log) |
+| `f4810f7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
