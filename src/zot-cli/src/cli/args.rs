@@ -568,6 +568,10 @@ pub(crate) struct ItemTagBatchArgs {
     pub(crate) remove_tags: Vec<String>,
     #[arg(long, default_value_t = 50)]
     pub(crate) limit: usize,
+    #[arg(long, default_value_t = 50)]
+    pub(crate) max_affected: usize,
+    #[arg(long)]
+    pub(crate) confirm: bool,
 }
 
 #[derive(Args)]

@@ -72,15 +72,15 @@ attempted add/remove operation must be reported even when earlier operations fai
 
 ## Acceptance Criteria
 
-- [ ] CLI parse tests cover `--confirm` and `--max-affected`; validation tests cover empty,
+- [x] CLI parse tests cover `--confirm` and `--max-affected`; validation tests cover empty,
       conflicting, and zero-valued inputs with stable codes.
-- [ ] Preview tests prove no writer/credential path is called, distinguish total matches from the
+- [x] Preview tests prove no writer/credential path is called, distinguish total matches from the
       limited target set, cap samples at 10, and report an exceeded ceiling without mutating.
-- [ ] Apply gate tests prove `affected > max_affected` fails before writer calls.
-- [ ] Fault-injection tests prove add/remove and later keys continue after failures; reports
+- [x] Apply gate tests prove `affected > max_affected` fails before writer calls.
+- [x] Fault-injection tests prove add/remove and later keys continue after failures; reports
       distinguish applied, partial, and failed states and preserve structured domain/generic
       error codes.
-- [ ] Canonical skill plus bilingual docs describe preview/confirm/max semantics; generated
+- [x] Canonical skill plus bilingual docs describe preview/confirm/max semantics; generated
       mirrors match; focused tests and final `just ci` pass.
 
 ## Out Of Scope

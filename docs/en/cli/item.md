@@ -128,8 +128,17 @@ zot --json item note delete NOTE001
 zot --json item tag list ATTN001
 zot --json item tag add ATTN001 --tag important --tag reading-list
 zot --json item tag remove ATTN001 --tag obsolete
+# Preview first; this command does not write
 zot --json item tag batch --tag test --add-tag verified --limit 50
+# After reviewing matched/affected/sample_keys, confirm with the same arguments
+zot --json item tag batch --tag test --add-tag verified --limit 50 --max-affected 50 --confirm
 ```
+
+`item tag batch` returns `state: preview` by default and distinguishes all filter matches
+(`matched`) from the `--limit`-selected targets (`affected`). Only `--confirm` calls the Web API;
+the command fails before writing when the selected count exceeds `--max-affected` (default 50).
+A confirmed run reports every add/remove operation. Treat `state: partial` or any
+`failed_operations > 0` as a partial failure, not full success.
 
 ### annotations
 

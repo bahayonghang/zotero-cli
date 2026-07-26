@@ -7,7 +7,7 @@ stability, and safety around writes matter more than clever abstractions.
 
 - Add clap parse coverage for new command surfaces in
   `cli.rs::parses_new_library_and_item_command_surfaces`.
-- Keep global flags (`--json`, `--profile`, `--library`) on the root `Cli`.
+- Keep global flags (`--json`, `--verbose`, `--profile`, `--library`) on the root `Cli`.
   `--library` only accepts `user` or `group:<id>` through `parse_library_scope`.
 - Return `CommandOutput` from handlers for JSON success payloads.
   `CommandOutput::new` assembles the envelope, adding `count`, `total`,
@@ -79,6 +79,85 @@ CommandOutput::new(ctx, items, seed, |items| print_items(items))
   would error or hang on the unexpected call, not just a test that asserts
   the JSON output looks right — an assertion-only test still passes if the
   gate is accidentally removed but the output field is hardcoded.
+
+## Scenario: `item tag batch` safety gate
+
+### 1. Scope / Trigger
+
+- Trigger: changing batch tag filters, limits, confirmation, result fields, or per-item writes.
+- Why: a fuzzy local query fans out into non-transactional Web writes, so permission, ceiling,
+  and partial-state evidence must be runtime-enforced.
+
+### 2. Signatures
+
+```text
+zot item tag batch [--query Q] [--tag T]
+  [--add-tag T]... [--remove-tag T]...
+  [--limit 50] [--max-affected 50] [--confirm]
+```
+
+```rust
+BatchTagWriter::add_tags(key, tags) -> Result<()>
+BatchTagWriter::remove_tags(key, tags) -> Result<()>
+```
+
+### 3. Contracts
+
+- No `--confirm`: local preview only; the writer factory must not run.
+- `matched` is the full filter count; `affected` is the `--limit`-selected count;
+  `sample_keys` contains at most 10 selected keys.
+- Confirmed apply requires `affected <= max_affected`. Each add/remove per key is one operation.
+- Apply output contains state, counts, successful `{key, operation}` entries, and failed
+  `{key, operation, error: ErrorPayload}` entries. Failures do not stop later operations.
+
+### 4. Validation & Error Matrix
+
+| Condition | Code / result | Writer calls |
+|---|---|---:|
+| missing/blank filter | `batch-tags-filter` | 0 |
+| missing/blank mutation | `batch-tags-op` | 0 |
+| same tag added and removed | `batch-tags-conflict` | 0 |
+| zero limit | `batch-tags-limit` | 0 |
+| zero/ exceeded ceiling on confirm | `batch-tags-max-affected` | 0 |
+| some remote operations fail | `state: partial` | remaining operations continue |
+| all remote operations fail | `state: failed` | all planned operations attempted |
+
+### 5. Good / Base / Bad Cases
+
+- Good: preview 100 matches with `limit=20`, reports `affected=20`, then confirm stays under a
+  reviewed ceiling and reports every operation.
+- Base: zero selected matches confirms as `applied` with zero operation counts.
+- Bad: constructing `ctx.remote()` before the preview branch, comparing the ceiling to unselected
+  `matched`, aborting on the first `?`, or treating a successful envelope as full apply success.
+
+### 6. Tests Required
+
+- CLI parse coverage for `--confirm` and `--max-affected`.
+- Validation table with stable codes and zero writer calls.
+- Writer-factory sentinel tests for preview and exceeded ceiling.
+- Fault injection across add/remove and multiple keys, asserting call order, continuation,
+  state/counts, and nested `runtime-error` plus domain codes.
+- Canonical skill mirror check and bilingual workflow examples.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```rust
+let remote = ctx.remote()?;
+for item in matches {
+    remote.add_tags(&item.key, &tags).await?;
+}
+```
+
+Correct:
+
+```rust
+let plan = build_plan(local_search)?;
+if !confirm { return preview(plan); }
+plan.enforce_max_affected()?;
+apply_all_and_record(&writer, plan).await
+```
 
 ## Review Checklist
 

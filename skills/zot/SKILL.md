@@ -360,15 +360,20 @@ cargo run -q -p zot-cli -- --json doctor
 
    层 C，批量写（影响一组条目，必须先在小范围试，再放开）：
    - `item import --confirm`（先 dry-run 复述目标可写性、记录数和格式）
-   - `item tag batch --add-tag/--remove-tag`
+   - `item tag batch --add-tag/--remove-tag`（不带 `--confirm` 只做本地 preview；核对
+     `matched`、`affected`、`truncated`、`sample_keys` 和 `exceeds_max_affected` 后，用完全相同
+     的 filters/mutations 加 `--confirm`；超过默认 50 条时必须在复核后显式提高
+     `--max-affected`）
    - `library duplicates-merge`（多源 → 单 keeper）
    - `library dedupe --confirm`（整库/整 collection 多组批量合并，先用 `--collection` 圈小范围、复查 low-confidence 组）
 
-4. `item merge` / `library duplicates-merge` / `library dedupe` / `sync update-status` 不带 `--confirm` / `--apply` 时本身就是 dry-run preview；要把 preview 当成“还没改”，不要错说成“已经合并 / 已经写回”。
+4. `item merge` / `item tag batch` / `library duplicates-merge` / `library dedupe` / `sync update-status` 不带 `--confirm` / `--apply` 时本身就是 dry-run preview；要把 preview 当成“还没改”，不要错说成“已经合并 / 已经写回”。
 5. connector import 的 preview 与 confirm 必须保持同一输入和格式，并在 confirm 前重新检查当前目标可写性；connector 失败不能改走 Web。
 6. merge/dedupe 的 preview 是本地只读规划，confirm 只走 Web API；缺少 Web 凭据时保留 preview 结果并停止，不能改走 connector。
 7. `library dedupe` 的 low-confidence 组默认跳过。不要把普通 confirm 当作授权，也不要自行追加 `--include-low-confidence`；必须先单独展示这些组，再取得一次明确的风险授权。
 8. 写权限缺失或目标路径不支持该 mutation 时停在只读分析，不要假装成功。
+9. `item tag batch --confirm` 返回 `state: applied|partial|failed` 和逐操作结果。只要
+   `failed_operations > 0` 就必须明确报告失败项；不能因命令返回了 envelope 就称为全部成功。
 
 ## 常见语义差异
 

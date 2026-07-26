@@ -128,8 +128,16 @@ zot --json item note delete NOTE001
 zot --json item tag list ATTN001
 zot --json item tag add ATTN001 --tag important --tag reading-list
 zot --json item tag remove ATTN001 --tag obsolete
+# 先 preview；此命令不会写库
 zot --json item tag batch --tag test --add-tag verified --limit 50
+# 核对 matched/affected/sample_keys 后，用相同参数确认写入
+zot --json item tag batch --tag test --add-tag verified --limit 50 --max-affected 50 --confirm
 ```
+
+`item tag batch` 默认返回 `state: preview`，并区分过滤器总命中数 `matched` 与本次由
+`--limit` 选中的 `affected`。只有 `--confirm` 才会调用 Web API；选中数超过
+`--max-affected`（默认 50）时会在写入前拒绝。确认执行会返回逐项 add/remove 结果；
+`state: partial` 或 `failed_operations > 0` 表示存在部分失败，不能当作全部成功。
 
 ### annotations
 

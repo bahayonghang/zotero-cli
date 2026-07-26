@@ -208,6 +208,8 @@ just docs
 - merge/dedupe、note、tag、collection、Web import、annotation、saved-search、status-sync mutation 统一走 Zotero Web API。
 - 旧 `desktop_bridge` / `write_backend` 配置会被忽略；`doctor` 会给出迁移提示，方便安全删除。
 - merge/dedupe 默认先 preview；批量 dedupe 默认跳过 low-confidence，只有单独展示并取得明确风险授权后才可使用 `--include-low-confidence`。
+- `item tag batch` 默认先 preview，只有 `--confirm` 才写入；确认目标不得超过
+  `--max-affected`（默认 50），逐操作的部分失败会在结果中明确列出。
 - annotation 创建是 PDF-first，依赖本地 PDF、Pdfium 和写凭证。
 - citation key 查询优先走 Better BibTeX，可用时补强；否则退回兼容的本地解析。
 - 旧参考实现里的 `search` / `fetch` 这种 connector 心智模型，已经被显式映射到 `library`、`item`、`collection`、`workspace`、`sync` 这些工作流。
