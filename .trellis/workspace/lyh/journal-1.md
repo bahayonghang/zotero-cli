@@ -782,3 +782,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: 完成本地边界与 sidecar 杂项加固
+
+**Date**: 2026-07-26
+**Task**: 完成本地边界与 sidecar 杂项加固
+**Branch**: `dev`
+
+### Summary
+
+加固附件下载路径与覆盖、区域标注数值、graph viewer、PDF cache sidecar 和 connector target TOCTOU；聚焦测试、Clippy、skills-check、task validate 与 just ci 均通过，并归档子任务。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `766b71b` | (see git log) |
+| `8ae247f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
