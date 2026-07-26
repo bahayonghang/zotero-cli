@@ -647,3 +647,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: 完成批量标签写入安全门禁
+
+**Date**: 2026-07-26
+**Task**: 完成批量标签写入安全门禁
+**Branch**: `dev`
+
+### Summary
+
+完成 item tag batch 的本地预览、显式确认、影响上限、逐项失败隔离与结构化结果契约；同步 CLI、技能、双语文档和质量规范，并通过聚焦测试、技能镜像检查、Clippy 与 just ci。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f5681c9` | (see git log) |
+| `33808ae` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

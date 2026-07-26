@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 19
+- **Total Sessions**: 20
 - **Last Active**: 2026-07-26
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~649 | Active |
+| `journal-1.md` | ~683 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 20 | 2026-07-26 | 完成批量标签写入安全门禁 | `f5681c9`, `33808ae` | `dev` |
 | 19 | 2026-07-26 | 完成 JSON 错误协议统一 | `1dc7e0b`, `f4810f7` | `dev` |
 | 18 | 2026-07-26 | 完成 SQLite 一致快照整改 | `08a5925`, `b1b7f50` | `dev` |
 | 17 | 2026-07-26 | 完成 Pdfium 下载校验与原子安装 | `f746f8d`, `6b65241` | `dev` |
