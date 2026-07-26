@@ -50,6 +50,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--canonical", type=Path, default=Path("skills/zot"))
     parser.add_argument("--mirror", type=Path, action="append")
+    parser.add_argument(
+        "--skip-if-all-missing",
+        action="store_true",
+        help="skip comparison when no generated mirror is installed",
+    )
     return parser.parse_args()
 
 
@@ -59,6 +64,11 @@ def main() -> int:
     failed = False
 
     try:
+        if args.skip_if_all_missing and all(not mirror.exists() for mirror in mirrors):
+            collect_tree(args.canonical)
+            print("skill mirrors are not installed; skipping local mirror comparison")
+            return 0
+
         for mirror in mirrors:
             issues = compare_trees(args.canonical, mirror)
             if not issues:

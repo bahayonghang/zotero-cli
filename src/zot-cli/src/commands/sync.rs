@@ -24,9 +24,10 @@ pub(crate) async fn handle(ctx: &AppContext, command: SyncCommand) -> Result<Com
                     item.url.as_deref(),
                     item.doi.as_deref(),
                     item.extra.get("extra").map(String::as_str),
-                ) && let Some(status) = client.check_publication(&info).await?
-                {
-                    matches.push((item.key.clone(), status));
+                ) {
+                    if let Some(status) = client.check_publication(&info).await? {
+                        matches.push((item.key.clone(), status));
+                    }
                 }
             }
             if args.apply {

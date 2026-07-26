@@ -49,6 +49,11 @@
    - `sync update-status --apply`
 5. Preview merge/dedupe first, report keeper, sources, confidence, and skipped groups, then wait for confirmation
 6. `library dedupe --confirm` skips low-confidence groups by default. Ordinary confirmation is not risk authorization; add `--include-low-confidence` only after showing those groups separately and obtaining explicit authorization
+7. `item tag batch` is local preview only without `--confirm`. Review `matched`, `affected`,
+   `truncated`, `sample_keys`, and `exceeds_max_affected`, then repeat the same filters/mutations
+   with `--confirm`. Raise the default `--max-affected 50` only after reviewing the larger batch
+8. For confirmed tag batches, use `state` and `failed_operations` as authoritative. Per-operation
+   failures are listed while later operations continue; never call `partial` or `failed` a full success
 
 ## Read/write boundary
 

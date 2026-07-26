@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde_json::json;
 use zot_core::{ZotError, ZotResult};
 
-use crate::http::{HttpRuntime, ensure_status, remote_err};
+use crate::http::{HttpRuntime, ensure_status, remote_err, send_with_retry};
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct BetterBibTexSearchItem {
@@ -35,7 +35,7 @@ impl BetterBibTexClient {
 
     pub async fn probe(&self) -> bool {
         let url = format!("{}/cayw?probe=true", self.base_url);
-        match self.client.get(url).send().await {
+        match send_with_retry(self.client.get(url), "bbt-probe").await {
             Ok(response) => response
                 .text()
                 .await

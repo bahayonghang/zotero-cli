@@ -1,10 +1,10 @@
 use anyhow::Result;
-use zot_local::PdfBackend;
+use zot_local::{PdfBackend, validate_area_coordinates};
 
-use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand};
+use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand, resolved_output_limit};
 use crate::context::AppContext;
 use crate::output::CommandOutput;
-use crate::util::{require_pdf_attachment, run_pdf};
+use crate::util::{require_pdf_attachment, run_local, run_pdf};
 
 pub(crate) async fn handle(
     ctx: &AppContext,
@@ -12,9 +12,12 @@ pub(crate) async fn handle(
 ) -> Result<CommandOutput> {
     match command {
         ItemAnnotationCommand::List(args) => {
-            let annotations = ctx
-                .local_library()?
-                .get_annotations(args.item_key.as_deref(), args.limit)?;
+            let item_key = args.item_key;
+            let limit = resolved_output_limit(args.limit);
+            let annotations = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                library.get_annotations(item_key.as_deref(), limit)
+            })
+            .await?;
             CommandOutput::new(ctx, annotations, None, |annotations| {
                 if annotations.is_empty() {
                     println!("No annotations found.");
@@ -29,9 +32,12 @@ pub(crate) async fn handle(
             })
         }
         ItemAnnotationCommand::Search(args) => {
-            let annotations = ctx
-                .local_library()?
-                .search_annotations(&args.query, args.limit)?;
+            let query = args.query;
+            let limit = resolved_output_limit(args.limit);
+            let annotations = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                library.search_annotations(&query, limit)
+            })
+            .await?;
             CommandOutput::new(ctx, annotations, None, |annotations| {
                 if annotations.is_empty() {
                     println!("No annotations found.");
@@ -135,6 +141,7 @@ async fn create_area_annotation(
     ctx: &AppContext,
     args: &AnnotationCreateAreaArgs,
 ) -> Result<serde_json::Value> {
+    validate_area_coordinates(args.x, args.y, args.width, args.height)?;
     let library = ctx.local_library()?;
     let attachment = require_pdf_attachment(&library, &args.attachment_key)?;
     let pdf_path = library.pdf_path(&attachment);

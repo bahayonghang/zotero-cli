@@ -258,11 +258,11 @@ pub(crate) fn build_merge_execution_plan(
     let mut children_to_reparent = Vec::new();
     let mut skipped_duplicate_attachments = 0usize;
     for child in source_children {
-        if let Some(signature) = attachment_signature(&child)
-            && !seen_attachment_signatures.insert(signature)
-        {
-            skipped_duplicate_attachments += 1;
-            continue;
+        if let Some(signature) = attachment_signature(&child) {
+            if !seen_attachment_signatures.insert(signature) {
+                skipped_duplicate_attachments += 1;
+                continue;
+            }
         }
         children_to_reparent.push(child);
     }

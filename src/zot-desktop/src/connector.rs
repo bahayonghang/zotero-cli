@@ -47,6 +47,8 @@ pub struct LocalHttpStatus {
 pub struct SelectedTarget {
     #[serde(default)]
     pub id: Option<i64>,
+    #[serde(default, rename = "libraryID", alias = "library_id")]
+    pub library_id: Option<i64>,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
@@ -482,6 +484,7 @@ mod tests {
 
         let target = client.selected_target().await.expect("selected target");
         assert_eq!(target.id, Some(42));
+        assert_eq!(target.library_id, Some(1));
         assert_eq!(target.name.as_deref(), Some("Reading List"));
         assert!(target.is_writable());
 

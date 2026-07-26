@@ -33,11 +33,25 @@ pub struct ErrorPayload {
 }
 ```
 
-The CLI wraps this in `CliEnvelope::Err` for `--json` output via the single
-constructor `CliEnvelope::err(&ZotError)` (envelope.rs). `ErrorPayload` is the
-canonical envelope error type (`EnvelopeError` is a type alias); do not copy
-fields manually. Preserve this shape unless intentionally changing the JSON
-API version in `zot-cli`.
+The CLI wraps this in `CliEnvelope::Err`. Domain callers may use
+`CliEnvelope::err(&ZotError)`; the executable boundary uses
+`CliEnvelope::err_payload_with_meta(ErrorPayload, EnvelopeMeta)` so generic and domain failures
+share one schema with `meta.api_version == 1`. `ErrorPayload` is the canonical envelope error
+type (`EnvelopeError` is a type alias); do not copy fields manually. Error metadata is additive
+and optional at the core type level because `zot-cli` owns the API version.
+
+The error envelope fields are:
+
+```rust
+Err {
+    ok: bool,
+    error: ErrorPayload,
+    meta: Option<EnvelopeMeta>,
+}
+```
+
+Tests must prove the legacy constructor omits metadata and the versioned constructor serializes
+`profile`/`api_version` without changing `ErrorPayload`.
 
 ## Patterns
 

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use zot_core::{EditorialNotice, SciteItemReport, SciteTally, ZotResult};
 
-use crate::http::{HttpRuntime, remote_err};
+use crate::http::{HttpRuntime, remote_err, send_with_retry};
 
 const SCITE_BATCH_SIZE: usize = 500;
 
@@ -75,12 +75,12 @@ impl SciteClient {
     }
 
     async fn get_tally(&self, doi: &str) -> ZotResult<Option<SciteTally>> {
-        let response = self
-            .client
-            .get(format!("{}/tallies/{}", self.base_url, doi))
-            .send()
-            .await
-            .map_err(remote_err("scite-tally"))?;
+        let response = send_with_retry(
+            self.client
+                .get(format!("{}/tallies/{}", self.base_url, doi)),
+            "scite-tally",
+        )
+        .await?;
         if !response.status().is_success() {
             return Ok(None);
         }
@@ -119,12 +119,11 @@ impl SciteClient {
     }
 
     async fn get_paper(&self, doi: &str) -> ZotResult<Option<PaperPayload>> {
-        let response = self
-            .client
-            .get(format!("{}/papers/{}", self.base_url, doi))
-            .send()
-            .await
-            .map_err(remote_err("scite-paper"))?;
+        let response = send_with_retry(
+            self.client.get(format!("{}/papers/{}", self.base_url, doi)),
+            "scite-paper",
+        )
+        .await?;
         if !response.status().is_success() {
             return Ok(None);
         }

@@ -476,3 +476,410 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: 完成 P0 Pdfium CWD 动态库劫持修复
+
+**Date**: 2026-07-26
+**Task**: 完成 P0 Pdfium CWD 动态库劫持修复
+**Branch**: `dev`
+
+### Summary
+
+完成 07-26-fix-pdfium-cwd-rce：删除隐式 CWD 候选及 pdfium-render 裸库名 system fallback，改为可信来源回归测试，补齐 zot-local 可执行安全契约；聚焦测试、clippy 与 just ci 全部通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `982c012` | (see git log) |
+| `c1e2d96` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 16: 完成凭据与 workspace 路径边界热修
+
+**Date**: 2026-07-26
+**Task**: 完成凭据与 workspace 路径边界热修
+**Branch**: `dev`
+
+### Summary
+
+拆分 Zotero 认证与外部附件上传请求，强制生产上传 HTTPS；引入 WorkspaceName 并统一 TOML/RAG canonical containment，补齐回归测试与安全 code-spec，just ci 全绿。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2da80f6` | (see git log) |
+| `1f31505` | (see git log) |
+| `242e99d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 17: 完成 Pdfium 下载校验与原子安装
+
+**Date**: 2026-07-26
+**Task**: 完成 Pdfium 下载校验与原子安装
+**Branch**: `dev`
+
+### Summary
+
+固定七平台双层 SHA-256 manifest，引入有界流式下载、regular-entry 解压、跨进程锁、同步原子发布和受管缓存复核，并通过聚焦测试与 just ci。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f746f8d` | (see git log) |
+| `6b65241` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 18: 完成 SQLite 一致快照整改
+
+**Date**: 2026-07-26
+**Task**: 完成 SQLite 一致快照整改
+**Branch**: `dev`
+
+### Summary
+
+移除 live DB immutable 与手工 DB/WAL/SHM copy，改用只读源连接、限时分页 Backup API、quick_check、稳定 busy error 和 doctor 快照元数据，并通过并发 writer 回归与 just ci。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `08a5925` | (see git log) |
+| `b1b7f50` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 19: 完成 JSON 错误协议统一
+
+**Date**: 2026-07-26
+**Task**: 完成 JSON 错误协议统一
+**Branch**: `dev`
+
+### Summary
+
+统一 CLI 顶层 AppError 分类与 versioned error envelope，补齐 --verbose、Clap parse、graph serve/completions 独立协议和十个命令组单文档回归测试，并通过 just ci。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1dc7e0b` | (see git log) |
+| `f4810f7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 20: 完成批量标签写入安全门禁
+
+**Date**: 2026-07-26
+**Task**: 完成批量标签写入安全门禁
+**Branch**: `dev`
+
+### Summary
+
+完成 item tag batch 的本地预览、显式确认、影响上限、逐项失败隔离与结构化结果契约；同步 CLI、技能、双语文档和质量规范，并通过聚焦测试、技能镜像检查、Clippy 与 just ci。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f5681c9` | (see git log) |
+| `33808ae` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 21: 完成配置与凭据加固
+
+**Date**: 2026-07-26
+**Task**: 完成配置与凭据加固
+**Branch**: `dev`
+
+### Summary
+
+完成 secret Debug 隔离、配置路径 fail-closed 与原子持久化，接入 effective profile/JSON/只读 limit，收紧 doctor 和 config init 契约；聚焦测试、just ci 与 zot doctor 均通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b7bd13e` | (see git log) |
+| `472d1da` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 22: 完成本地 DB 语义与性能整改
+
+**Date**: 2026-07-26
+**Task**: 完成本地 DB 语义与性能整改
+**Branch**: `dev`
+
+### Summary
+
+默认排除回收站并标注 envelope 策略；SQL 下推 search 分页与批量 hydration；collection 歧义 fail closed；duplicate/graph 增加可审计预算；重型本地查询迁移至 run_local blocking 边界；聚焦测试、just ci 与 zot doctor 均通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1bfeaae` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 23: 完成远程 HTTP 与不可信下载安全整改
+
+**Date**: 2026-07-26
+**Task**: 完成远程 HTTP 与不可信下载安全整改
+**Branch**: `dev`
+
+### Summary
+
+收敛并实现有界重试、Zotero API 版本固定、错误体清洗、OA PDF SSRF 与资源限制、附件上传补偿及 arXiv 结构化解析；聚焦测试、clippy 与 just ci 全部通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `08f5e3c` | (see git log) |
+| `11184bc` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 24: 完成本地边界与 sidecar 杂项加固
+
+**Date**: 2026-07-26
+**Task**: 完成本地边界与 sidecar 杂项加固
+**Branch**: `dev`
+
+### Summary
+
+加固附件下载路径与覆盖、区域标注数值、graph viewer、PDF cache sidecar 和 connector target TOCTOU；聚焦测试、Clippy、skills-check、task validate 与 just ci 均通过，并归档子任务。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `766b71b` | (see git log) |
+| `8ae247f` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 25: 完成工程化与文档基线整改
+
+**Date**: 2026-07-26
+**Task**: 完成工程化与文档基线整改
+**Branch**: `dev`
+
+### Summary
+
+完成纯检查门禁、三平台与 MSRV CI、依赖审计和未使用依赖治理，补齐 workspace lint、1.0.0 CHANGELOG、控制面文档与可执行规范；just ci、audit、deny、machete、udeps 和 doctor 均通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d76211b` | (see git log) |
+| `2e176b7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 26: 完成审计整改父任务集成验收
+
+**Date**: 2026-07-26
+**Task**: 完成审计整改父任务集成验收
+**Branch**: `dev`
+
+### Summary
+
+确认 11 个子任务全部完成归档，逐项复验审计映射、P0/P1 安全回归与跨任务契约；最终 just ci 和 Trellis validate 通过，持久化源审计报告与集成验收工件并归档父任务。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6f1bf1c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

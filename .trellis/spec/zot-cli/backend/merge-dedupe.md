@@ -35,7 +35,7 @@ pub fn item_uri(&self, key: &str) -> String; // http://zotero.org/users|groups/{
 ```
 
 CLI: `zot library dedupe [--method both|doi|title] [--collection <id>] [--limit N]
-[--confirm] [--include-low-confidence]`
+[--candidate-budget N] [--confirm] [--include-low-confidence]`
 — dry-run by default; dry-run is pure local and must not construct the remote
 writer (writer construction occurs only in `--confirm`).
 
@@ -56,6 +56,9 @@ writer (writer construction occurs only in `--confirm`).
   `keeper{key,item_type,title}`, `reason` (auditable, stops at the first
   decisive layer), `absorb[]`. Plus `total_groups`, `confirm_required`.
 - `DedupePlan` also records `include_low_confidence`.
+- Detection returns `DuplicateScanResult`; `--limit` caps returned/planned
+  groups, while `--candidate-budget` (default 250,000) bounds title pair
+  comparisons and never truncates scan input.
 - `DedupeApplyReport`: `applied[]`, `failed[{keeper, sources, error}]`,
   `skipped_low_confidence[]`, `total_groups`, `eligible_groups`,
   `applied_groups`, `failed_groups`, and `skipped_low_confidence_groups`.
@@ -72,6 +75,7 @@ writer (writer construction occurs only in `--confirm`).
 | One group fails during `--confirm` apply                  | recorded in `failed[]` as `code: message`; loop continues                                                    |
 | Low-confidence group without include flag                | copied to `skipped_low_confidence[]`; writer is never called                                                |
 | `--include-low-confidence` with confirm                   | low and normal groups enter the same serial writer loop                                                     |
+| Candidate budget exhausted                               | `duplicate-scan-truncated` before writer construction; increase budget and rescan                           |
 | Web credentials missing                                  | `write-credentials`; no writer or mutation is attempted                                                     |
 
 ### 5. Good / Base / Bad Cases (field fill decision)
@@ -109,7 +113,8 @@ against `GET /itemTypeFields?itemType=X`.
 - Web writer loopback regression asserts the legacy seven-request order,
   version preconditions, keeper `dc:replaces`, and source `{deleted:1}`.
 - Dedupe gate tests assert default low groups produce zero writer calls and
-  explicit include applies them; counts/lists must agree.
+  explicit include applies them; counts/lists must agree. A truncated scan
+  must also produce zero writer construction/calls.
 
 ### 7. Wrong vs Correct
 

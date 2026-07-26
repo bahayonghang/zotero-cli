@@ -19,19 +19,22 @@
 - All clients share the response layer in `http.rs`: `remote_err(code)` maps
   `reqwest::Error` while preserving the operation code and optional HTTP
   status; `ensure_status`, `read_json`, and `ensure_empty` map non-success
-  statuses and JSON decode failures. Do not redefine these per client.
+  statuses and JSON decode failures. `ensure_status` reads at most 4 KiB of an
+  error body, removes control characters, collapses whitespace, and marks
+  truncation. Do not redefine these per client or call `response.text()` on
+  an untrusted non-success response.
 - Non-critical lookups may return `Ok(None)` on remote miss. Examples:
   Scite single report calls return `Ok(None)` when both tally and paper are
   absent; Semantic Scholar publication checks return `Ok(None)` for 404.
 
 ## Code Example
 
-HTTP status failures should keep the status and remote body:
+HTTP status failures should keep the status and a bounded sanitized excerpt:
 
 ```rust
 return Err(ZotError::Remote {
     code: code.to_string(),
-    message: format!("Request failed with status {}: {body}", status.as_u16()),
+    message: format!("Request failed with status {}: {excerpt}", status.as_u16()),
     hint: http_hint(Some(status)),
     status: Some(status.as_u16()),
 });
@@ -53,3 +56,5 @@ return Err(ZotError::Remote {
   unless the source is explicitly optional and the caller can proceed.
 - Do not include API keys, bearer tokens, or upload authorization secrets in
   error messages.
+- Do not attach an unbounded response body to a typed error, even when the
+  remote service is expected to return plain text.

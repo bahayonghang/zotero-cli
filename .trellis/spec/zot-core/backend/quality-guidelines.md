@@ -33,13 +33,82 @@ verified through the workspace gate.
 Use serde defaults to keep config additions compatible with existing files:
 
 ```rust
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputConfig {
     #[serde(default = "default_format")]
     pub default_format: String,
     #[serde(default = "default_limit")]
     pub limit: usize,
 }
+
+impl Default for OutputConfig {
+    fn default() -> Self {
+        Self { default_format: default_format(), limit: default_limit() }
+    }
+}
+```
+
+## Scenario: Secret config and atomic persistence
+
+### 1. Scope / Trigger
+
+- Trigger: adding a credential field, changing config paths, or changing `AppConfig::save`.
+- Why: derived diagnostics and direct overwrite can leak or destroy the user's write credentials.
+
+### 2. Signatures
+
+```rust
+SecretString::expose_secret(&self) -> &str
+AppConfig::config_file() -> ZotResult<PathBuf>
+AppConfig::state_dir() -> PathBuf
+AppConfig::save(&self) -> ZotResult<PathBuf>
+```
+
+### 3. Contracts
+
+- Secret fields use serde-transparent `SecretString`; TOML remains a string, while `Debug` is always redacted.
+- `config.toml` requires the platform user config directory and never falls back to CWD.
+- Non-secret caches/indexes use `state_dir`; they cannot become a config-file fallback.
+- Save creates a same-directory temp file, restricts permissions before writing, syncs, then atomically replaces.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| platform config dir missing | `config-dir-unavailable` |
+| output format outside `table/json` | `config-value` |
+| output limit zero | `config-value` |
+| temp write/persist fails | typed `Io`; old target is not pre-truncated |
+
+### 5. Good / Base / Bad Cases
+
+- Good: existing config is atomically replaced and Unix mode remains `0600`.
+- Base: absent config returns defaults with `table` and limit 50.
+- Bad: derive `Debug` over raw `String` secrets or call `fs::write` on the final path.
+
+### 6. Tests Required
+
+- Canary is absent from `SecretString`, config, and context Debug while TOML round-trips it.
+- Unicode redaction asserts character boundaries.
+- Atomic overwrite asserts final contents, no temp residue, and Unix `0600`.
+- A `None` platform directory asserts `config-dir-unavailable`.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```rust
+#[derive(Debug)]
+struct Config { api_key: String }
+std::fs::write(AppConfig::config_file(), encoded)?;
+```
+
+Correct:
+
+```rust
+#[derive(Debug)]
+struct Config { api_key: SecretString }
+config.save()?; // same-directory temp + sync + atomic persist
 ```
 
 ## Testing Requirements

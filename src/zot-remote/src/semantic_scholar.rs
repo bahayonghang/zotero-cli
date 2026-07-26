@@ -3,7 +3,7 @@ use regex::Regex;
 use serde::Deserialize;
 use zot_core::{ZotError, ZotResult};
 
-use crate::http::{HttpRuntime, ensure_status, remote_err};
+use crate::http::{HttpRuntime, ensure_status, remote_err, send_with_retry};
 
 const API_BASE: &str = "https://api.semanticscholar.org/graph/v1";
 static ARXIV_VERSION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"v\d+$").expect("valid regex"));
@@ -48,30 +48,30 @@ pub fn extract_preprint_info(
         extra.unwrap_or_default(),
     ] {
         for re in ARXIV_PATTERNS.iter() {
-            if let Some(captures) = re.captures(source)
-                && let Some(matched) = captures.get(1)
-            {
-                let id = matched.as_str().to_string();
-                let normalized = ARXIV_VERSION_RE.replace(&id, "").to_string();
-                return Some(PreprintInfo {
-                    preprint_id: normalized.clone(),
-                    source: "arxiv".to_string(),
-                    api_id: format!("arXiv:{normalized}"),
-                });
+            if let Some(captures) = re.captures(source) {
+                if let Some(matched) = captures.get(1) {
+                    let id = matched.as_str().to_string();
+                    let normalized = ARXIV_VERSION_RE.replace(&id, "").to_string();
+                    return Some(PreprintInfo {
+                        preprint_id: normalized.clone(),
+                        source: "arxiv".to_string(),
+                        api_id: format!("arXiv:{normalized}"),
+                    });
+                }
             }
         }
     }
 
     for source in [doi.unwrap_or_default(), url.unwrap_or_default()] {
-        if let Some(captures) = BIORXIV_RE.captures(source)
-            && let Some(matched) = captures.get(1)
-        {
-            let preprint_doi = matched.as_str().to_string();
-            return Some(PreprintInfo {
-                preprint_id: preprint_doi.clone(),
-                source: "doi".to_string(),
-                api_id: format!("DOI:{preprint_doi}"),
-            });
+        if let Some(captures) = BIORXIV_RE.captures(source) {
+            if let Some(matched) = captures.get(1) {
+                let preprint_doi = matched.as_str().to_string();
+                return Some(PreprintInfo {
+                    preprint_id: preprint_doi.clone(),
+                    source: "doi".to_string(),
+                    api_id: format!("DOI:{preprint_doi}"),
+                });
+            }
         }
     }
 
@@ -133,7 +133,7 @@ impl SemanticScholarClient {
         if let Some(api_key) = self.api_key.as_deref() {
             request = request.header("x-api-key", api_key);
         }
-        let response = request.send().await.map_err(remote_err("ss-request"))?;
+        let response = send_with_retry(request, "ss-request").await?;
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(None);
         }

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use zot_local::{CollectionContent, CollectionNav};
 
-use crate::cli::CollectionCommand;
+use crate::cli::{CollectionCommand, resolved_output_limit};
 use crate::context::AppContext;
 use crate::format::{print_collections, print_items};
 use crate::output::CommandOutput;
@@ -100,7 +100,8 @@ fn handle_read<L: CollectionNav + CollectionContent>(
             CommandOutput::new(ctx, items, None, |items| print_items(items))
         }
         CollectionCommand::Search(args) => {
-            let collections = library.search_collections(&args.query, args.limit)?;
+            let collections =
+                library.search_collections(&args.query, resolved_output_limit(args.limit))?;
             CommandOutput::new(ctx, collections, None, |collections| {
                 print_collections(collections, 0)
             })

@@ -70,7 +70,10 @@ zot --json config set embedding-url https://api.example.com/v1/embeddings
 说明：
 
 - `embedding-*` 只支持根配置，不支持 `--target-profile`
+- `output-format` 只接受 `table` 或 `json`；命令行显式 `--json` 始终优先开启 JSON
 - `output-limit` 需要正整数
+- `output-limit` 只作为未显式传 `--limit` 时的只读结果默认值，覆盖 library 查询/列表、item related/deleted/note search、collection search、workspace show/query、annotation list/search 和 Scite search/retractions
+- 索引构建、dedupe、tag batch 和 sync 的工作量或写入安全上限不读取 `output-limit`
 
 ## profiles
 

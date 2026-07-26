@@ -3,6 +3,59 @@
 All notable changes to this project will be documented in this file. Dates use
 `YYYY-MM-DD`. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-07-26
+
+### Fixed
+
+- Synchronized workspace version 1.0.1 lockfile, skill metadata, and changelog.
+
+## [1.0.0] - 2026-07-26
+
+### Security
+
+- Pdfium discovery no longer considers the current working directory. Managed native libraries
+  are downloaded with pinned archive/library SHA-256 values and published atomically only after
+  bounded extraction and verification.
+- Attachment upload credentials are restricted to the Zotero API origin; external upload targets
+  receive neither the API key nor Zotero protocol headers. Workspace paths, attachment download
+  filenames, graph URLs, annotation geometry, and connector import targets now fail closed at
+  their trust boundaries.
+- Configuration secrets use redacted diagnostics and atomic restrictive persistence. Remote HTTP
+  handling now bounds retries/error bodies and validates OA PDF redirects, addresses, MIME, size,
+  and file magic.
+
+### Reliability
+
+- Local Zotero reads use the SQLite Backup API for consistent WAL-aware snapshots. PDF text cache
+  sidecars use WAL, busy timeouts, schema versions, and content SHA-256 cache identities.
+- JSON failures now use one versioned envelope across runtime, parse, and protocol errors. Batch tag
+  writes require explicit confirmation, enforce an affected-item ceiling, and retain per-operation
+  partial-state evidence.
+- Search and statistics exclude trashed items by default; collection-name ambiguity, note-tag N+1,
+  duplicate detection, graph edge budgets, heavy local I/O scheduling, retry semantics, and
+  attachment orphan cleanup are hardened for larger libraries.
+
+### Changed
+
+- Effective profile, output format/limit, doctor capability fields, and config initialization now
+  report or reject the settings actually used instead of accepting silent no-ops.
+- Some legacy 0.x result semantics and error shapes are intentionally tightened. Agent consumers
+  should rely on stable error codes and `meta.api_version = 1`, not human-readable messages.
+
+### Engineering
+
+- The five crates inherit workspace lints. Local and GitHub gates use `Cargo.lock`, preserve Rust
+  1.85 compatibility, verify version/skill drift, and run on Linux, Windows, and macOS.
+- CI adds dependency advisory/license/source checks and unused-dependency analysis. The unused
+  `rmcp` workspace declaration is removed until MCP is implemented.
+
+### Migration
+
+- **Rotate the Zotero API key if any release before 1.0.0 was used to upload attachments.** Earlier
+  versions could forward that key to an authorization-provided upload host.
+- Review automation that depends on 0.x JSON error text, trashed-item inclusion, ambiguous
+  collection names, or implicit attachment overwrite. Use the new explicit flags and stable codes.
+
 ## [0.6.0] - 2026-07-18
 
 ### Added

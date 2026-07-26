@@ -1,0 +1,30 @@
+{
+  "id": "fix-pdfium-cwd-rce",
+  "name": "fix-pdfium-cwd-rce",
+  "title": "P0热修:移除Pdfium CWD加载路径",
+  "description": "报告P0-01(check-pdfium已CONFIRMED)。pdf.rs candidate_library_paths() 候选第4项 env::current_dir().join(library_name) 使 zot doctor 在不可信目录加载恶意 pdfium.dll/.so/.dylib -> 任意代码执行。修复:删除CWD候选;保留显式 ZOT_PDFIUM_LIB_PATH/PDFIUM_LIB_PATH 与可执行文件同目录/受管缓存;加载前无trust则拒绝。加候选路径单测+安全回归测试。当前证据:src/zot-local/src/pdf.rs:597-647,636-639,696-702;src/zot-cli/src/commands/doctor.rs:29-30。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P0",
+  "creator": "lyh",
+  "assignee": "lyh",
+  "createdAt": "2026-07-26",
+  "completedAt": "2026-07-26",
+  "branch": null,
+  "base_branch": "dev",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-26-audit-remediation",
+  "relatedFiles": [
+    "src/zot-local/src/pdf.rs",
+    ".trellis/spec/zot-local/backend/quality-guidelines.md",
+    ".trellis/spec/zot-local/backend/directory-structure.md"
+  ],
+  "notes": "P0 implemented 2026-07-26: removed implicit CWD candidate and bare-name system fallback; trusted-source regression test + spec policy recorded; just ci passed.",
+  "meta": {}
+}

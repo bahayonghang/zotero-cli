@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use zot_core::config::ProfileConfig;
-use zot_core::{AppConfig, canonicalize_or_original, detect_zotero_data_dir};
+use zot_core::{AppConfig, SecretString, canonicalize_or_original, detect_zotero_data_dir};
 
 use crate::cli::{
     ConfigCommand, ConfigInitArgs, ConfigKeyArg, ConfigProfilesCommand, ConfigProfilesUseArgs,
@@ -47,7 +47,7 @@ async fn handle_show(ctx: &AppContext) -> Result<CommandOutput> {
         .profile
         .clone()
         .or_else(|| raw.default_profile_name().map(ToOwned::to_owned));
-    let path = canonicalize_or_original(&AppConfig::config_file());
+    let path = canonicalize_or_original(&AppConfig::config_file()?);
     let payload = serde_json::json!({
         "config_file": path,
         "default_profile": raw.default_profile_name(),
@@ -75,15 +75,18 @@ async fn handle_show(ctx: &AppContext) -> Result<CommandOutput> {
             "Library ID: {}",
             blank_or_value(&effective.zotero.library_id)
         );
-        println!("API key: {}", redact_or_missing(&effective.zotero.api_key));
+        println!(
+            "API key: {}",
+            redact_or_missing(effective.zotero.api_key.expose_secret())
+        );
         println!(
             "Semantic Scholar key: {}",
-            redact_or_missing(&effective.zotero.semantic_scholar_api_key)
+            redact_or_missing(effective.zotero.semantic_scholar_api_key.expose_secret())
         );
         println!("Embedding URL: {}", effective.embedding.url);
         println!(
             "Embedding key: {}",
-            redact_or_missing(&effective.embedding.api_key)
+            redact_or_missing(effective.embedding.api_key.expose_secret())
         );
         println!("Embedding model: {}", effective.embedding.model);
     })
@@ -168,6 +171,7 @@ enum ConfigTarget<'a> {
 /// Field slot a config key resolves to on a given target.
 enum SettingSlot<'a> {
     Text(&'a mut String),
+    Secret(&'a mut SecretString),
     Limit(&'a mut usize),
 }
 
@@ -187,7 +191,7 @@ fn setting_slot<'a>(
     target: &'a mut ConfigTarget<'_>,
     key: &ConfigKeyArg,
 ) -> Option<SettingSlot<'a>> {
-    use SettingSlot::{Limit, Text};
+    use SettingSlot::{Limit, Secret, Text};
     match key {
         ConfigKeyArg::DataDir => match target {
             ConfigTarget::Root(config) => Some(Text(&mut config.zotero.data_dir)),
@@ -198,19 +202,19 @@ fn setting_slot<'a>(
             ConfigTarget::Profile(profile) => Some(Text(&mut profile.library_id)),
         },
         ConfigKeyArg::ApiKey => match target {
-            ConfigTarget::Root(config) => Some(Text(&mut config.zotero.api_key)),
-            ConfigTarget::Profile(profile) => Some(Text(&mut profile.api_key)),
+            ConfigTarget::Root(config) => Some(Secret(&mut config.zotero.api_key)),
+            ConfigTarget::Profile(profile) => Some(Secret(&mut profile.api_key)),
         },
         ConfigKeyArg::SemanticScholarApiKey => match target {
-            ConfigTarget::Root(config) => Some(Text(&mut config.zotero.semantic_scholar_api_key)),
-            ConfigTarget::Profile(profile) => Some(Text(&mut profile.semantic_scholar_api_key)),
+            ConfigTarget::Root(config) => Some(Secret(&mut config.zotero.semantic_scholar_api_key)),
+            ConfigTarget::Profile(profile) => Some(Secret(&mut profile.semantic_scholar_api_key)),
         },
         ConfigKeyArg::EmbeddingUrl => match target {
             ConfigTarget::Root(config) => Some(Text(&mut config.embedding.url)),
             ConfigTarget::Profile(_) => None,
         },
         ConfigKeyArg::EmbeddingKey => match target {
-            ConfigTarget::Root(config) => Some(Text(&mut config.embedding.api_key)),
+            ConfigTarget::Root(config) => Some(Secret(&mut config.embedding.api_key)),
             ConfigTarget::Profile(_) => None,
         },
         ConfigKeyArg::EmbeddingModel => match target {
@@ -237,21 +241,20 @@ fn setting_slot<'a>(
 /// and `config set`.
 fn apply_setting(target: &mut ConfigTarget<'_>, key: &ConfigKeyArg, value: &str) -> Result<()> {
     match setting_slot(target, key) {
-        Some(SettingSlot::Text(slot)) => *slot = value.to_string(),
-        Some(SettingSlot::Limit(slot)) => *slot = parse_limit(value)?,
-        None => {
-            return Err(zot_core::ZotError::InvalidInput {
-                code: "config-key".to_string(),
-                message: format!(
-                    "Key '{}' is only supported at the root config level",
-                    key.as_str()
-                ),
-                hint: Some(
-                    "Use 'zot config set <key> <value>' without --target-profile".to_string(),
-                ),
+        Some(SettingSlot::Text(slot)) => {
+            if matches!(key, ConfigKeyArg::OutputFormat) && !matches!(value, "table" | "json") {
+                return Err(zot_core::ZotError::InvalidInput {
+                    code: "config-value".to_string(),
+                    message: format!("Invalid output format '{value}'"),
+                    hint: Some("Use 'table' or 'json'".to_string()),
+                }
+                .into());
             }
-            .into());
+            *slot = value.to_string();
         }
+        Some(SettingSlot::Secret(slot)) => slot.set(value.to_string()),
+        Some(SettingSlot::Limit(slot)) => *slot = parse_limit(value)?,
+        None => return Err(root_only_key_error(key).into()),
     }
     Ok(())
 }
@@ -262,18 +265,21 @@ fn apply_init(
     args: &ConfigInitArgs,
     default_data_dir: String,
 ) -> Result<()> {
-    if let Some(SettingSlot::Text(data_dir)) = setting_slot(target, &ConfigKeyArg::DataDir)
-        && data_dir.is_empty()
-    {
-        *data_dir = default_data_dir;
+    let settings = provided_init_settings(args);
+    for (key, _) in &settings {
+        if setting_slot(target, key).is_none() {
+            return Err(root_only_key_error(key).into());
+        }
     }
 
-    for (key, value) in provided_init_settings(args) {
-        // `config init` keeps its historical behavior of silently ignoring
-        // root-only keys on profile targets; `config set` rejects them.
-        if setting_slot(target, &key).is_some() {
-            apply_setting(target, &key, value)?;
+    if let Some(SettingSlot::Text(data_dir)) = setting_slot(target, &ConfigKeyArg::DataDir) {
+        if data_dir.is_empty() {
+            *data_dir = default_data_dir;
         }
+    }
+
+    for (key, value) in settings {
+        apply_setting(target, &key, value)?;
     }
     Ok(())
 }
@@ -300,14 +306,29 @@ fn provided_init_settings(args: &ConfigInitArgs) -> Vec<(ConfigKeyArg, &str)> {
 }
 
 fn parse_limit(value: &str) -> Result<usize> {
-    value.parse::<usize>().map_err(|_| {
-        zot_core::ZotError::InvalidInput {
-            code: "config-limit".to_string(),
-            message: format!("Invalid output limit '{}'", value),
-            hint: Some("Pass a positive integer".to_string()),
-        }
-        .into()
-    })
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|limit| *limit > 0)
+        .ok_or_else(|| {
+            zot_core::ZotError::InvalidInput {
+                code: "config-value".to_string(),
+                message: format!("Invalid output limit '{}'", value),
+                hint: Some("Pass a positive integer".to_string()),
+            }
+            .into()
+        })
+}
+
+fn root_only_key_error(key: &ConfigKeyArg) -> zot_core::ZotError {
+    zot_core::ZotError::InvalidInput {
+        code: "config-key".to_string(),
+        message: format!(
+            "Key '{}' is only supported at the root config level",
+            key.as_str()
+        ),
+        hint: Some("Use 'zot config set <key> <value>' without --target-profile".to_string()),
+    }
 }
 
 fn config_change_payload(
@@ -329,11 +350,11 @@ fn config_view(config: &AppConfig) -> serde_json::Value {
     serde_json::json!({
         "data_dir": blank_or_value(&config.zotero.data_dir),
         "library_id": blank_or_value(&config.zotero.library_id),
-        "api_key": redact_or_missing(&config.zotero.api_key),
-        "semantic_scholar_api_key": redact_or_missing(&config.zotero.semantic_scholar_api_key),
+        "api_key": redact_or_missing(config.zotero.api_key.expose_secret()),
+        "semantic_scholar_api_key": redact_or_missing(config.zotero.semantic_scholar_api_key.expose_secret()),
         "embedding": {
             "url": blank_or_value(&config.embedding.url),
-            "api_key": redact_or_missing(&config.embedding.api_key),
+            "api_key": redact_or_missing(config.embedding.api_key.expose_secret()),
             "model": blank_or_value(&config.embedding.model),
         },
         "output": {
@@ -488,6 +509,7 @@ mod tests {
         for key in ConfigKeyArg::value_variants() {
             let value = match key {
                 ConfigKeyArg::OutputLimit => "25",
+                ConfigKeyArg::OutputFormat => "json",
                 _ => "value",
             };
 
@@ -533,7 +555,7 @@ mod tests {
     }
 
     #[test]
-    fn init_reuses_apply_setting_and_skips_root_only_keys_for_profiles() {
+    fn init_reuses_apply_setting_and_rejects_root_only_keys_before_mutation() {
         let mut args = init_args();
         args.library_id = Some("7".to_string());
         args.embedding_url = Some("https://example.com".to_string());
@@ -550,14 +572,18 @@ mod tests {
         assert_eq!(config.embedding.url, "https://example.com");
 
         let mut profile = ProfileConfig::default();
-        apply_init(
+        let error = apply_init(
             &mut ConfigTarget::Profile(&mut profile),
             &args,
             "detected-dir".to_string(),
         )
-        .expect("profile init ignores root-only keys");
-        assert_eq!(profile.data_dir, "detected-dir");
-        assert_eq!(profile.library_id, "7");
+        .expect_err("profile init must reject root-only keys");
+        let error = error
+            .downcast_ref::<zot_core::ZotError>()
+            .expect("zot error");
+        assert_eq!(error.payload().code, "config-key");
+        assert!(profile.data_dir.is_empty());
+        assert!(profile.library_id.is_empty());
     }
 
     #[test]
@@ -591,5 +617,6 @@ mod tests {
     fn parses_output_limit_for_config_updates() {
         assert_eq!(parse_limit("25").expect("limit"), 25);
         assert!(parse_limit("bad").is_err());
+        assert!(parse_limit("0").is_err());
     }
 }

@@ -49,6 +49,11 @@
    - `sync update-status --apply`
 5. merge/dedupe 先 preview，复述 keeper、sources、confidence 和跳过项，再等确认
 6. `library dedupe --confirm` 默认跳过 low-confidence。普通 confirm 不代表风险授权；只有单独展示这些组并取得明确授权后才可追加 `--include-low-confidence`
+7. `item tag batch` 不带 `--confirm` 时只做本地 preview。先核对 `matched`、`affected`、
+   `truncated`、`sample_keys` 和 `exceeds_max_affected`，再用相同 filters/mutations 加
+   `--confirm`；超过默认 50 条时，复核后才可显式提高 `--max-affected`
+8. tag batch 确认结果以 `state` 和 `failed_operations` 为准；逐项失败会继续执行并列出，
+   不能把 `partial` / `failed` 说成全部成功
 
 ## 读写边界
 

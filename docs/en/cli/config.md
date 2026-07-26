@@ -70,7 +70,10 @@ Supported keys:
 Notes:
 
 - `embedding-*` is root-only and does not support `--target-profile`
+- `output-format` accepts only `table` or `json`; an explicit `--json` always enables JSON
 - `output-limit` must be a positive integer
+- `output-limit` is the default only for read-result commands without an explicit `--limit`: library queries/lists, item related/deleted/note search, collection search, workspace show/query, annotation list/search, and Scite search/retractions
+- indexing, dedupe, tag batch, and sync keep their own workload or write-safety limits
 
 ## profiles
 

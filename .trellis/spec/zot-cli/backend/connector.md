@@ -49,7 +49,8 @@ POST /connector/import?session=<uuid>
 - Header `X-Zotero-Connector-API-Version: 3` on connector requests.
 - Timeouts: 5s connect / 30s connector request; `/api/` readiness probes use
   the 5s timeout.
-- `SelectedTarget { id, name, editable, library_editable: Option<bool> }`;
+- `SelectedTarget { id, library_id, name, editable, library_editable: Option<bool> }`;
+  `library_id` maps connector JSON `libraryID` and participates in target identity;
   writable iff `editable` and (when present) `library_editable` are both
   true — see `SelectedTarget::is_writable()`. Never infer writability from
   only one of the two fields.
@@ -60,6 +61,11 @@ POST /connector/import?session=<uuid>
 - Dry-run envelope: `{ target, editable, entries, format, confirmed: false }`
   — no `session`/`status` fields, because nothing was sent.
 - Confirmed envelope: `{ session, target, editable, entries, format, status }`.
+- Dry-run reads selected target once. Confirm reads it once for the initial gate,
+  parses the input, then reads it again immediately before import. The second
+  target must still be writable and its
+  `(library_id, id, name, editable, library_editable)` fingerprint must match.
+  The confirmed envelope reports this revalidated target.
 - Format resolution, in priority order: (1) explicit `--format` flag,
   (2) file extension (`.bib`/`.ris`), (3) content sniff (`@\w+\s*\{` prefix
   means bibtex, `^TY  - ` means ris), (4) `connector-import-format` error.
@@ -75,17 +81,22 @@ POST /connector/import?session=<uuid>
 | Non-2xx HTTP response                                                      | `connector-http` with `status`                                     |
 | Format undetectable from flag/extension/content                            | `connector-import-format`; no network call made                    |
 | `--confirm` and (`editable == false` or `library_editable == Some(false)`) | `connector-target-readonly`; import request never sent             |
+| confirmed target becomes read-only at the second read                       | `connector-target-readonly`; import request never sent             |
+| confirmed target remains writable but fingerprint changes                   | `connector-target-changed`; import request never sent              |
 | No `--confirm`                                                             | dry-run only — `ping` + `selected_target` run, `import` never sent |
 | `--file` and `--text` both given, or neither given                         | clap-level error (`conflicts_with` / `required_unless_present`)    |
 
 ### 5. Good / Base / Bad Cases
 
-- Good: Zotero running, a writable collection selected, `--confirm` given ->
-  entries land in that collection, envelope reports `session`/`status`.
+- Good: Zotero running, the same writable library/collection is observed twice,
+  `--confirm` is given -> entries land in that target and the envelope reports
+  `session`/`status`.
 - Base: no `--confirm` -> dry-run reports target/editable/entries/format,
   zero network writes.
 - Bad: a read-only group/feed is selected and `--confirm` is given ->
   `connector-target-readonly` before any import request leaves the process.
+- Bad: the user switches library/collection while confirm input is being
+  prepared -> `connector-target-changed` and zero import requests.
 - Bad: Zotero is closed -> `connector-unreachable`; no Web API fallback
   under any connector failure, ever.
 
@@ -99,7 +110,8 @@ POST /connector/import?session=<uuid>
   stray `import` call hits connection-refused and fails the test, not just
   a wrong output field); the same proof-by-absence shape for the
   readonly-target gate; a confirmed-writable-target happy path asserting
-  the returned `session`/`status`.
+  two selected-target reads and the returned `session`/`status`; changed
+  library/collection and second-read readonly fixtures proving zero import.
 - `just ci` full gate (fmt / check / clippy `-D warnings` / test /
   skills-check).
 
@@ -121,9 +133,16 @@ let result = client.import(&session, &text)?;
 if !target.is_writable() { return Err(readonly_error()); }
 
 // Correct — the readonly gate runs before any import call, so a read-only
-// target never reaches the network:
+// or changed target never reaches the import endpoint:
 if !target.is_writable() {
     return Err(readonly_error());
+}
+let confirmed = client.selected_target()?;
+if !confirmed.is_writable() {
+    return Err(readonly_error());
+}
+if target_fingerprint(&confirmed) != target_fingerprint(&target) {
+    return Err(changed_target_error());
 }
 client.import(&session, &text)?;
 ```

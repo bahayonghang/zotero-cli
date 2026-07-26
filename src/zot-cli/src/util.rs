@@ -1,6 +1,9 @@
 use anyhow::Result;
-use zot_core::{Attachment, EmbeddingConfig, Item, PdfOutlineEntry, ZotError, ZotResult};
-use zot_local::{AttachmentSource, ItemReader};
+use zot_core::{
+    AppConfig, Attachment, EmbeddingConfig, Item, LibraryScope, PdfOutlineEntry, ZotError,
+    ZotResult,
+};
+use zot_local::{AttachmentSource, ItemReader, LocalLibrary};
 use zot_remote::{EmbeddingClient, HttpRuntime, PublicationStatus, normalize_doi};
 
 pub(crate) async fn run_pdf<F, R>(f: F) -> ZotResult<R>
@@ -15,6 +18,23 @@ where
             message: join.to_string(),
             hint: None,
         })?
+}
+
+pub(crate) async fn run_local<F, R>(config: AppConfig, scope: LibraryScope, f: F) -> ZotResult<R>
+where
+    F: FnOnce(LocalLibrary) -> ZotResult<R> + Send + 'static,
+    R: Send + 'static,
+{
+    tokio::task::spawn_blocking(move || {
+        let library = LocalLibrary::open(zot_core::get_data_dir(&config), scope)?;
+        f(library)
+    })
+    .await
+    .map_err(|join| ZotError::InvalidInput {
+        code: "local-task-join".to_string(),
+        message: format!("Local database worker failed: {join}"),
+        hint: Some("Retry the command; report the failure if it persists".to_string()),
+    })?
 }
 
 pub(crate) async fn maybe_embed_query(
@@ -205,7 +225,7 @@ mod tests {
 
     use zot_core::ZotError;
 
-    use super::{parse_page_range, require_valid_doi, run_pdf};
+    use super::{parse_page_range, require_valid_doi, run_local, run_pdf};
 
     #[tokio::test(flavor = "current_thread")]
     async fn run_pdf_offloads_blocking_work_to_a_separate_thread() {
@@ -218,6 +238,25 @@ mod tests {
         .await
         .expect("run_pdf must return Ok value");
         assert_eq!(outcome, 42);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn run_local_opens_and_queries_on_a_blocking_thread() {
+        let data_dir = tempfile::tempdir().expect("temporary Zotero data dir");
+        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../zot-local/tests/fixtures/zotero.sqlite");
+        std::fs::copy(&fixture, data_dir.path().join("zotero.sqlite"))
+            .expect("copy local library fixture");
+        let mut config = zot_core::AppConfig::default();
+        config.zotero.data_dir = data_dir.path().display().to_string();
+        let runtime_thread = std::thread::current().id();
+        let worker_thread = run_local(config, zot_core::LibraryScope::User, move |_| {
+            Ok::<_, ZotError>(std::thread::current().id())
+        })
+        .await
+        .expect("run local fixture query");
+
+        assert_ne!(worker_thread, runtime_thread);
     }
 
     #[test]

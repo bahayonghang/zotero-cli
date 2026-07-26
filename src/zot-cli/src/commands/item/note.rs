@@ -1,7 +1,7 @@
 use anyhow::Result;
 use zot_local::NoteReader;
 
-use crate::cli::ItemNoteCommand;
+use crate::cli::{ItemNoteCommand, resolved_output_limit};
 use crate::context::AppContext;
 use crate::output::CommandOutput;
 
@@ -52,7 +52,7 @@ fn handle_read<L: NoteReader>(
             })
         }
         ItemNoteCommand::Search(args) => {
-            let notes = library.search_notes(&args.query, args.limit)?;
+            let notes = library.search_notes(&args.query, resolved_output_limit(args.limit))?;
             CommandOutput::new(ctx, notes, None, |notes| {
                 for note in notes {
                     println!(
@@ -168,7 +168,7 @@ mod tests {
             &fake,
             ItemNoteCommand::Search(NoteSearchArgs {
                 query: "attention".to_string(),
-                limit: 7,
+                limit: Some(7),
             }),
         )
         .expect("search must succeed");

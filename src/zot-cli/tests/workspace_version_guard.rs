@@ -58,6 +58,62 @@ fn workspace_internal_dependencies_are_centralized() {
     eprintln!("成员 crate 的依赖继承方式校验完成");
 }
 
+#[test]
+fn workspace_members_inherit_lints_and_changelog_matches_version() {
+    let workspace_root = workspace_root();
+    let root_manifest = read_manifest(&workspace_root.join("Cargo.toml"));
+    let workspace = match root_manifest.get("workspace").and_then(Value::as_table) {
+        Some(workspace) => workspace,
+        None => panic!("根 Cargo.toml 缺少 [workspace]"),
+    };
+    let members = match workspace.get("members").and_then(Value::as_array) {
+        Some(members) => members,
+        None => panic!("根 Cargo.toml 缺少 workspace.members"),
+    };
+
+    assert_eq!(members.len(), 5, "workspace 应包含五个 crate");
+    for member in members {
+        let member = match member.as_str() {
+            Some(member) => member,
+            None => panic!("workspace member 必须是字符串"),
+        };
+        let manifest_rel_path = format!("{member}/Cargo.toml");
+        let manifest = read_manifest(&workspace_root.join(&manifest_rel_path));
+        let inherits_lints = manifest
+            .get("lints")
+            .and_then(Value::as_table)
+            .and_then(|lints| lints.get("workspace"))
+            .and_then(Value::as_bool);
+        assert_eq!(
+            inherits_lints,
+            Some(true),
+            "{manifest_rel_path} 应使用 `[lints] workspace = true`",
+        );
+    }
+
+    let version = match workspace
+        .get("package")
+        .and_then(Value::as_table)
+        .and_then(|package| package.get("version"))
+        .and_then(Value::as_str)
+    {
+        Some(version) => version,
+        None => panic!("根 Cargo.toml 缺少 workspace.package.version"),
+    };
+    let changelog_path = workspace_root.join("CHANGELOG.md");
+    let changelog = match fs::read_to_string(&changelog_path) {
+        Ok(changelog) => changelog,
+        Err(error) => panic!("读取 {} 失败: {error}", changelog_path.display()),
+    };
+    let expected_heading = format!("## [{version}]");
+    assert!(
+        changelog
+            .lines()
+            .any(|line| line.starts_with(&expected_heading)),
+        "CHANGELOG.md 缺少当前 workspace 版本 heading: {expected_heading}",
+    );
+}
+
 fn workspace_root() -> PathBuf {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     match manifest_dir.ancestors().nth(2) {

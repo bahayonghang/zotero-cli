@@ -7,10 +7,10 @@ help:
   @just --list
 
 version-check:
-  cargo test -p zot-cli --test workspace_version_guard
+  cargo test -p zot-cli --test workspace_version_guard --locked
 
 check: version-check
-  cargo check --workspace
+  cargo check --workspace --locked
 
 fmt:
   cargo fmt --all --check
@@ -19,13 +19,13 @@ fmt-fix:
   cargo fmt --all
 
 clippy:
-  cargo clippy --workspace --all-targets -- -D warnings
+  cargo clippy --workspace --all-targets --locked -- -D warnings
 
 test:
-  cargo test --workspace
+  cargo test --workspace --locked
 
 build:
-  cargo build --release -p zot-cli
+  cargo build --release -p zot-cli --locked
 
 docs:
   npm --prefix docs install
@@ -48,7 +48,7 @@ version-sync:
       sk.write_text("".join(lines), encoding="utf-8")
   print(f"version-sync: synced v{version} to skills/*/SKILL.md")
 
-install: install-local _install-skills
+install: install-local skills-sync
 
 install-local:
   cargo install --path src/zot-cli --locked --force
@@ -69,8 +69,12 @@ _install-skills:
                   shutil.rmtree(destination)
               shutil.copytree(skill, destination)
 
-skills-check: _install-skills
-  python scripts/check_skill_mirrors.py
+skills-sync: _install-skills
+
+skills-check:
+  python scripts/check_skill_mirrors.py --skip-if-all-missing
   python -m unittest discover -s scripts/tests -p "test_*.py"
 
-ci: version-sync fmt check clippy test skills-check
+ci-check: fmt check clippy test skills-check
+
+ci: ci-check

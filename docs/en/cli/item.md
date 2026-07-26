@@ -78,7 +78,8 @@ zot --json item attach ATTN001 --file supplement.pdf
 zot --json item download ATCH005 --output downloads/
 ```
 
-These commands mutate the library through the Zotero Web API. Check first that:
+`update`, `trash`, `restore`, and `attach` mutate the library through the
+Zotero Web API. Check first that:
 
 1. `doctor` has been run
 2. `ZOT_API_KEY` is configured
@@ -87,7 +88,9 @@ These commands mutate the library through the Zotero Web API. Check first that:
 Notes:
 
 - `item attach` uploads a new attachment
-- `item download` downloads an existing attachment
+- `item download` is a read-only local file copy and needs no Web API
+  credentials. It does not overwrite an existing destination unless you
+  inspect it and explicitly add `--force`
 
 ## merge
 
@@ -128,8 +131,17 @@ zot --json item note delete NOTE001
 zot --json item tag list ATTN001
 zot --json item tag add ATTN001 --tag important --tag reading-list
 zot --json item tag remove ATTN001 --tag obsolete
+# Preview first; this command does not write
 zot --json item tag batch --tag test --add-tag verified --limit 50
+# After reviewing matched/affected/sample_keys, confirm with the same arguments
+zot --json item tag batch --tag test --add-tag verified --limit 50 --max-affected 50 --confirm
 ```
+
+`item tag batch` returns `state: preview` by default and distinguishes all filter matches
+(`matched`) from the `--limit`-selected targets (`affected`). Only `--confirm` calls the Web API;
+the command fails before writing when the selected count exceeds `--max-affected` (default 50).
+A confirmed run reports every add/remove operation. Treat `state: partial` or any
+`failed_operations > 0` as a partial failure, not full success.
 
 ### annotations
 
@@ -144,7 +156,9 @@ Notes:
 
 - annotation creation is PDF-first and requires a locally readable PDF attachment
 - `create` locates text by phrase
-- `create-area` creates an image-style annotation from normalized coordinates
+- `create-area` creates an image-style annotation from normalized coordinates:
+  values must be finite, `x/y` must be in `[0,1)`, sizes must be positive, and
+  the rectangle must remain inside the unit page
 
 ### Scite
 

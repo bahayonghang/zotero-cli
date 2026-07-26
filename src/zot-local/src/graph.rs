@@ -9,8 +9,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use zot_core::{
-    CommunitySummary, EdgeRelation, GraphEdge, GraphMetrics, GraphNode, GraphOptions, Item,
-    KnowledgeGraph, RankedNode, TagSummary,
+    CommunitySummary, EdgeRelation, GraphBuildMeta, GraphEdge, GraphMetrics, GraphNode,
+    GraphOptions, Item, KnowledgeGraph, RankedNode, TagSummary,
 };
 
 const COAUTHOR_WEIGHT: i64 = 8;
@@ -30,6 +30,12 @@ pub(crate) struct PairAccum {
     pub(crate) tag: usize,
     pub(crate) collection: usize,
     pub(crate) related: bool,
+}
+
+#[derive(Default)]
+struct BuildAccum {
+    skipped_oversize_groups: usize,
+    truncated: bool,
 }
 
 /// Single source of truth for "how related are two items". Both `zot graph`
@@ -68,22 +74,21 @@ pub(crate) fn assemble_graph(
         .collect();
 
     let mut pairs: HashMap<(usize, usize), PairAccum> = HashMap::new();
+    let mut build = BuildAccum::default();
 
     if opts.relations.coauthor {
         for group in invert_authors(&ordered).values() {
-            accumulate(group, opts.max_group_size, &mut pairs, |acc| {
-                acc.coauthor += 1
-            });
+            accumulate(group, opts, &mut pairs, &mut build, |acc| acc.coauthor += 1);
         }
     }
     if opts.relations.tag {
         for group in invert_tags(&ordered).values() {
-            accumulate(group, opts.max_group_size, &mut pairs, |acc| acc.tag += 1);
+            accumulate(group, opts, &mut pairs, &mut build, |acc| acc.tag += 1);
         }
     }
     if opts.relations.collection {
         for group in invert_collections(&ordered).values() {
-            accumulate(group, opts.max_group_size, &mut pairs, |acc| {
+            accumulate(group, opts, &mut pairs, &mut build, |acc| {
                 acc.collection += 1
             });
         }
@@ -92,9 +97,16 @@ pub(crate) fn assemble_graph(
         for (source, target) in explicit_relations {
             if let (Some(&i), Some(&j)) =
                 (index_of.get(source.as_str()), index_of.get(target.as_str()))
-                && i != j
             {
-                pairs.entry(order_pair(i, j)).or_default().related = true;
+                if i != j {
+                    admit_pair(
+                        order_pair(i, j),
+                        opts.edge_budget,
+                        &mut pairs,
+                        &mut build,
+                        |acc| acc.related = true,
+                    );
+                }
             }
         }
     }
@@ -191,6 +203,12 @@ pub(crate) fn assemble_graph(
         nodes,
         edges,
         metrics,
+        build: GraphBuildMeta {
+            edge_budget: opts.edge_budget,
+            candidate_pair_count: pairs.len(),
+            skipped_oversize_groups: build.skipped_oversize_groups,
+            truncated: build.truncated,
+        },
     }
 }
 
@@ -202,17 +220,46 @@ fn order_pair(i: usize, j: usize) -> (usize, usize) {
 /// single popular tag/collection cannot create a dense hairball.
 fn accumulate(
     group: &[usize],
-    max_group_size: usize,
+    opts: &GraphOptions,
     pairs: &mut HashMap<(usize, usize), PairAccum>,
+    build: &mut BuildAccum,
     mut bump: impl FnMut(&mut PairAccum),
 ) {
-    if group.len() < 2 || group.len() > max_group_size {
+    if group.len() < 2 {
+        return;
+    }
+    if group.len() > opts.max_group_size {
+        build.skipped_oversize_groups += 1;
         return;
     }
     for a in 0..group.len() {
         for b in (a + 1)..group.len() {
-            bump(pairs.entry(order_pair(group[a], group[b])).or_default());
+            admit_pair(
+                order_pair(group[a], group[b]),
+                opts.edge_budget,
+                pairs,
+                build,
+                &mut bump,
+            );
         }
+    }
+}
+
+fn admit_pair(
+    pair: (usize, usize),
+    edge_budget: usize,
+    pairs: &mut HashMap<(usize, usize), PairAccum>,
+    build: &mut BuildAccum,
+    bump: impl FnOnce(&mut PairAccum),
+) {
+    if let Some(acc) = pairs.get_mut(&pair) {
+        bump(acc);
+    } else if pairs.len() < edge_budget {
+        let mut acc = PairAccum::default();
+        bump(&mut acc);
+        pairs.insert(pair, acc);
+    } else {
+        build.truncated = true;
     }
 }
 
@@ -471,7 +518,29 @@ fn top_counts(values: impl Iterator<Item = String>, top_n: usize) -> Vec<TagSumm
 
 #[cfg(test)]
 mod tests {
-    use super::{PairAccum, score_pair};
+    use std::collections::BTreeMap;
+
+    use zot_core::{GraphOptions, GraphRelationToggles, Item};
+
+    use super::{PairAccum, assemble_graph, score_pair};
+
+    fn item(key: String, tags: Vec<String>) -> Item {
+        Item {
+            key,
+            item_type: "journalArticle".to_string(),
+            title: String::new(),
+            creators: Vec::new(),
+            abstract_note: None,
+            date: None,
+            url: None,
+            doi: None,
+            tags,
+            collections: Vec::new(),
+            date_added: None,
+            date_modified: None,
+            extra: BTreeMap::new(),
+        }
+    }
 
     #[test]
     fn score_pair_is_the_single_weight_table() {
@@ -522,5 +591,76 @@ mod tests {
             }),
             100 + 2 * 8 + 3 * 5 + 4
         );
+    }
+
+    #[test]
+    fn edge_budget_bounds_new_pairs_and_reports_truncation() {
+        let items = vec![
+            item("A".to_string(), vec!["shared".to_string()]),
+            item("B".to_string(), vec!["shared".to_string()]),
+            item("C".to_string(), vec!["shared".to_string()]),
+        ];
+        let options = GraphOptions {
+            edge_budget: 1,
+            min_shared_tags: 1,
+            relations: GraphRelationToggles {
+                coauthor: false,
+                tag: true,
+                collection: false,
+                related: false,
+            },
+            ..GraphOptions::default()
+        };
+
+        let graph = assemble_graph(&items, &[], &options, "test".to_string());
+        assert_eq!(graph.build.candidate_pair_count, 1);
+        assert_eq!(graph.edges.len(), 1);
+        assert!(graph.build.truncated);
+    }
+
+    #[test]
+    fn oversize_groups_are_counted_without_pair_expansion() {
+        let items = (0..3)
+            .map(|index| item(format!("I{index}"), vec!["shared".to_string()]))
+            .collect::<Vec<_>>();
+        let options = GraphOptions {
+            max_group_size: 2,
+            min_shared_tags: 1,
+            relations: GraphRelationToggles {
+                coauthor: false,
+                tag: true,
+                collection: false,
+                related: false,
+            },
+            ..GraphOptions::default()
+        };
+
+        let graph = assemble_graph(&items, &[], &options, "test".to_string());
+        assert_eq!(graph.build.candidate_pair_count, 0);
+        assert_eq!(graph.build.skipped_oversize_groups, 1);
+        assert!(!graph.build.truncated);
+    }
+
+    #[test]
+    fn fifty_thousand_node_oversize_group_does_not_expand_a_clique() {
+        let items = (0..50_000)
+            .map(|index| item(format!("I{index:05}"), vec!["shared".to_string()]))
+            .collect::<Vec<_>>();
+        let options = GraphOptions {
+            max_group_size: 50,
+            edge_budget: 100_000,
+            relations: GraphRelationToggles {
+                coauthor: false,
+                tag: true,
+                collection: false,
+                related: false,
+            },
+            ..GraphOptions::default()
+        };
+
+        let graph = assemble_graph(&items, &[], &options, "synthetic".to_string());
+        assert_eq!(graph.nodes.len(), 50_000);
+        assert_eq!(graph.build.candidate_pair_count, 0);
+        assert_eq!(graph.build.skipped_oversize_groups, 1);
     }
 }

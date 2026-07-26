@@ -465,6 +465,17 @@ pub struct DedupeApplyReport {
     pub skipped_low_confidence_groups: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DuplicateScanResult {
+    pub groups: Vec<DuplicateGroup>,
+    pub scanned_count: usize,
+    pub candidate_pair_count: usize,
+    pub skipped_oversize_blocks: usize,
+    pub threshold: f32,
+    pub candidate_budget: usize,
+    pub truncated: bool,
+}
+
 /// The kind of local relationship an edge in the knowledge graph represents.
 ///
 /// A single [`GraphEdge`] may carry several of these when two papers are
@@ -543,6 +554,15 @@ pub struct KnowledgeGraph {
     pub nodes: Vec<GraphNode>,
     pub edges: Vec<GraphEdge>,
     pub metrics: GraphMetrics,
+    pub build: GraphBuildMeta,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GraphBuildMeta {
+    pub edge_budget: usize,
+    pub candidate_pair_count: usize,
+    pub skipped_oversize_groups: usize,
+    pub truncated: bool,
 }
 
 /// Which relation types contribute edges when building the graph.
@@ -575,6 +595,8 @@ pub struct GraphOptions {
     /// Skip author/tag/collection groups larger than this to avoid hairballs
     /// (default 50).
     pub max_group_size: usize,
+    /// Maximum unique candidate pairs retained during graph assembly.
+    pub edge_budget: usize,
     /// Length of each Top-N ranking in the metrics (default 20).
     pub top_n: usize,
     pub relations: GraphRelationToggles,
@@ -586,6 +608,7 @@ impl Default for GraphOptions {
             collection: None,
             min_shared_tags: 2,
             max_group_size: 50,
+            edge_budget: 100_000,
             top_n: 20,
             relations: GraphRelationToggles::default(),
         }

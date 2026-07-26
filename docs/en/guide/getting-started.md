@@ -49,7 +49,7 @@ cargo run -q -p zot-cli -- --json doctor
 
 Pick one invocation path and keep it consistent for the session.
 
-`doctor` reports `local_sqlite_read`, `local_http_read`, `connector_write`, and `web_write` independently. Missing `write_credentials` means Web writes are unavailable; it does not block local reads or connector imports.
+`doctor` reports `local_sqlite_read`, `local_http_read`, `connector_write`, and `web_write` independently. `web_write.configured` only means credentials are present; `verified=false` means doctor did not make a network request to verify the key, scope, or permissions. Missing credentials do not block local reads or connector imports.
 
 If `doctor` shows `pdf_backend.available=false` on a supported platform, `zot` will auto-download a managed Pdfium binary the first time a local PDF read actually needs it. `doctor` itself does not trigger the download.
 
@@ -60,7 +60,10 @@ zot --json item import --file references.bib
 zot --json item import --file references.bib --confirm
 ```
 
-No plugin or pairing is required. Zotero must be running, and its UI must have a writable library or collection selected. Without `--confirm`, no import request is sent.
+No plugin or pairing is required. Zotero must be running, and its UI must have
+a writable library or collection selected. Without `--confirm`, no import
+request is sent. The confirmed branch reads the target again immediately before
+the write and aborts without importing if its identity or writability changed.
 
 ### 5. Configure merge/dedupe, other Web writes, and saved-search support when needed
 

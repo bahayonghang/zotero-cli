@@ -4,13 +4,41 @@
 (async function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
+  const element = (tag, className, text) => {
+    const value = document.createElement(tag);
+    if (className) value.className = className;
+    if (text != null) value.textContent = String(text);
+    return value;
+  };
   const PALETTE = [
     "#2f81f7", "#3fb950", "#e3b341", "#f85149", "#bc8cff", "#39c5cf",
     "#ff7b72", "#d2a8ff", "#7ee787", "#ffa657", "#a5d6ff", "#ff9bce",
   ];
   const colorFor = (c) => PALETTE[((c % PALETTE.length) + PALETTE.length) % PALETTE.length];
-  const esc = (s) => (s == null ? "" : String(s).replace(/[&<>"]/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])));
+  function safeWebUrl(value) {
+    try {
+      const url = new URL(String(value));
+      return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function externalLink(label, href) {
+    const link = element("a", "", label);
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    return link;
+  }
+
+  function appendField(parent, label, value) {
+    if (value == null || value === "") return;
+    const field = element("div", "field");
+    field.append(element("span", "k", label + ":"), " ");
+    field.append(value instanceof Node ? value : document.createTextNode(String(value)));
+    parent.append(field);
+  }
 
   let raw;
   try {
@@ -141,32 +169,59 @@
   }
 
   function showDetail(node) {
-    if (!node) { $("detail").innerHTML = '<div class="empty">Click a node to inspect it.</div>'; return; }
-    const rows = [];
-    rows.push('<div class="title">' + esc(node.title || node.key) + "</div>");
-    const field = (k, v) => v ? '<div class="field"><span class="k">' + k + ":</span> " + v + "</div>" : "";
-    rows.push(field("Type", esc(node.item_type)));
-    rows.push(field("Year", esc(node.year)));
-    rows.push(field("First author", esc(node.first_author)));
-    rows.push(field("Connections", node.degree + " (weighted " + node.weighted_degree + ")"));
-    rows.push(field("Community", "#" + node.community));
-    if (node.doi) rows.push(field("DOI", '<a href="https://doi.org/' + esc(node.doi) + '" target="_blank">' + esc(node.doi) + "</a>"));
-    if (node.url) rows.push(field("URL", '<a href="' + esc(node.url) + '" target="_blank">' + esc(node.url) + "</a>"));
-    rows.push(field("Zotero", '<a href="zotero://select/library/items/' + esc(node.key) + '">open in Zotero</a>'));
-    if (node.tags && node.tags.length) {
-      rows.push('<div class="field"><span class="k">Tags:</span><br>' +
-        node.tags.map((t) => '<span class="tag">' + esc(t) + "</span>").join("") + "</div>");
+    const detail = $("detail");
+    detail.replaceChildren();
+    if (!node) {
+      detail.append(element("div", "empty", "Click a node to inspect it."));
+      return;
     }
-    $("detail").innerHTML = rows.join("");
+    detail.append(element("div", "title", node.title || node.key));
+    appendField(detail, "Type", node.item_type);
+    appendField(detail, "Year", node.year);
+    appendField(detail, "First author", node.first_author);
+    appendField(detail, "Connections", node.degree + " (weighted " + node.weighted_degree + ")");
+    appendField(detail, "Community", "#" + node.community);
+    if (node.doi) {
+      const doiUrl = new URL("https://doi.org/");
+      doiUrl.pathname = String(node.doi);
+      appendField(detail, "DOI", externalLink(node.doi, doiUrl.href));
+    }
+    if (node.url) {
+      const href = safeWebUrl(node.url);
+      appendField(detail, "URL", href ? externalLink(node.url, href) : node.url);
+    }
+    const zoteroLink = element("a", "", "open in Zotero");
+    zoteroLink.href = "zotero://select/library/items/" + encodeURIComponent(String(node.key));
+    appendField(detail, "Zotero", zoteroLink);
+    if (node.tags && node.tags.length) {
+      const tags = element("div", "field");
+      tags.append(element("span", "k", "Tags:"), document.createElement("br"));
+      node.tags.forEach((tag) => tags.append(element("span", "tag", tag)));
+      detail.append(tags);
+    }
   }
 
   function renderLegend() {
     const list = (metrics.communities || []).slice(0, 10);
-    $("legend").innerHTML = list.map((c) =>
-      '<div class="item"><span class="swatch" style="background:' + colorFor(c.id) + '"></span>' +
-      "<span>#" + c.id + " · " + c.size + " papers" +
-      (c.top_tags && c.top_tags.length ? " · " + esc(c.top_tags.join(", ")) : "") + "</span></div>"
-    ).join("") || '<div class="empty">No communities.</div>';
+    const legend = $("legend");
+    legend.replaceChildren();
+    if (!list.length) {
+      legend.append(element("div", "empty", "No communities."));
+      return;
+    }
+    list.forEach((community) => {
+      const item = element("div", "item");
+      const swatch = element("span", "swatch");
+      swatch.style.background = colorFor(community.id);
+      const tags = community.top_tags && community.top_tags.length
+        ? " · " + community.top_tags.join(", ")
+        : "";
+      item.append(
+        swatch,
+        element("span", "", "#" + community.id + " · " + community.size + " papers" + tags)
+      );
+      legend.append(item);
+    });
   }
 
   cy.on("tap", "node", (evt) => {

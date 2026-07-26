@@ -141,18 +141,22 @@ where
                 text: metadata_chunk,
             });
             stats.chunks += 1;
-            if fulltext && let Some(attachment) = library.get_pdf_attachment(&item.key)? {
-                let pdf_path = library.pdf_path(&attachment);
-                let text = pdf_text(backend, md_cache, &pdf_path)?;
-                for chunk in chunk_text(&text, &item.title, CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS)
-                {
-                    let chunk_id = index.insert_chunk(&item.key, "pdf", &chunk)?;
-                    index.insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&chunk)))?;
-                    pending.push(PendingEmbedding {
-                        chunk_id,
-                        text: chunk,
-                    });
-                    stats.chunks += 1;
+            if fulltext {
+                if let Some(attachment) = library.get_pdf_attachment(&item.key)? {
+                    let pdf_path = library.pdf_path(&attachment);
+                    let text = pdf_text(backend, md_cache, &pdf_path)?;
+                    for chunk in
+                        chunk_text(&text, &item.title, CHUNK_MAX_TOKENS, CHUNK_OVERLAP_TOKENS)
+                    {
+                        let chunk_id = index.insert_chunk(&item.key, "pdf", &chunk)?;
+                        index
+                            .insert_terms(chunk_id, &compute_term_frequencies(&tokenize(&chunk)))?;
+                        pending.push(PendingEmbedding {
+                            chunk_id,
+                            text: chunk,
+                        });
+                        stats.chunks += 1;
+                    }
                 }
             }
         }
@@ -198,14 +202,14 @@ pub(crate) fn apply_pending_embeddings(
         });
     }
     let embedding_dim = embeddings.first().map(Vec::len);
-    if let Some(dim) = embedding_dim
-        && embeddings.iter().any(|embedding| embedding.len() != dim)
-    {
-        return Err(ZotError::InvalidInput {
-            code: "embedding-dimension-mismatch".into(),
-            message: "Embeddings in one writeback batch must have the same dimension".into(),
-            hint: None,
-        });
+    if let Some(dim) = embedding_dim {
+        if embeddings.iter().any(|embedding| embedding.len() != dim) {
+            return Err(ZotError::InvalidInput {
+                code: "embedding-dimension-mismatch".into(),
+                message: "Embeddings in one writeback batch must have the same dimension".into(),
+                hint: None,
+            });
+        }
     }
     index.with_write_tx(|| {
         for (p, e) in pending.into_iter().zip(embeddings) {

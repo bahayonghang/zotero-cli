@@ -1,7 +1,7 @@
 use anyhow::Result;
 use zot_core::{AppConfig, ZotError, redact_secret};
 use zot_desktop::{ConnectorPing, LocalHttpStatus};
-use zot_local::{PdfiumAvailability, PdfiumBackend};
+use zot_local::{LibrarySnapshotMeta, PdfiumAvailability, PdfiumBackend};
 use zot_remote::BetterBibTexClient;
 
 use crate::commands::library;
@@ -29,11 +29,13 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let pdf_backend = PdfiumBackend;
     let pdf_status = pdf_backend.status();
     let library = ctx.local_library();
-    let schema_version = library
+    let snapshot_meta = library
         .as_ref()
         .ok()
-        .and_then(|library| library.check_schema_compatibility().ok())
-        .flatten();
+        .map(|library| library.snapshot_meta().clone());
+    let schema_version = snapshot_meta
+        .as_ref()
+        .and_then(|snapshot| snapshot.schema_version);
     let libraries = library
         .as_ref()
         .ok()
@@ -49,14 +51,14 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let connector = ctx.connector()?;
     let local_http = connector.probe_local_http().await;
     let connector_ping = connector.ping().await;
-    let migration_hint =
-        legacy_bridge_config_present(&AppConfig::config_file()).then_some(LEGACY_BRIDGE_HINT);
+    let config_file = AppConfig::config_file()?;
+    let migration_hint = legacy_bridge_config_present(&config_file).then_some(LEGACY_BRIDGE_HINT);
     let local_sqlite_available = library.is_ok();
     let web_write_configured = ctx.config.write_credentials_configured();
     let pdf_available = pdf_status.available;
     let semantic_status = library::semantic_status(ctx).await.ok();
     let payload = serde_json::json!({
-        "config_file": AppConfig::config_file(),
+        "config_file": &config_file,
         "data_dir": data_dir,
         "db_exists": db_path.exists(),
         "write_credentials": write_credentials_payload(&ctx.config),
@@ -95,7 +97,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let connector_write_label = capability_label(&connector_ping);
     CommandOutput::new(ctx, payload, None, move |_| {
         println!("{DOCTOR_BANNER}");
-        println!("Config: {}", AppConfig::config_file().display());
+        println!("Config: {}", config_file.display());
         println!("Data dir: {}", data_dir.display());
         println!("Database exists: {}", db_path.exists());
         println!("Write credentials: {write_creds_label}");
@@ -139,6 +141,12 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         if let Some(version) = schema_version {
             println!("Schema version: {version}");
         }
+        if let Some(snapshot) = snapshot_meta {
+            println!("SQLite snapshot: {}", snapshot.snapshot_created_at);
+            if let Some(source_modified_at) = snapshot.source_modified_at {
+                println!("SQLite source modified: {source_modified_at}");
+            }
+        }
         if let Some(hint) = migration_hint {
             println!("Migration: {hint}");
         }
@@ -149,16 +157,21 @@ fn local_sqlite_capability(
     library: &zot_core::ZotResult<zot_local::LocalLibrary>,
 ) -> serde_json::Value {
     match library {
-        Ok(_) => serde_json::json!({
-            "configured": true,
-            "available": true,
-        }),
+        Ok(library) => local_sqlite_available_payload(library.snapshot_meta()),
         Err(error) => serde_json::json!({
             "configured": true,
             "available": false,
             "error": error.payload(),
         }),
     }
+}
+
+fn local_sqlite_available_payload(snapshot: &LibrarySnapshotMeta) -> serde_json::Value {
+    serde_json::json!({
+            "configured": true,
+            "available": true,
+            "snapshot": snapshot,
+    })
 }
 
 fn local_http_capability(status: &zot_core::ZotResult<LocalHttpStatus>) -> serde_json::Value {
@@ -198,7 +211,9 @@ fn web_write_capability(config: &AppConfig) -> serde_json::Value {
     let configured = config.write_credentials_configured();
     serde_json::json!({
         "configured": configured,
-        "available": configured,
+        "verified": false,
+        "permissions": serde_json::Value::Null,
+        "last_error": serde_json::Value::Null,
         "checked": "credentials-only",
         "hint": if configured {
             serde_json::Value::Null
@@ -246,7 +261,7 @@ fn write_credentials_payload(config: &AppConfig) -> serde_json::Value {
     serde_json::json!({
         "configured": config.write_credentials_configured(),
         "library_id": if config.zotero.library_id.is_empty() { "(missing)".to_string() } else { config.zotero.library_id.clone() },
-        "api_key": if config.zotero.api_key.is_empty() { "(missing)".to_string() } else { redact_secret(&config.zotero.api_key) },
+        "api_key": if config.zotero.api_key.is_empty() { "(missing)".to_string() } else { redact_secret(config.zotero.api_key.expose_secret()) },
         "required_for_local_read": false,
         "required_for_remote_write": true,
         "note": "Optional for local reads; required only for Zotero Web API writes.",
@@ -285,6 +300,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn local_sqlite_capability_exposes_snapshot_metadata() {
+        let snapshot = LibrarySnapshotMeta {
+            source_modified_at: Some("2026-07-26T10:00:00+00:00".to_string()),
+            snapshot_created_at: "2026-07-26T10:00:01+00:00".to_string(),
+            schema_version: Some(42),
+        };
+        let payload = local_sqlite_available_payload(&snapshot);
+
+        assert_eq!(payload["configured"], true);
+        assert_eq!(payload["available"], true);
+        assert_eq!(
+            payload["snapshot"],
+            serde_json::json!({
+                "source_modified_at": "2026-07-26T10:00:00+00:00",
+                "snapshot_created_at": "2026-07-26T10:00:01+00:00",
+                "schema_version": 42,
+            })
+        );
+    }
+
+    #[test]
+    fn local_sqlite_capability_preserves_typed_snapshot_error() {
+        let library: zot_core::ZotResult<zot_local::LocalLibrary> = Err(ZotError::Database {
+            code: "zotero-db-busy".to_string(),
+            message: "snapshot timed out".to_string(),
+            hint: Some("Close Zotero and retry".to_string()),
+        });
+        let payload = local_sqlite_capability(&library);
+
+        assert_eq!(payload["configured"], true);
+        assert_eq!(payload["available"], false);
+        assert_eq!(payload["error"]["code"], "zotero-db-busy");
+        assert_eq!(payload["error"]["hint"], "Close Zotero and retry");
+        assert!(payload.get("snapshot").is_none());
+    }
+
+    #[test]
     fn write_credentials_payload_marks_local_reads_as_optional() {
         /*
          * ========================================================================
@@ -321,8 +373,11 @@ mod tests {
     fn web_capability_is_credentials_only() {
         let payload = web_write_capability(&AppConfig::default());
         assert_eq!(payload["configured"], false);
-        assert_eq!(payload["available"], false);
+        assert_eq!(payload["verified"], false);
+        assert_eq!(payload["permissions"], serde_json::Value::Null);
+        assert_eq!(payload["last_error"], serde_json::Value::Null);
         assert_eq!(payload["checked"], "credentials-only");
+        assert!(payload.get("available").is_none());
     }
 
     #[test]

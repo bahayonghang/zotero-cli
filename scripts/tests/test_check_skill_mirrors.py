@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import io
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
-from scripts.check_skill_mirrors import compare_trees
+from scripts.check_skill_mirrors import compare_trees, main
 
 
 class SkillMirrorComparisonTests(unittest.TestCase):
@@ -38,6 +41,43 @@ class SkillMirrorComparisonTests(unittest.TestCase):
         issues = compare_trees(self.canonical, self.mirror)
         self.assertIn("missing: evals/evals.json", issues)
         self.assertIn("extra: unexpected.txt", issues)
+
+    def test_all_uninstalled_mirrors_can_be_skipped(self) -> None:
+        root = Path(self.temp_dir.name)
+        mirrors = [root / "agents-mirror", root / "claude-mirror"]
+        argv = [
+            "check_skill_mirrors.py",
+            "--canonical",
+            str(self.canonical),
+            "--mirror",
+            str(mirrors[0]),
+            "--mirror",
+            str(mirrors[1]),
+            "--skip-if-all-missing",
+        ]
+
+        output = io.StringIO()
+        with patch("sys.argv", argv), redirect_stdout(output):
+            self.assertEqual(main(), 0)
+        self.assertIn("skill mirrors are not installed", output.getvalue())
+
+    def test_partial_mirror_install_still_fails(self) -> None:
+        missing_mirror = Path(self.temp_dir.name) / "missing-mirror"
+        argv = [
+            "check_skill_mirrors.py",
+            "--canonical",
+            str(self.canonical),
+            "--mirror",
+            str(self.mirror),
+            "--mirror",
+            str(missing_mirror),
+            "--skip-if-all-missing",
+        ]
+
+        output = io.StringIO()
+        with patch("sys.argv", argv), redirect_stdout(output):
+            self.assertEqual(main(), 1)
+        self.assertIn(f"skill tree does not exist: {missing_mirror}", output.getvalue())
 
 
 if __name__ == "__main__":

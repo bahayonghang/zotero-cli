@@ -42,6 +42,45 @@ libraries. Keep it accurate as the implementation evolves.
 - That means a query like `50%` will only match strings that contain
   `50%` literally, and `foo_bar` will only match `foo_bar` (not `fooXbar`).
 
+## Local library search and trash policy
+
+- `zot library search`, `list`, and `stats` exclude Zotero `deletedItems` by
+  default. Their explicit `--include-trashed` flag restores the legacy broad
+  view; JSON envelopes report the applied choice as
+  `meta.trash_policy = "excluded" | "included"`.
+- Search computes `total` with SQL and applies deterministic SQL
+  `ORDER BY/LIMIT/OFFSET` before hydrating item fields, creators, tags, and
+  collections. Memory use therefore follows the requested page size rather
+  than the full number of matches.
+- Collection arguments resolve an exact key first. A non-key display name is
+  accepted only when unique; duplicate names return `collection-ambiguous`
+  with sorted candidate keys.
+
+## Duplicate and graph candidate budgets
+
+- `zot library duplicates` and `zot library dedupe` default to
+  `--candidate-budget 250000`. This bounds title-similarity pair comparisons;
+  it does not cap scanned items. Read-only duplicate results expose
+  `scanned_count`, `candidate_pair_count`, `skipped_oversize_blocks`,
+  `candidate_budget`, and `truncated`.
+- A truncated `library dedupe` run fails with `duplicate-scan-truncated` before
+  any Web writer is constructed. Increase the budget and rerun; never apply a
+  partial duplicate scan.
+- `zot graph` and `zot graph serve` default to `--edge-budget 100000` unique
+  candidate pairs. Graph JSON reports the budget, admitted pair count,
+  skipped oversize groups, and truncation under `build`. Existing admitted
+  pairs may still accumulate later relation signals after the budget fills.
+- Zero candidate or edge budgets are invalid. These ceilings bound candidate
+  work, not output-node count; graph still includes every node in scope.
+
+## Async local database boundary
+
+- Heavy library search/list/stats, duplicate/dedupe planning, graph builds,
+  annotation reads, and workspace membership/import/search queries run through
+  the CLI `run_local` blocking boundary. The snapshot open and rusqlite query
+  execute together on a blocking worker; remote HTTP writes remain async and
+  outside that closure.
+
 ## Scite batch endpoints
 
 - `SciteClient::get_reports_batch` calls Scite's `/tallies` and `/papers`
@@ -66,6 +105,19 @@ libraries. Keep it accurate as the implementation evolves.
   applicable) `more_occurrences`, which makes it straightforward to chain
   follow-up calls.
 
+## Local attachment and PDF sidecar boundaries
+
+- `zot item download` treats an attachment metadata filename as an untrusted
+  basename. It rejects traversal/separators and does not overwrite an existing
+  destination unless `--force` is explicit.
+- Area annotation coordinates must be finite and remain inside the normalized
+  unit page: `0 <= x,y < 1`, positive width/height, and endpoints at most 1.
+- PDF text caches use WAL, a 5-second SQLite busy timeout, schema version 1,
+  and streamed SHA-256 content fingerprints. Workspace indexing keeps the
+  existing shared `.md_cache.sqlite` path.
+- `graph serve` renders graph fields with DOM APIs, permits clickable item URLs
+  only for HTTP(S), and applies CSP plus `nosniff` to every route.
+
 ## CrossRef polite-pool contact email
 
 - CrossRef and Unpaywall requests both include a `mailto:` contact in the
@@ -73,12 +125,32 @@ libraries. Keep it accurate as the implementation evolves.
   to enter the CrossRef polite pool. The default is `noreply@zot.local`,
   which is recognised as an opaque placeholder rather than a real mailbox.
 
+## Remote HTTP and attachment limits
+
+- Eligible GET and `Zotero-Write-Token` requests make at most **3 attempts**.
+  `Retry-After` and fallback backoff are capped at **5 seconds** per retry.
+  Other mutations are one-shot.
+- Remote non-success bodies retain at most **4 KiB** after control-character
+  removal and whitespace normalization; larger/unfinished bodies are marked
+  `[truncated]`.
+- OA automatic PDF downloads allow at most **5 redirects**, validate every
+  destination and DNS result, and accept at most **100 MiB** by both declared
+  and streamed size. They also require `application/pdf` and `%PDF-` magic.
+- Local attachment uploads accept regular files up to **100 MiB**. The limit is
+  checked before attachment-item creation; later authorize/upload/register
+  failures trigger best-effort orphan cleanup.
+
 ## JSON envelope contract
 
-- `zot --json ...` always returns the standard envelope from
-  `zot-core::CliEnvelope`. Success payloads now carry
-  `meta.profile == "<active>"` and `meta.api_version == 1` regardless of
-  which command produced the output. `api_version == 1` identifies the
+- Executed one-shot `zot --json ...` commands always return exactly one standard envelope from
+  `zot-core::CliEnvelope`, including failures from generic runtime errors and CLI parsing.
+  Success and error payloads carry `meta.api_version == 1`; `meta.profile == "<active>"` is
+  included when a profile is known. Stable generic codes are `runtime-error`,
+  `json-serialization`, and `cli-parse`.
+- `graph serve` is a long-running human protocol and `completions` emits a raw shell script;
+  both reject `--json` with `json-protocol-unsupported`. Clap help/version remain native
+  documentation output rather than command envelopes.
+- `api_version == 1` identifies the
   envelope family, but individual command payload fields may be added or
   removed during the 0.x release line. Consumers must also follow
   `CHANGELOG.md`; if `api_version` is absent or larger, expect broader schema

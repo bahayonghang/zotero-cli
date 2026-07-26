@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
-- **Last Active**: 2026-07-18
+- **Total Sessions**: 26
+- **Last Active**: 2026-07-26
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~478 | Active |
+| `journal-1.md` | ~885 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,18 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 26 | 2026-07-26 | 完成审计整改父任务集成验收 | `6f1bf1c` | `dev` |
+| 25 | 2026-07-26 | 完成工程化与文档基线整改 | `d76211b`, `2e176b7` | `dev` |
+| 24 | 2026-07-26 | 完成本地边界与 sidecar 杂项加固 | `766b71b`, `8ae247f` | `dev` |
+| 23 | 2026-07-26 | 完成远程 HTTP 与不可信下载安全整改 | `08f5e3c`, `11184bc` | `dev` |
+| 22 | 2026-07-26 | 完成本地 DB 语义与性能整改 | `1bfeaae` | `dev` |
+| 21 | 2026-07-26 | 完成配置与凭据加固 | `b7bd13e`, `472d1da` | `dev` |
+| 20 | 2026-07-26 | 完成批量标签写入安全门禁 | `f5681c9`, `33808ae` | `dev` |
+| 19 | 2026-07-26 | 完成 JSON 错误协议统一 | `1dc7e0b`, `f4810f7` | `dev` |
+| 18 | 2026-07-26 | 完成 SQLite 一致快照整改 | `08a5925`, `b1b7f50` | `dev` |
+| 17 | 2026-07-26 | 完成 Pdfium 下载校验与原子安装 | `f746f8d`, `6b65241` | `dev` |
+| 16 | 2026-07-26 | 完成凭据与 workspace 路径边界热修 | `2da80f6`, `1f31505`, `242e99d` | `dev` |
+| 15 | 2026-07-26 | 完成 P0 Pdfium CWD 动态库劫持修复 | `982c012`, `c1e2d96` | `dev` |
 | 14 | 2026-07-18 | Finalize connector replacement parent | - | `dev` |
 | 13 | 2026-07-18 | Optimize zot connector skill | `7fd1938` | `dev` |
 | 12 | 2026-07-18 | Remove zot-bridge and desktop write backend | `bae3544` | `dev` |

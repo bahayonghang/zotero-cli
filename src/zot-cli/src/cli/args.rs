@@ -20,7 +20,7 @@ pub(crate) enum LibraryCommand {
     Search(LibrarySearchArgs),
     List(LibraryListArgs),
     Recent(LibraryRecentArgs),
-    Stats,
+    Stats(LibraryStatsArgs),
     Citekey(LibraryCiteKeyArgs),
     Tags,
     Libraries,
@@ -229,20 +229,30 @@ pub(crate) struct LibrarySearchArgs {
     pub(crate) sort: Option<SortFieldArg>,
     #[arg(long, default_value = "desc")]
     pub(crate) direction: SortDirectionArg,
-    #[arg(long, default_value_t = 50)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
     #[arg(long, default_value_t = 0)]
     pub(crate) offset: usize,
+    #[arg(long)]
+    pub(crate) include_trashed: bool,
 }
 
 #[derive(Args)]
 pub(crate) struct LibraryListArgs {
     #[arg(long)]
     pub(crate) collection: Option<String>,
-    #[arg(long, default_value_t = 50)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
     #[arg(long, default_value_t = 0)]
     pub(crate) offset: usize,
+    #[arg(long)]
+    pub(crate) include_trashed: bool,
+}
+
+#[derive(Args)]
+pub(crate) struct LibraryStatsArgs {
+    #[arg(long)]
+    pub(crate) include_trashed: bool,
 }
 
 #[derive(Args)]
@@ -252,8 +262,8 @@ pub(crate) struct LibraryRecentArgs {
     pub(crate) count: Option<usize>,
     #[arg(long, default_value = "date-added")]
     pub(crate) sort: SortFieldArg,
-    #[arg(long, default_value_t = 50)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -264,8 +274,8 @@ pub(crate) struct LibraryCiteKeyArgs {
 #[derive(Args)]
 pub(crate) struct LibraryFeedItemsArgs {
     pub(crate) library_id: i64,
-    #[arg(long, default_value_t = 20)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -275,8 +285,8 @@ pub(crate) struct LibrarySemanticSearchArgs {
     pub(crate) mode: HybridModeArg,
     #[arg(long)]
     pub(crate) collection: Option<String>,
-    #[arg(long, default_value_t = 10)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -297,8 +307,10 @@ pub(crate) struct LibraryDuplicatesArgs {
     pub(crate) method: DuplicateMethodArg,
     #[arg(long)]
     pub(crate) collection: Option<String>,
-    #[arg(long, default_value_t = 50)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
+    #[arg(long, default_value_t = 250_000)]
+    pub(crate) candidate_budget: usize,
 }
 
 #[derive(Args)]
@@ -323,6 +335,8 @@ pub(crate) struct LibraryDedupeArgs {
     pub(crate) confirm: bool,
     #[arg(long)]
     pub(crate) include_low_confidence: bool,
+    #[arg(long, default_value_t = 250_000)]
+    pub(crate) candidate_budget: usize,
 }
 
 #[derive(Args)]
@@ -350,6 +364,9 @@ pub(crate) struct GraphArgs {
     /// Restrict the graph to a single collection key (default: whole library).
     #[arg(long)]
     pub(crate) collection: Option<String>,
+    /// Maximum unique candidate edges retained during graph assembly.
+    #[arg(long, default_value_t = 100_000)]
+    pub(crate) edge_budget: usize,
 }
 
 #[derive(Subcommand)]
@@ -363,6 +380,9 @@ pub(crate) struct GraphServeArgs {
     /// Restrict the graph to a single collection key (default: whole library).
     #[arg(long)]
     pub(crate) collection: Option<String>,
+    /// Maximum unique candidate edges retained during graph assembly.
+    #[arg(long, default_value_t = 100_000)]
+    pub(crate) edge_budget: usize,
     /// Port to bind on 127.0.0.1 (falls back to a free port if taken).
     #[arg(long, default_value_t = 7878)]
     pub(crate) port: u16,
@@ -374,8 +394,8 @@ pub(crate) struct GraphServeArgs {
 #[derive(Args)]
 pub(crate) struct ItemRelatedArgs {
     pub(crate) key: String,
-    #[arg(long, default_value_t = 20)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -404,12 +424,14 @@ pub(crate) struct ItemDownloadArgs {
     pub(crate) key: String,
     #[arg(long)]
     pub(crate) output: Option<PathBuf>,
+    #[arg(long)]
+    pub(crate) force: bool,
 }
 
 #[derive(Args)]
 pub(crate) struct ItemDeletedArgs {
-    #[arg(long, default_value_t = 50)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -538,8 +560,8 @@ pub(crate) struct ItemNoteAddArgs {
 #[derive(Args)]
 pub(crate) struct NoteSearchArgs {
     pub(crate) query: String,
-    #[arg(long, default_value_t = 20)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -568,6 +590,10 @@ pub(crate) struct ItemTagBatchArgs {
     pub(crate) remove_tags: Vec<String>,
     #[arg(long, default_value_t = 50)]
     pub(crate) limit: usize,
+    #[arg(long, default_value_t = 50)]
+    pub(crate) max_affected: usize,
+    #[arg(long)]
+    pub(crate) confirm: bool,
 }
 
 #[derive(Args)]
@@ -578,8 +604,8 @@ pub(crate) struct CollectionItemsArgs {
 #[derive(Args)]
 pub(crate) struct CollectionSearchArgs {
     pub(crate) query: String,
-    #[arg(long, default_value_t = 20)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -630,8 +656,8 @@ pub(crate) struct WorkspaceIndexArgs {
 #[derive(Args)]
 pub(crate) struct WorkspaceShowArgs {
     pub(crate) name: String,
-    #[arg(long, default_value_t = 50)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -676,8 +702,8 @@ pub(crate) struct WorkspaceQueryArgs {
     pub(crate) question: String,
     #[arg(long, default_value = "hybrid")]
     pub(crate) mode: HybridModeArg,
-    #[arg(long, default_value_t = 10)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -695,15 +721,15 @@ pub(crate) struct UpdateStatusArgs {
 pub(crate) struct AnnotationListArgs {
     #[arg(long)]
     pub(crate) item_key: Option<String>,
-    #[arg(long, default_value_t = 50)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
 pub(crate) struct AnnotationSearchArgs {
     pub(crate) query: String,
-    #[arg(long, default_value_t = 20)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -754,8 +780,8 @@ pub(crate) struct SciteReportArgs {
 #[derive(Args)]
 pub(crate) struct SciteSearchArgs {
     pub(crate) query: String,
-    #[arg(long, default_value_t = 10)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }
 
 #[derive(Args)]
@@ -764,6 +790,6 @@ pub(crate) struct SciteRetractionsArgs {
     pub(crate) collection: Option<String>,
     #[arg(long)]
     pub(crate) tag: Option<String>,
-    #[arg(long, default_value_t = 50)]
-    pub(crate) limit: usize,
+    #[arg(long)]
+    pub(crate) limit: Option<usize>,
 }

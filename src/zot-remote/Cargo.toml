@@ -8,6 +8,9 @@ repository.workspace = true
 rust-version.workspace = true
 description = "Remote Zotero Web API, enrichment, and embedding support for zot."
 
+[lints]
+workspace = true
+
 [features]
 test-support = []
 
@@ -15,15 +18,16 @@ test-support = []
 chrono.workspace = true
 md5.workspace = true
 once_cell.workspace = true
+quick-xml.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
 tokio.workspace = true
 urlencoding.workspace = true
 uuid.workspace = true
 zot-core.workspace = true
 
 [dev-dependencies]
+tempfile.workspace = true
 tiny_http.workspace = true

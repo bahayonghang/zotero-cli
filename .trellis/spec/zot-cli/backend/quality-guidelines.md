@@ -7,7 +7,7 @@ stability, and safety around writes matter more than clever abstractions.
 
 - Add clap parse coverage for new command surfaces in
   `cli.rs::parses_new_library_and_item_command_surfaces`.
-- Keep global flags (`--json`, `--profile`, `--library`) on the root `Cli`.
+- Keep global flags (`--json`, `--verbose`, `--profile`, `--library`) on the root `Cli`.
   `--library` only accepts `user` or `group:<id>` through `parse_library_scope`.
 - Return `CommandOutput` from handlers for JSON success payloads.
   `CommandOutput::new` assembles the envelope, adding `count`, `total`,
@@ -15,7 +15,9 @@ stability, and safety around writes matter more than clever abstractions.
   modules — the decision lives once inside `CommandOutput::new`.
 - Preserve human output helpers in `format.rs` for table/text output rather
   than open-coding repeated printing in command modules.
-- Offload blocking PDF backend calls through `util::run_pdf`.
+- Offload blocking PDF backend calls through `util::run_pdf`. Offload the
+  named heavy SQLite paths through `util::run_local`, which must open
+  `LocalLibrary` inside the blocking closure.
 - Keep workspace dependency declarations centralized. The
   `workspace_version_guard` integration test verifies root internal path
   dependencies and member `.workspace = true` inheritance.
@@ -28,8 +30,18 @@ stability, and safety around writes matter more than clever abstractions.
   unconditional internal dependency. Do not gate production behavior behind
   `test-support`; it exists only to expose a test constructor.
 - Treat `skills/zot` as the canonical operator skill. Update
-  `.agents/skills/zot` and `.claude/skills/zot` only through `_install-skills`;
+  `.agents/skills/zot` and `.claude/skills/zot` only through `skills-sync`;
   never hand-edit generated mirrors.
+- Keep `just ci` and `ci-check` pure. Generation belongs to explicit
+  `version-sync`/`skills-sync` recipes; check recipes must fail on drift rather
+  than repairing it. Because generated mirrors are gitignored, a clean checkout
+  may skip mirror comparison only when both default mirrors are absent; a partial
+  install or any drift in installed mirrors must still fail.
+- Every workspace member must declare `[lints] workspace = true`. Extend the
+  root member list only together with the manifest guard.
+- Keep locked stable checks compatible with workspace MSRV 1.85. Dependency
+  audit/deny and unused-dependency gates complement, but do not replace,
+  `just ci`.
 
 ## Testing Requirements
 
@@ -37,14 +49,104 @@ stability, and safety around writes matter more than clever abstractions.
   changes.
 - Run `cargo test -p zot-cli --test workspace_version_guard` after manifest
   edits.
-- Run `just ci` before finishing broad changes; it runs fmt, check, clippy, and
-  tests in the repo-defined order, then `skills-check`.
+- Run `just ci` before finishing broad changes; it runs the pure fmt, locked
+  check, clippy, test, version, and `skills-check` gates.
 - Run `just skills-check` after canonical skill edits. It compares relative
-  file sets and bytes for both mirrors and runs drift fixtures covering
-  content, missing-file, and extra-file failures.
+  file sets and bytes for installed mirrors and runs fixtures covering content,
+  missing-file, extra-file, clean-checkout, and partial-install behavior.
 - Add targeted tests close to behavior: parse tests in `cli.rs`, output
   envelope tests in `format.rs`, helper tests in `util.rs`, command logic tests
   in the owning command module.
+
+## Scenario: Repository quality and dependency gates
+
+### 1. Scope / Trigger
+
+- Trigger: changing a workspace member, dependency manifest, `Cargo.lock`, `justfile`,
+  skill mirror, version metadata, or `.github/workflows/ci.yml`.
+- Why: local and hosted checks must enforce the same read-only contract while preserving
+  Rust 1.85 compatibility and making dependency findings reproducible.
+
+### 2. Signatures
+
+```text
+just ci -> just ci-check
+cargo +1.85.0 check --workspace --locked
+cargo audit
+cargo deny check
+cargo machete
+cargo +nightly-2026-07-01 udeps --workspace --all-targets --locked
+```
+
+Every workspace member manifest declares:
+
+```toml
+[lints]
+workspace = true
+```
+
+### 3. Contracts
+
+- `ci`/`ci-check`, `version-check`, and `skills-check` are read-only. Only explicit
+  `version-sync` and `skills-sync` recipes may rewrite source or mirrors.
+- `skills-check` validates both default mirrors when either is installed. When both
+  gitignored mirrors are absent, as in a hosted clean checkout, it validates the
+  canonical tree and skips only the local mirror comparison.
+- Stable CI runs `just ci-check` on Linux, Windows, and macOS, then requires a clean diff.
+- MSRV CI uses Rust 1.85.0 with the committed lockfile; unused-dependency analysis uses only
+  the fixed nightly shown above and does not change the workspace toolchain contract.
+- Audit, deny, machete, and udeps tool installs pin versions and use their published lockfiles.
+  Do not ignore advisories or machete findings merely to make CI green.
+- After removing dependencies, regenerate `Cargo.lock` once, then prove both MSRV check and
+  udeps pass with `--locked`.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| canonical skill and mirror differ | `skills-check` fails without repairing either tree |
+| both generated mirrors are absent | canonical tree is validated; mirror comparison is skipped |
+| only one generated mirror is absent | `skills-check` fails as a partial install |
+| member omits lint inheritance | `workspace_version_guard` fails with the member path |
+| current workspace version lacks CHANGELOG heading | version guard fails |
+| lockfile needs resolution at Rust 1.85 | MSRV job fails |
+| vulnerable, disallowed, or unknown-source dependency | audit/deny job fails |
+| unused direct or target-specific dependency | machete/udeps job fails |
+| a check rewrites tracked files in CI | post-check `git diff --exit-code` fails |
+
+### 5. Good / Base / Bad Cases
+
+- Good: intentionally run a sync recipe, commit the generated result, then run all checks on
+  the committed lockfile without further modifications.
+- Base: a source-only change passes `just ci` locally and the same `ci-check` on all three OSes.
+- Base: a hosted clean checkout has neither gitignored mirror and still runs canonical skill tests.
+- Bad: put a generator in `ci`, use floating nightly for udeps, lift the MSRV to solve a lock
+  failure, or restore a global `RUSTFLAGS=-D warnings` that promotes toolchain linker messages.
+- Bad: skip mirror comparison when only one mirror exists, which hides an incomplete local install.
+
+### 6. Tests Required
+
+- Run the workspace version guard after every member/version/CHANGELOG edit.
+- Exercise a temporary skill mirror drift and assert `just skills-check` fails, then remove it.
+- Assert all-absent mirrors can be skipped while a partial mirror install still fails.
+- Run `cargo +1.85.0 check --workspace --locked`, audit, deny, machete, and fixed-nightly udeps.
+- Run `just ci`, compare tracked hashes before/after when changing check recipes, and finish with
+  `git diff --check`.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```make
+ci: version-sync skills-sync test
+```
+
+Correct:
+
+```make
+ci-check: fmt check clippy test skills-check
+ci: ci-check
+```
 
 ## Code Example
 
@@ -56,6 +158,7 @@ assembles stable envelope metadata (`count`, `total`, active profile,
 let seed = Some(EnvelopeMetaSeed {
     count: Some(items.len()),
     total: Some(total),
+    trash_policy: Some("excluded".to_string()),
 });
 CommandOutput::new(ctx, items, seed, |items| print_items(items))
 ```
@@ -80,6 +183,162 @@ CommandOutput::new(ctx, items, seed, |items| print_items(items))
   the JSON output looks right — an assertion-only test still passes if the
   gate is accidentally removed but the output field is hardcoded.
 
+## Scenario: `item tag batch` safety gate
+
+### 1. Scope / Trigger
+
+- Trigger: changing batch tag filters, limits, confirmation, result fields, or per-item writes.
+- Why: a fuzzy local query fans out into non-transactional Web writes, so permission, ceiling,
+  and partial-state evidence must be runtime-enforced.
+
+### 2. Signatures
+
+```text
+zot item tag batch [--query Q] [--tag T]
+  [--add-tag T]... [--remove-tag T]...
+  [--limit 50] [--max-affected 50] [--confirm]
+```
+
+```rust
+BatchTagWriter::add_tags(key, tags) -> Result<()>
+BatchTagWriter::remove_tags(key, tags) -> Result<()>
+```
+
+### 3. Contracts
+
+- No `--confirm`: local preview only; the writer factory must not run.
+- `matched` is the full filter count; `affected` is the `--limit`-selected count;
+  `sample_keys` contains at most 10 selected keys.
+- Confirmed apply requires `affected <= max_affected`. Each add/remove per key is one operation.
+- Apply output contains state, counts, successful `{key, operation}` entries, and failed
+  `{key, operation, error: ErrorPayload}` entries. Failures do not stop later operations.
+
+### 4. Validation & Error Matrix
+
+| Condition | Code / result | Writer calls |
+|---|---|---:|
+| missing/blank filter | `batch-tags-filter` | 0 |
+| missing/blank mutation | `batch-tags-op` | 0 |
+| same tag added and removed | `batch-tags-conflict` | 0 |
+| zero limit | `batch-tags-limit` | 0 |
+| zero/ exceeded ceiling on confirm | `batch-tags-max-affected` | 0 |
+| some remote operations fail | `state: partial` | remaining operations continue |
+| all remote operations fail | `state: failed` | all planned operations attempted |
+
+### 5. Good / Base / Bad Cases
+
+- Good: preview 100 matches with `limit=20`, reports `affected=20`, then confirm stays under a
+  reviewed ceiling and reports every operation.
+- Base: zero selected matches confirms as `applied` with zero operation counts.
+- Bad: constructing `ctx.remote()` before the preview branch, comparing the ceiling to unselected
+  `matched`, aborting on the first `?`, or treating a successful envelope as full apply success.
+
+### 6. Tests Required
+
+- CLI parse coverage for `--confirm` and `--max-affected`.
+- Validation table with stable codes and zero writer calls.
+- Writer-factory sentinel tests for preview and exceeded ceiling.
+- Fault injection across add/remove and multiple keys, asserting call order, continuation,
+  state/counts, and nested `runtime-error` plus domain codes.
+- Canonical skill mirror check and bilingual workflow examples.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```rust
+let remote = ctx.remote()?;
+for item in matches {
+    remote.add_tags(&item.key, &tags).await?;
+}
+```
+
+Correct:
+
+```rust
+let plan = build_plan(local_search)?;
+if !confirm { return preview(plan); }
+plan.enforce_max_affected()?;
+apply_all_and_record(&writer, plan).await
+```
+
+## Scenario: attachment download and graph-viewer browser boundary
+
+### 1. Scope / Trigger
+
+This contract applies when changing `item download`, graph browser assets, or
+the localhost graph server. Zotero attachment filenames and graph node fields
+are untrusted data even though their source database and HTTP origin are local.
+
+### 2. Signatures
+
+```text
+zot item download <attachment-key> [--output <path>] [--force]
+GET / | /app.js | /cytoscape.min.js | /graph.json
+```
+
+- `safe_attachment_basename(filename) -> ZotResult<PathBuf>`
+- `copy_attachment(source, destination, force) -> ZotResult<()>`
+
+### 3. Contracts
+
+- Metadata filenames are used only for missing/directory `--output` and must be
+  one non-empty basename with no absolute path, separator, Windows prefix/ADS
+  colon, `.` or `..`. An explicit output file is operator-owned.
+- Default download opens with `create_new`; only explicit `--force` may
+  truncate/overwrite. Force still rejects symlink destinations and a destination
+  resolving to the source attachment. Do not reintroduce an exists-check
+  followed by `fs::copy`.
+- Graph-derived text/tags/links use DOM APIs, never HTML string interpolation.
+  `node.url` is clickable only for absolute HTTP(S); DOI/Zotero links use fixed
+  code-owned schemes. Every `_blank` link has `noopener noreferrer`.
+- Every graph response, including 404, sends CSP with `default-src 'self'` and
+  self-only scripts, plus `X-Content-Type-Options: nosniff`. Inline permission
+  is limited to existing styles, never scripts/eval.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| unsafe metadata filename used for implicit/directory output | `attachment-filename` before destination open |
+| destination exists without `--force` | `attachment-exists`; original bytes unchanged |
+| force destination is a symlink or resolves to source | `attachment-destination-symlink` / `attachment-source-destination`; source/target unchanged |
+| explicit output file | metadata filename is ignored |
+| graph URL is `javascript:`, relative, invalid, or another scheme | visible plain text, no clickable anchor |
+| unknown graph route | 404 with the same CSP/nosniff headers |
+
+### 5. Good / Base / Bad Cases
+
+- Good: download to a reviewed explicit path, or use `--force` after inspecting
+  the existing destination.
+- Base: safe metadata basename downloads into the current/existing output
+  directory without clobbering.
+- Bad: join raw metadata into a directory, pre-check `exists()`, interpolate
+  graph fields into `innerHTML`, or add CSP only to index HTML.
+
+### 6. Tests Required
+
+- Table-test traversal, absolute, Windows separator/prefix/ADS, empty, and
+  normal basenames; prove explicit output ignores metadata.
+- Prove no-clobber leaves original bytes and force replaces them; keep clap
+  parse coverage for `--force`.
+- Assert embedded `app.js` has no `innerHTML`, contains HTTP(S) policy and
+  `noopener noreferrer`.
+- Assert HTML/JS/JSON/404 response headers and MIME/status behavior.
+- Run `cargo test -p zot-cli`, workspace clippy, and `just ci`.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: traversal plus racy/default overwrite.
+let destination = output_dir.join(attachment.filename);
+std::fs::copy(source, destination)?;
+
+// Correct: validate metadata and make no-clobber one OS open operation.
+let destination = output_dir.join(safe_attachment_basename(filename)?);
+OpenOptions::new().write(true).create_new(true).open(destination)?;
+```
+
 ## Review Checklist
 
 - Does the command belong under existing `library`, `item`, `collection`,
@@ -91,3 +350,71 @@ CommandOutput::new(ctx, items, seed, |items| print_items(items))
   boundaries without fallback?
 - If `skills/zot` changed, were mirrors regenerated and `just skills-check`
   run instead of editing mirror files directly?
+
+## Scenario: Effective config options and doctor write capability
+
+### 1. Scope / Trigger
+
+- Trigger: changing `--json`, `--profile`, result `--limit`, config output fields, or doctor Web-write fields.
+- Why: agent envelopes must describe the options actually used, while output defaults must not weaken write ceilings.
+
+### 2. Signatures
+
+```rust
+AppConfig::into_effective(profile) -> (AppConfig, Option<String>)
+Cli::resolve_effective_options(configured_limit) -> Result<(), ZotError>
+AppContext { json, profile, config, .. }
+```
+
+Doctor Web-write payload:
+
+```json
+{"configured": true, "verified": false, "permissions": null,
+ "last_error": null, "checked": "credentials-only"}
+```
+
+### 3. Contracts
+
+- Explicit profile wins; otherwise envelope `meta.profile` contains the materialized default profile.
+- `--json` enables JSON; configured `output-format=json` is the default for success, runtime errors, and protocol rejection.
+- Configured `output-limit` fills only whitelisted read-result commands with no explicit limit.
+- Index, dedupe, tag-batch, and sync limits remain command-owned safety/workload bounds.
+- Doctor does not emit `available` for credential-only Web checks and does not claim verification.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| explicit/profile output limit zero | `config-value` before dispatch |
+| configured JSON on server/raw command | `json-protocol-unsupported` before command I/O |
+| profile init includes root-only key | `config-key`, no saved partial mutation |
+| Web credentials exist but unprobed | `configured=true`, `verified=false` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: default profile selects JSON and limit 17; an explicit `--limit 3` remains 3.
+- Base: root config defaults to table and limit 50.
+- Bad: replace every field named `limit`, report credentials as `available`, or keep only explicit CLI profile in metadata.
+
+### 6. Tests Required
+
+- Unit tests cover default/explicit profile, configured/explicit limits, zero rejection, and excluded write/index commands.
+- Context Debug uses a secret canary.
+- Doctor schema asserts all five fields and absence of `available`.
+- JSON integration tests retain one-document success/error and protocol rejection.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```rust
+ctx.profile = cli.profile.clone();
+args.limit = config.output.limit; // also overwrites write ceilings
+```
+
+Correct:
+
+```rust
+let (config, profile) = raw.into_effective(cli.profile.as_deref());
+cli.resolve_effective_options(config.output.limit)?; // exhaustive read whitelist
+```

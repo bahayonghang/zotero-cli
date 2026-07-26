@@ -5,7 +5,7 @@ use zot_core::{Item, RetractionCheckResult, SciteItemReport};
 use zot_local::SearchOptions;
 use zot_remote::SciteClient;
 
-use crate::cli::ItemSciteCommand;
+use crate::cli::{ItemSciteCommand, resolved_output_limit};
 use crate::context::AppContext;
 use crate::output::CommandOutput;
 use crate::util::{require_item, require_valid_doi};
@@ -22,7 +22,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemSciteCommand) -> Resul
             })
         }
         ItemSciteCommand::Search(args) => {
-            let reports = search(ctx, &args.query, args.limit).await?;
+            let reports = search(ctx, &args.query, resolved_output_limit(args.limit)).await?;
             CommandOutput::new(ctx, reports, None, |reports| {
                 println!(
                     "{}",
@@ -35,7 +35,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemSciteCommand) -> Resul
                 ctx,
                 args.collection.as_deref(),
                 args.tag.as_deref(),
-                args.limit,
+                resolved_output_limit(args.limit),
             )
             .await?;
             CommandOutput::new(ctx, reports, None, |reports| {

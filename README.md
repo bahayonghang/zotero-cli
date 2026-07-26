@@ -208,6 +208,8 @@ Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.
 - Merge/dedupe, note, tag, collection, Web import, annotation, saved-search, and status-sync mutations use the Zotero Web API.
 - Legacy `desktop_bridge` and `write_backend` config entries are ignored; `doctor` reports a migration hint so they can be removed safely.
 - Merge/dedupe is preview-first. Batch dedupe skips low-confidence groups unless the user separately authorizes `--include-low-confidence` after reviewing them.
+- `item tag batch` is preview-first and requires `--confirm`; confirmed targets cannot exceed
+  `--max-affected` (default 50), and partial per-operation failures are returned explicitly.
 - Annotation creation is PDF-first. It requires a local PDF, Pdfium support, and write credentials.
 - Citation-key lookup prefers Better BibTeX support and falls back to compatible local parsing when possible.
 - Legacy connector-style `search` / `fetch` ideas are intentionally mapped onto explicit `library`, `item`, `collection`, `workspace`, and `sync` workflows.

@@ -17,9 +17,10 @@ over broad live-network tests.
 - Preserve output count/order for embedding batches. `EmbeddingClient::embed`
   extends batches serially and validates the final vector count.
 - Map responses through the shared `http.rs` layer (`remote_err`, `http_hint`,
-  `ensure_status`, `read_json`, `ensure_empty`) instead of redefining error
-  mapping per client. Intentional divergences: soft-fail lookups that return
-  `Ok(None)` on non-success, and the attachment upload's exact-201 check.
+  `send_with_retry`, `ensure_status`, `read_json`, `ensure_empty`) instead of
+  redefining retry or error mapping per client. Intentional divergences:
+  soft-fail lookups that return `Ok(None)` on non-success, and the attachment
+  upload's exact-201 check.
 - Every client's base URL is overridable via env for tests and local
   substitutes, with production defaults unchanged: `ZOT_BBT_URL`/`ZOT_BBT_PORT`,
   `ZOT_SCITE_API_BASE`, `ZOT_CROSSREF_API_BASE`, `ZOT_UNPAYWALL_API_BASE`,
@@ -70,10 +71,150 @@ Err(ZotError::Remote {
 - CrossRef and Unpaywall requests should include polite contact information
   through `ZOT_CONTACT_EMAIL`; `oa.rs` defaults to `noreply@zot.local`.
 
+## Scenario: Origin-scoped Zotero attachment credentials
+
+### 1. Scope / Trigger
+
+This contract applies whenever `zotero.rs` changes Zotero request builders or
+the multi-step attachment upload flow. Zotero API credentials must never inherit
+onto the external upload URL returned by attachment authorization.
+
+### 2. Signatures
+
+- `zotero_request(method: Method, endpoint: &str) -> RequestBuilder`
+- `external_upload_request(upload_url: &str) -> ZotResult<RequestBuilder>`
+- `upload_attachment(parent_key: &str, file_path: &Path) -> ZotResult<String>`
+
+### 3. Contracts
+
+- Authenticated builders accept only a Zotero-relative endpoint and add
+  `zotero-api-key` and fixed `Zotero-API-Version: 3`; they construct the final
+  URL through `self.endpoint()`.
+- External uploads reuse the pooled `HttpRuntime` client but never add the API
+  key or API version. Production upload URLs must use HTTPS.
+- The test-only explicit-base constructor may allow HTTP only for loopback fake
+  servers; the production constructor never enables that exception.
+- A regular-file/100 MiB precheck and streaming MD5 pass happen before create.
+  After create, authorize/upload/register failure triggers best-effort hard
+  deletion of only the newly returned attachment key.
+
+### 4. Validation & Error Matrix
+
+- Invalid URL syntax -> `InvalidInput` code `attachment-upload-url`.
+- Production URL with a non-HTTPS scheme -> `attachment-upload-url` before send.
+- External send failure -> `Remote` code `attachment-upload`.
+- External status other than 201 -> `Remote` code `attachment-upload` with status.
+- Oversize/non-regular local input -> `attachment-size`/`attachment-file` with
+  zero requests.
+- Post-create failure + successful cleanup -> original code/status with hint
+  `Orphan attachment cleanup succeeded`.
+- Cleanup failure -> original code/status plus bounded cleanup failure evidence.
+
+### 5. Good / Base / Bad Cases
+
+- Good: authorization returns `https://uploads.zotero.org/...`; upload has no
+  `zotero-api-key`, then registration returns 204.
+- Base: `exists=true` returns the created attachment key without upload/register;
+  a test authorization may use HTTP loopback only through the test constructor.
+- Bad: pass the authorization URL to an authenticated Zotero builder or permit a
+  production HTTP upload; leave a newly created child after later failure.
+
+### 6. Tests Required
+
+- Use separate API and upload fake servers for the complete flow.
+- Assert every API-server request has the test key and the upload-server request
+  has no `zotero-api-key` or `Zotero-API-Version` header.
+- Assert production construction accepts HTTPS and rejects HTTP, other schemes,
+  and malformed URLs without sending.
+- Inject authorize/upload/register failures and assert GET current version then
+  hard DELETE; inject cleanup failure and assert the original error remains primary.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: upload_url inherits Zotero ambient authority.
+self.zotero_post(&upload_url).send().await?;
+
+// Correct: validate the external target and build without Zotero credentials.
+self.external_upload_request(&upload_url)?.send().await?;
+```
+
+## Scenario: Bounded HTTP retry and untrusted PDF download
+
+### 1. Scope / Trigger
+
+This contract applies when adding a remote request, changing `HttpRuntime`, or
+downloading a provider-returned OA PDF. It prevents duplicate writes, unbounded
+error/resource use, and SSRF through locator metadata.
+
+### 2. Signatures
+
+- `send_with_retry(request: RequestBuilder, code: &'static str) -> ZotResult<Response>`
+- `download_pdf_to_path(runtime: &HttpRuntime, source: &str, destination: &Path) -> ZotResult<()>`
+- `ZoteroRemote::zotero_request(method, endpoint) -> RequestBuilder`
+
+### 3. Contracts
+
+- Retry at most 3 attempts only for GET or a clonable request carrying one
+  unchanged `Zotero-Write-Token`. Conditional writes, ordinary POSTs, and
+  external upload never retry.
+- Retry eligible transport errors, 429, and 5xx. Honor numeric or HTTP-date
+  `Retry-After` up to 5 seconds; otherwise use capped exponential backoff/jitter.
+- OA auto-download uses the redirect-disabled runtime client, HTTPS, at most 5
+  manually validated redirects, and rejects userinfo or any DNS/IP result in a
+  non-public range.
+- A final PDF requires 2xx, `application/pdf`, at most 100 MiB by declared and
+  actual length, and leading `%PDF-`; bytes stream to caller-owned temp storage.
+- arXiv Atom fields use `quick-xml` events. Identifier recognition may use regex;
+  XML field extraction may not.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| retryable request still 429/5xx after attempt 3 | final response maps normally; exactly 3 sends |
+| non-token mutation returns 5xx | one send; original operation code/status |
+| URL is HTTP/userinfo/malformed | `pdf-download-url` before send |
+| DNS is empty/private/loopback/link-local/mixed public-private | `pdf-download-address` |
+| redirect count exceeds 5 | `pdf-download-redirect` |
+| wrong MIME / magic | `pdf-download-content-type` / `pdf-download-magic` |
+| declared or streamed bytes exceed 100 MiB | `pdf-download-size` |
+| malformed/missing arXiv entry | `arxiv-parse` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a public HTTPS URL redirects to another public HTTPS URL and streams a
+  bounded valid PDF into a `NamedTempFile` before attachment upload.
+- Base: a GET succeeds first try; no sleep or duplicate request occurs.
+- Bad: retry a version-conditioned PATCH, rely on reqwest automatic redirects,
+  accept one public DNS answer when another is private, or call `.bytes()` on a PDF.
+
+### 6. Tests Required
+
+- Header-aware fake servers assert GET 429/5xx recovery, 3-attempt ceiling,
+  unchanged write token, and one-shot conditional writes.
+- Error fixtures assert 4 KiB truncation and control-character sanitization.
+- Download fixtures assert private redirect rejection before the second request,
+  redirect budget, MIME/magic, declared/actual size, and valid streamed bytes.
+- Atom fixtures include namespaces, entities, CDATA, nested text, multiple authors,
+  missing entry, and malformed XML after the first entry.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: automatic redirects and unbounded memory for an untrusted locator.
+let bytes = runtime.client().get(url).send().await?.bytes().await?;
+
+// Correct: every hop and byte crosses the shared bounded policy.
+download_pdf_to_path(runtime, url, temporary.path()).await?;
+```
+
 ## Review Checklist
 
 - Does every mutating Zotero request carry the right version precondition or
   write token?
+- Does every Zotero API request carry version 3 while external upload carries neither credential header?
+- Are only GET/write-token requests routed through `send_with_retry`?
 - Does a new external call reuse `HttpRuntime` and map errors into
   `ZotError::Remote`?
 - Are batching and count-preservation rules tested?

@@ -5,7 +5,7 @@ use zot_core::{QueryChunk, Workspace, ZotResult};
 
 use crate::pdf::{PdfBackend, PdfCache};
 use crate::rag_engine::{self, PendingEmbedding, RagLibrary, ReindexStats};
-use crate::workspace::{HybridMode, RagIndex};
+use crate::workspace::{HybridMode, RagIndex, WorkspaceName};
 
 /// Options controlling [`WorkspaceRagStore::reindex_workspace`].
 ///
@@ -26,8 +26,11 @@ pub struct WorkspaceRagStore {
 }
 
 impl WorkspaceRagStore {
-    pub fn open(store: &crate::workspace::WorkspaceStore, workspace_name: &str) -> ZotResult<Self> {
-        let index_path = store.root().join(format!("{workspace_name}.idx.sqlite"));
+    pub fn open(
+        store: &crate::workspace::WorkspaceStore,
+        workspace_name: &WorkspaceName,
+    ) -> ZotResult<Self> {
+        let index_path = store.rag_index_path(workspace_name)?;
         let md_cache_path = store.root().join(".md_cache.sqlite");
         Ok(Self {
             index: RagIndex::open(&index_path)?,
@@ -131,6 +134,10 @@ mod tests {
 
     use super::*;
     use zot_core::{Attachment, Creator, Item, Workspace, WorkspaceItem, ZotError};
+
+    fn demo_name() -> WorkspaceName {
+        WorkspaceName::parse("demo").expect("valid workspace name")
+    }
 
     struct FakeLibrary {
         items: Vec<Item>,
@@ -248,9 +255,9 @@ mod tests {
 
     #[test]
     fn metadata_only_workspace_is_queryable() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         let item = sample_item(
             "ATTN001",
             "Attention Is All You Need",
@@ -269,20 +276,20 @@ mod tests {
                 &FakeBackend::new(""),
                 WorkspaceReindexOpts::default(),
             )
-            .unwrap();
+            .expect("reindex metadata workspace");
         assert_eq!(pending.len(), 1);
         let hits = rag
             .query_workspace(&workspace, "attention", HybridMode::Bm25, None, 10)
-            .unwrap();
+            .expect("query metadata workspace");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].item_key, "ATTN001");
     }
 
     #[test]
     fn query_workspace_filters_stale_chunks_by_current_membership() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         let item = sample_item(
             "ATTN001",
             "Attention Is All You Need",
@@ -300,7 +307,7 @@ mod tests {
             &FakeBackend::new(""),
             WorkspaceReindexOpts::default(),
         )
-        .unwrap();
+        .expect("reindex initial workspace");
 
         let current_workspace = Workspace {
             name: "demo".into(),
@@ -311,15 +318,15 @@ mod tests {
 
         let hits = rag
             .query_workspace(&current_workspace, "attention", HybridMode::Bm25, None, 10)
-            .unwrap();
+            .expect("query current workspace membership");
         assert!(hits.is_empty());
     }
 
     #[test]
     fn query_workspace_filters_before_limit() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         let target = sample_item("KEEP001", "Kept Paper", "needle");
         let mut items = vec![target.clone()];
         for index in 0..8 {
@@ -355,20 +362,20 @@ mod tests {
             &FakeBackend::new(""),
             WorkspaceReindexOpts::default(),
         )
-        .unwrap();
+        .expect("reindex workspace before filtering");
 
         let hits = rag
             .query_workspace(&current_workspace, "needle", HybridMode::Bm25, None, 1)
-            .unwrap();
+            .expect("query workspace before limit");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].item_key, "KEEP001");
     }
 
     #[test]
     fn reindex_skips_missing_workspace_items() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         let missing_item = sample_item("MISS001", "Missing", "Missing abstract");
         let workspace = workspace_with(&missing_item);
         let lib = FakeLibrary {
@@ -384,25 +391,25 @@ mod tests {
                 &FakeBackend::new(""),
                 WorkspaceReindexOpts::default(),
             )
-            .unwrap();
+            .expect("reindex workspace with missing item");
 
         assert_eq!(stats.items, 1);
         assert_eq!(stats.chunks, 0);
         assert!(pending.is_empty());
         assert!(
             rag.query("missing", HybridMode::Bm25, None, 10)
-                .unwrap()
+                .expect("query workspace with missing item")
                 .is_empty()
         );
     }
 
     #[test]
     fn fulltext_reindex_reuses_pdf_cache() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         let pdf_path = dir.path().join("paper.pdf");
-        std::fs::write(&pdf_path, b"pdf").unwrap();
+        std::fs::write(&pdf_path, b"pdf").expect("write PDF fixture");
         let item = sample_item(
             "ATTN001",
             "Attention Is All You Need",
@@ -430,7 +437,7 @@ mod tests {
                 force_rebuild: true,
             },
         )
-        .unwrap();
+        .expect("first fulltext reindex");
         rag.reindex_workspace(
             &lib,
             &workspace,
@@ -440,19 +447,21 @@ mod tests {
                 force_rebuild: true,
             },
         )
-        .unwrap();
+        .expect("second fulltext reindex");
 
         assert_eq!(backend.extracted.get(), 1);
-        let hits = rag.query("cached", HybridMode::Bm25, None, 10).unwrap();
+        let hits = rag
+            .query("cached", HybridMode::Bm25, None, 10)
+            .expect("query cached fulltext");
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].source, "pdf");
     }
 
     #[test]
     fn query_embedding_dimension_mismatch_errors() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         rag.apply_pending_embeddings(
             vec![PendingEmbedding {
                 chunk_id: 1,
@@ -460,19 +469,19 @@ mod tests {
             }],
             vec![vec![1.0, 0.0, 0.0]],
         )
-        .unwrap();
+        .expect("store embedding fixture");
 
         let err = rag
             .query("attention", HybridMode::Semantic, Some(&[1.0, 0.0]), 10)
-            .unwrap_err();
+            .expect_err("dimension mismatch must fail");
         assert!(matches!(err, ZotError::InvalidInput { .. }));
     }
 
     #[test]
     fn embedding_count_mismatch_errors() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         let err = rag
             .apply_pending_embeddings(
                 vec![PendingEmbedding {
@@ -481,15 +490,15 @@ mod tests {
                 }],
                 vec![],
             )
-            .unwrap_err();
+            .expect_err("embedding count mismatch must fail");
         assert!(matches!(err, ZotError::InvalidInput { .. }));
     }
 
     #[test]
     fn incremental_reindex_does_not_reembed_unchanged_items() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         let item = sample_item("INC001", "Incremental Paper", "abstract content");
         let workspace = workspace_with(&item);
         let lib = FakeLibrary {
@@ -504,7 +513,7 @@ mod tests {
                 &FakeBackend::new(""),
                 WorkspaceReindexOpts::default(),
             )
-            .unwrap();
+            .expect("first incremental reindex");
         assert_eq!(first_pending.len(), 1);
         let (_, second_pending) = rag
             .reindex_workspace(
@@ -513,7 +522,7 @@ mod tests {
                 &FakeBackend::new(""),
                 WorkspaceReindexOpts::default(),
             )
-            .unwrap();
+            .expect("second incremental reindex");
         assert!(
             second_pending.is_empty(),
             "unchanged workspace must not produce pending embeddings on a second reindex"
@@ -522,9 +531,9 @@ mod tests {
 
     #[test]
     fn force_rebuild_clears_and_re_embeds() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         let item = sample_item("REB001", "Rebuild Paper", "abstract content");
         let workspace = workspace_with(&item);
         let lib = FakeLibrary {
@@ -538,7 +547,7 @@ mod tests {
             &FakeBackend::new(""),
             WorkspaceReindexOpts::default(),
         )
-        .unwrap();
+        .expect("seed workspace index");
         let (_, rebuild_pending) = rag
             .reindex_workspace(
                 &lib,
@@ -549,7 +558,7 @@ mod tests {
                     force_rebuild: true,
                 },
             )
-            .unwrap();
+            .expect("force rebuild workspace index");
         assert_eq!(
             rebuild_pending.len(),
             1,
@@ -559,10 +568,28 @@ mod tests {
 
     #[test]
     fn workspace_paths_follow_store_root() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("workspace tempdir");
         let store = crate::workspace::WorkspaceStore::new(Some(dir.path().to_path_buf()));
-        let rag = WorkspaceRagStore::open(&store, "demo").unwrap();
+        let rag = WorkspaceRagStore::open(&store, &demo_name()).expect("open workspace RAG");
         assert_eq!(rag.index_path(), &dir.path().join("demo.idx.sqlite"));
         assert_eq!(rag.cache_path(), &dir.path().join(".md_cache.sqlite"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn open_rejects_index_symlink_outside_root() {
+        use std::os::unix::fs::symlink;
+
+        let root = tempdir().expect("workspace root");
+        let outside = tempdir().expect("outside root");
+        let outside_index = outside.path().join("outside.idx.sqlite");
+        std::fs::write(&outside_index, []).expect("create outside index");
+        symlink(&outside_index, root.path().join("demo.idx.sqlite")).expect("create symlink");
+        let store = crate::workspace::WorkspaceStore::new(Some(root.path().to_path_buf()));
+
+        let err = WorkspaceRagStore::open(&store, &demo_name())
+            .err()
+            .expect("external symlink must fail");
+        assert_eq!(err.payload().code, "workspace-path-boundary");
     }
 }

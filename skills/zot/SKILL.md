@@ -1,6 +1,6 @@
 ---
 name: zot
-description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v1.0.0)
+description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v1.0.1)
 ---
 
 # zot
@@ -276,7 +276,8 @@ cargo run -q -p zot-cli -- --json doctor
 - `capabilities.local_sqlite_read`
 - `capabilities.local_http_read`
 - `capabilities.connector_write`（仅表示本机 BibTeX/RIS import 能力）
-- `capabilities.web_write`
+- `capabilities.web_write.configured`（只表示凭据存在）
+- `capabilities.web_write.verified`（当前为 `false`，doctor 不联网验证 key/scope/permission）
 - `write_credentials.configured`（只表示 Web API credential，不是 connector 导入能力）
 - `pdf_backend.available`
 - `better_bibtex.available`
@@ -360,15 +361,20 @@ cargo run -q -p zot-cli -- --json doctor
 
    层 C，批量写（影响一组条目，必须先在小范围试，再放开）：
    - `item import --confirm`（先 dry-run 复述目标可写性、记录数和格式）
-   - `item tag batch --add-tag/--remove-tag`
+   - `item tag batch --add-tag/--remove-tag`（不带 `--confirm` 只做本地 preview；核对
+     `matched`、`affected`、`truncated`、`sample_keys` 和 `exceeds_max_affected` 后，用完全相同
+     的 filters/mutations 加 `--confirm`；超过默认 50 条时必须在复核后显式提高
+     `--max-affected`）
    - `library duplicates-merge`（多源 → 单 keeper）
    - `library dedupe --confirm`（整库/整 collection 多组批量合并，先用 `--collection` 圈小范围、复查 low-confidence 组）
 
-4. `item merge` / `library duplicates-merge` / `library dedupe` / `sync update-status` 不带 `--confirm` / `--apply` 时本身就是 dry-run preview；要把 preview 当成“还没改”，不要错说成“已经合并 / 已经写回”。
+4. `item merge` / `item tag batch` / `library duplicates-merge` / `library dedupe` / `sync update-status` 不带 `--confirm` / `--apply` 时本身就是 dry-run preview；要把 preview 当成“还没改”，不要错说成“已经合并 / 已经写回”。
 5. connector import 的 preview 与 confirm 必须保持同一输入和格式，并在 confirm 前重新检查当前目标可写性；connector 失败不能改走 Web。
 6. merge/dedupe 的 preview 是本地只读规划，confirm 只走 Web API；缺少 Web 凭据时保留 preview 结果并停止，不能改走 connector。
 7. `library dedupe` 的 low-confidence 组默认跳过。不要把普通 confirm 当作授权，也不要自行追加 `--include-low-confidence`；必须先单独展示这些组，再取得一次明确的风险授权。
 8. 写权限缺失或目标路径不支持该 mutation 时停在只读分析，不要假装成功。
+9. `item tag batch --confirm` 返回 `state: applied|partial|failed` 和逐操作结果。只要
+   `failed_operations > 0` 就必须明确报告失败项；不能因命令返回了 envelope 就称为全部成功。
 
 ## 常见语义差异
 
@@ -378,7 +384,8 @@ cargo run -q -p zot-cli -- --json doctor
 - `item add-doi` / `item add-url` / `item create --doi|--url|--pdf` 支持 `--attach-mode`
 - `item add-file` 可以带 `--doi` 补元数据，但不接受 `--attach-mode`
 - feeds 不通过 `--library group:<id>` 访问，而是用 `library feeds` / `feed-items`
-- `item download` 下载本地附件文件，`item attach` 上传新附件
+- `item download` 下载本地附件文件，默认不覆盖已有目标；只有复核现有文件后才加
+  `--force`。`item attach` 上传新附件
 - `item merge` 是手工选 keeper/source 的通用合并，`library duplicates-merge` 是先找重复、再按 keeper 合并
 - `library dedupe` 是整库/整 collection 自动选 keeper 的批量清理，`library duplicates-merge` 是单组手工指定 keeper 的合并
 - `config show` 是看有效配置，`config profiles use` 是切换默认 profile
@@ -404,16 +411,16 @@ cargo run -q -p zot-cli -- --json doctor
   走 `library saved-search create`
 
 - “把附件 ATCH005 下载出来”  
-  走 `item download`
+  走 `item download`；目标已存在时先报告冲突，不要自行追加 `--force`
 
 - “用浏览器打开 ATTN001 的 DOI 看看”  
   走 `item open ATTN001 --url`
 
 - “把这个 bib 导入 Zotero”
-  先 `item import --file <path>` dry-run，复述当前目标、可写性、记录数和格式；用户确认后才执行同一命令并追加 `--confirm`
+  先 `item import --file <path>` dry-run，复述当前目标、可写性、记录数和格式；用户确认后才执行同一命令并追加 `--confirm`。确认分支会再次读取 target，变化时中止，需重新 preview
 
 - “把这几条 RIS 存进我当前的 collection”
-  先 `item import --text <ris> --format ris` dry-run；确认 Zotero UI 当前选中的 collection 正确且可写后，才追加 `--confirm`
+  先 `item import --text <ris> --format ris` dry-run；确认 Zotero UI 当前选中的 collection 正确且可写后，才追加 `--confirm`；若 target 变化则重新 preview
 
 - “把 citation key 为 vaswani_attention_2023 的文献插进草稿，并维护 references.bib”
   先 `library citekey vaswani_attention_2023` 解析 Zotero item key（如 `PXW99EKT`），再用 `item cite PXW99EKT --style apa` 获取显示引用、`item export PXW99EKT --format bibtex` 获取 BibTeX；agent 用导出的 BibTeX 条目更新 `references.bib`，并把 BibTeX citation key 插入草稿。CLI 不直接编辑草稿或 `.bib` 文件

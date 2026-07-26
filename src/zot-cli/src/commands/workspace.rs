@@ -2,28 +2,31 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 use zot_local::{
-    HybridMode, SearchOptions, WorkspaceRagStore, WorkspaceReindexOpts, WorkspaceStore,
+    HybridMode, SearchOptions, WorkspaceName, WorkspaceRagStore, WorkspaceReindexOpts,
+    WorkspaceStore,
 };
 use zot_remote::EmbeddingClient;
 
 use crate::cli::{
     WorkspaceCommand, WorkspaceExportArgs, WorkspaceImportArgs, WorkspaceQueryArgs,
-    WorkspaceSearchArgs,
+    WorkspaceSearchArgs, resolved_output_limit,
 };
 use crate::context::AppContext;
 use crate::format::{print_items, print_query_chunks, print_workspace, to_pretty_json};
 use crate::output::CommandOutput;
-use crate::util::{maybe_embed_query, run_pdf};
+use crate::util::{maybe_embed_query, run_local, run_pdf};
 
 pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Result<CommandOutput> {
     let store = WorkspaceStore::new(None);
     match command {
         WorkspaceCommand::New(args) => {
-            let workspace = store.create(&args.name, &args.description)?;
+            let name = WorkspaceName::parse(&args.name)?;
+            let workspace = store.create(&name, &args.description)?;
             CommandOutput::new(ctx, workspace, None, print_workspace)
         }
         WorkspaceCommand::Delete(args) => {
-            store.delete(&args.name)?;
+            let name = WorkspaceName::parse(&args.name)?;
+            store.delete(&name)?;
             let payload = serde_json::json!({ "deleted": args.name });
             CommandOutput::new(ctx, payload, None, |_| println!("Workspace deleted."))
         }
@@ -37,18 +40,25 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
             })
         }
         WorkspaceCommand::Show(args) => {
-            let workspace = store.load(&args.name)?;
+            let name = WorkspaceName::parse(&args.name)?;
+            let mut workspace = store.load(&name)?;
+            workspace.items.truncate(resolved_output_limit(args.limit));
             CommandOutput::new(ctx, workspace, None, print_workspace)
         }
         WorkspaceCommand::Add(args) => {
-            let mut workspace = store.load(&args.name)?;
-            let library = ctx.local_library()?;
-            let mut items = Vec::new();
-            for key in args.keys {
-                if let Some(item) = library.get_item(&key)? {
-                    items.push(item);
+            let name = WorkspaceName::parse(&args.name)?;
+            let mut workspace = store.load(&name)?;
+            let keys = args.keys;
+            let items = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                let mut items = Vec::new();
+                for key in keys {
+                    if let Some(item) = library.get_item(&key)? {
+                        items.push(item);
+                    }
                 }
-            }
+                Ok(items)
+            })
+            .await?;
             let added = store.add_items(&mut workspace, &items);
             store.save(&workspace)?;
             let payload = serde_json::json!({ "added": added });
@@ -57,7 +67,8 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
             })
         }
         WorkspaceCommand::Remove(args) => {
-            let mut workspace = store.load(&args.name)?;
+            let name = WorkspaceName::parse(&args.name)?;
+            let mut workspace = store.load(&name)?;
             let removed = store.remove_keys(&mut workspace, &args.keys);
             store.save(&workspace)?;
             let payload = serde_json::json!({ "removed": removed });
@@ -78,32 +89,41 @@ async fn import_items(
     store: &WorkspaceStore,
     args: WorkspaceImportArgs,
 ) -> Result<CommandOutput> {
-    let mut workspace = store.load(&args.name)?;
-    let library = ctx.local_library()?;
-    let items = if let Some(collection) = args.collection.as_deref() {
-        library.get_collection_items(collection)?
-    } else if let Some(tag) = args.tag.as_deref() {
-        library
-            .list_items(None, 10_000, 0)?
-            .into_iter()
-            .filter(|item| item.tags.iter().any(|existing| existing == tag))
-            .collect()
-    } else if let Some(query) = args.search.as_deref() {
-        library
-            .search(SearchOptions {
-                query: query.to_string(),
-                limit: 10_000,
-                ..SearchOptions::default()
-            })?
-            .items
-    } else {
+    let name = WorkspaceName::parse(&args.name)?;
+    let mut workspace = store.load(&name)?;
+    if args.collection.is_none() && args.tag.is_none() && args.search.is_none() {
         return Err(zot_core::ZotError::InvalidInput {
             code: "workspace-import".to_string(),
             message: "Provide --collection, --tag, or --search".to_string(),
             hint: None,
         }
         .into());
-    };
+    }
+    let collection = args.collection;
+    let tag = args.tag;
+    let search = args.search;
+    let items = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+        if let Some(collection) = collection.as_deref() {
+            library.get_collection_items(collection)
+        } else if let Some(tag) = tag.as_deref() {
+            Ok(library
+                .list_items(None, 10_000, 0)?
+                .into_iter()
+                .filter(|item| item.tags.iter().any(|existing| existing == tag))
+                .collect())
+        } else if let Some(query) = search {
+            Ok(library
+                .search(SearchOptions {
+                    query,
+                    limit: 10_000,
+                    ..SearchOptions::default()
+                })?
+                .items)
+        } else {
+            unreachable!("workspace import mode validated before blocking query")
+        }
+    })
+    .await?;
     let added = store.add_items(&mut workspace, &items);
     store.save(&workspace)?;
     let payload = serde_json::json!({ "added": added });
@@ -117,22 +137,27 @@ async fn search_workspace(
     store: &WorkspaceStore,
     args: WorkspaceSearchArgs,
 ) -> Result<CommandOutput> {
-    let workspace = store.load(&args.name)?;
+    let name = WorkspaceName::parse(&args.name)?;
+    let workspace = store.load(&name)?;
     let allowed = workspace
         .items
         .iter()
         .map(|item| item.key.clone())
         .collect::<HashSet<_>>();
-    let result = ctx.local_library()?.search(SearchOptions {
-        query: args.query,
-        limit: 10_000,
-        ..SearchOptions::default()
-    })?;
-    let filtered = result
-        .items
-        .into_iter()
-        .filter(|item| allowed.contains(&item.key))
-        .collect::<Vec<_>>();
+    let query = args.query;
+    let filtered = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+        let result = library.search(SearchOptions {
+            query,
+            limit: 10_000,
+            ..SearchOptions::default()
+        })?;
+        Ok(result
+            .items
+            .into_iter()
+            .filter(|item| allowed.contains(&item.key))
+            .collect::<Vec<_>>())
+    })
+    .await?;
     CommandOutput::new(ctx, filtered, None, |filtered| print_items(filtered))
 }
 
@@ -141,7 +166,8 @@ async fn export_workspace(
     store: &WorkspaceStore,
     args: WorkspaceExportArgs,
 ) -> Result<CommandOutput> {
-    let workspace = store.load(&args.name)?;
+    let name = WorkspaceName::parse(&args.name)?;
+    let workspace = store.load(&name)?;
     let library = ctx.local_library()?;
     let mut items = Vec::with_capacity(workspace.items.len());
     for entry in &workspace.items {
@@ -189,9 +215,10 @@ async fn index_workspace(
     store: &WorkspaceStore,
     args: crate::cli::WorkspaceIndexArgs,
 ) -> Result<CommandOutput> {
-    let workspace = store.load(&args.name)?;
+    let name = WorkspaceName::parse(&args.name)?;
+    let workspace = store.load(&name)?;
     let library = ctx.local_library()?;
-    let rag = WorkspaceRagStore::open(store, &args.name)?;
+    let rag = WorkspaceRagStore::open(store, &name)?;
     let backend = ctx.pdf_backend();
     let embedding_client = EmbeddingClient::new(ctx.http(), ctx.config.embedding.clone());
     let opts = WorkspaceReindexOpts {
@@ -221,8 +248,9 @@ async fn query_workspace(
     store: &WorkspaceStore,
     args: WorkspaceQueryArgs,
 ) -> Result<CommandOutput> {
-    let workspace = store.load(&args.name)?;
-    let rag = WorkspaceRagStore::open(store, &args.name)?;
+    let name = WorkspaceName::parse(&args.name)?;
+    let workspace = store.load(&name)?;
+    let rag = WorkspaceRagStore::open(store, &name)?;
     let mode: HybridMode = args.mode.into();
     let embedding = if matches!(mode, HybridMode::Semantic | HybridMode::Hybrid) {
         maybe_embed_query(ctx.http(), &ctx.config.embedding, &args.question).await?
@@ -234,7 +262,7 @@ async fn query_workspace(
         &args.question,
         mode,
         embedding.as_deref(),
-        args.limit,
+        resolved_output_limit(args.limit),
     )?;
     CommandOutput::new(ctx, chunks, None, |chunks| print_query_chunks(chunks))
 }
