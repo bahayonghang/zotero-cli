@@ -42,13 +42,13 @@
 
 ## 跨子任务验收标准
 
-- [ ] P0/P1 全部关闭:CWD 候选删除、上传请求无 key、workspace 全入口校验、下载有校验、
+- [x] P0/P1 全部关闭:CWD 候选删除、上传请求无 key、workspace 全入口校验、下载有校验、
       immutable=1 移除、--json 全错误路径 envelope、tag batch 有 confirm。
-- [ ] 安全回归测试落地(报告 8.1 清单为准):doctor 不考虑 CWD、upload server 无 key header、
+- [x] 安全回归测试落地(报告 8.1 清单为准):doctor 不考虑 CWD、upload server 无 key header、
       workspace name property test、checksum 拒绝篡改、secret canary 不出现在 Debug/错误输出。
-- [ ] `cargo test --workspace` 全绿;新增测试覆盖每个子任务的核心分支。
-- [ ] 每个子任务完成后同步对应 .trellis/spec(zot-local/zot-remote/zot-cli backend)。
-- [ ] 全部完成后 CHANGELOG 记录安全修复,并按报告建议在 release notes 提示曾用附件上传的用户轮换 API key。
+- [x] `cargo test --workspace` 全绿;新增测试覆盖每个子任务的核心分支。
+- [x] 每个子任务完成后同步对应 .trellis/spec(zot-local/zot-remote/zot-cli backend)。
+- [x] 全部完成后 CHANGELOG 记录安全修复,并按报告建议在 release notes 提示曾用附件上传的用户轮换 API key。
 
 ## 范围外(报告长期项,不在本轮建任务)
 

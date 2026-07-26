@@ -3,7 +3,7 @@
   "name": "audit-remediation",
   "title": "GPT审计整改:安全与可靠性优化",
   "description": "基于 zotero-cli-code-audit-2026-07-25.md 审计报告的整改父任务;33条指控已逐条核实(32条属实/1条部分属实),按 P0-P3 拆分子任务",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
