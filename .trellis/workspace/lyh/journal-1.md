@@ -748,3 +748,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 23: 完成远程 HTTP 与不可信下载安全整改
+
+**Date**: 2026-07-26
+**Task**: 完成远程 HTTP 与不可信下载安全整改
+**Branch**: `dev`
+
+### Summary
+
+收敛并实现有界重试、Zotero API 版本固定、错误体清洗、OA PDF SSRF 与资源限制、附件上传补偿及 arXiv 结构化解析；聚焦测试、clippy 与 just ci 全部通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `08f5e3c` | (see git log) |
+| `11184bc` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
