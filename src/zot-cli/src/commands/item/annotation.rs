@@ -4,7 +4,7 @@ use zot_local::PdfBackend;
 use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand, resolved_output_limit};
 use crate::context::AppContext;
 use crate::output::CommandOutput;
-use crate::util::{require_pdf_attachment, run_pdf};
+use crate::util::{require_pdf_attachment, run_local, run_pdf};
 
 pub(crate) async fn handle(
     ctx: &AppContext,
@@ -12,9 +12,12 @@ pub(crate) async fn handle(
 ) -> Result<CommandOutput> {
     match command {
         ItemAnnotationCommand::List(args) => {
-            let annotations = ctx
-                .local_library()?
-                .get_annotations(args.item_key.as_deref(), resolved_output_limit(args.limit))?;
+            let item_key = args.item_key;
+            let limit = resolved_output_limit(args.limit);
+            let annotations = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                library.get_annotations(item_key.as_deref(), limit)
+            })
+            .await?;
             CommandOutput::new(ctx, annotations, None, |annotations| {
                 if annotations.is_empty() {
                     println!("No annotations found.");
@@ -29,9 +32,12 @@ pub(crate) async fn handle(
             })
         }
         ItemAnnotationCommand::Search(args) => {
-            let annotations = ctx
-                .local_library()?
-                .search_annotations(&args.query, resolved_output_limit(args.limit))?;
+            let query = args.query;
+            let limit = resolved_output_limit(args.limit);
+            let annotations = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                library.search_annotations(&query, limit)
+            })
+            .await?;
             CommandOutput::new(ctx, annotations, None, |annotations| {
                 if annotations.is_empty() {
                     println!("No annotations found.");

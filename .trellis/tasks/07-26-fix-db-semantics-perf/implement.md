@@ -2,16 +2,16 @@
 
 ## Ordered Checklist
 
-1. Add core result/build metadata and optional envelope trash policy with serde tests.
-2. Flip `SearchOptions` trash default, add CLI `--include-trashed`, update stats predicates and envelope meta.
-3. Make collection lookup key-first with deterministic name ambiguity errors and fixture tests.
-4. Replace `get_notes` per-note tags with the existing batch loader.
-5. Replace Rust candidate-set search with shared SQL count/page queries and page-only batch hydration; update golden regressions.
-6. Add minimal duplicate candidate projection, deterministic title blocks, candidate budget/result metadata and dedupe truncation gate.
-7. Add graph edge budget/build metadata and truncated human warning.
-8. Add `run_local` and migrate the named heavy library/graph/annotation/workspace paths without moving remote work into blocking threads.
-9. Add deterministic 10k/50k complexity regressions and update operational limits plus zot-local/zot-cli specs.
-10. Complete AC mapping, focused tests, full crate tests, `just ci`, diff review and atomic commit.
+1. [x] Add core result/build metadata and optional envelope trash policy with serde tests.
+2. [x] Flip `SearchOptions` trash default, add CLI `--include-trashed`, update stats predicates and envelope meta.
+3. [x] Make collection lookup key-first with deterministic name ambiguity errors and fixture tests.
+4. [x] Replace `get_notes` per-note tags with the existing batch loader.
+5. [x] Replace Rust candidate-set search with shared SQL count/page queries and page-only batch hydration; update golden regressions.
+6. [x] Add minimal duplicate candidate projection, deterministic title blocks, candidate budget/result metadata and dedupe truncation gate.
+7. [x] Add graph edge budget/build metadata and truncated human warning.
+8. [x] Add `run_local` and migrate the named heavy library/graph/annotation/workspace paths without moving remote work into blocking threads.
+9. [x] Add deterministic 10k/50k complexity regressions and update operational limits plus zot-local/zot-cli specs.
+10. [x] Complete AC mapping, focused tests, full crate tests, `just ci`, diff review and atomic commit.
 
 ## Focused Validation
 

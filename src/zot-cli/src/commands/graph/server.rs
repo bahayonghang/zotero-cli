@@ -13,18 +13,23 @@ use zot_core::GraphOptions;
 
 use crate::cli::GraphServeArgs;
 use crate::context::AppContext;
-use crate::util::open_target;
+use crate::util::{open_target, run_local};
 
 const INDEX_HTML: &str = include_str!("../../../assets/graph/index.html");
 const APP_JS: &str = include_str!("../../../assets/graph/app.js");
 const CYTOSCAPE_JS: &str = include_str!("../../../assets/graph/cytoscape.min.js");
 
 pub(crate) async fn run(ctx: &AppContext, args: GraphServeArgs) -> Result<()> {
+    let edge_budget = super::validate_edge_budget(args.edge_budget)?;
     let opts = GraphOptions {
         collection: args.collection.clone(),
+        edge_budget,
         ..GraphOptions::default()
     };
-    let graph = ctx.local_library()?.build_knowledge_graph(&opts)?;
+    let graph = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+        library.build_knowledge_graph(&opts)
+    })
+    .await?;
     let node_count = graph.nodes.len();
     let edge_count = graph.edges.len();
     let graph_json = serde_json::to_string(&graph)?;

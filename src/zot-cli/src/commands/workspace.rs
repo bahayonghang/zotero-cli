@@ -14,7 +14,7 @@ use crate::cli::{
 use crate::context::AppContext;
 use crate::format::{print_items, print_query_chunks, print_workspace, to_pretty_json};
 use crate::output::CommandOutput;
-use crate::util::{maybe_embed_query, run_pdf};
+use crate::util::{maybe_embed_query, run_local, run_pdf};
 
 pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Result<CommandOutput> {
     let store = WorkspaceStore::new(None);
@@ -48,13 +48,17 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
         WorkspaceCommand::Add(args) => {
             let name = WorkspaceName::parse(&args.name)?;
             let mut workspace = store.load(&name)?;
-            let library = ctx.local_library()?;
-            let mut items = Vec::new();
-            for key in args.keys {
-                if let Some(item) = library.get_item(&key)? {
-                    items.push(item);
+            let keys = args.keys;
+            let items = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                let mut items = Vec::new();
+                for key in keys {
+                    if let Some(item) = library.get_item(&key)? {
+                        items.push(item);
+                    }
                 }
-            }
+                Ok(items)
+            })
+            .await?;
             let added = store.add_items(&mut workspace, &items);
             store.save(&workspace)?;
             let payload = serde_json::json!({ "added": added });
@@ -87,31 +91,39 @@ async fn import_items(
 ) -> Result<CommandOutput> {
     let name = WorkspaceName::parse(&args.name)?;
     let mut workspace = store.load(&name)?;
-    let library = ctx.local_library()?;
-    let items = if let Some(collection) = args.collection.as_deref() {
-        library.get_collection_items(collection)?
-    } else if let Some(tag) = args.tag.as_deref() {
-        library
-            .list_items(None, 10_000, 0)?
-            .into_iter()
-            .filter(|item| item.tags.iter().any(|existing| existing == tag))
-            .collect()
-    } else if let Some(query) = args.search.as_deref() {
-        library
-            .search(SearchOptions {
-                query: query.to_string(),
-                limit: 10_000,
-                ..SearchOptions::default()
-            })?
-            .items
-    } else {
+    if args.collection.is_none() && args.tag.is_none() && args.search.is_none() {
         return Err(zot_core::ZotError::InvalidInput {
             code: "workspace-import".to_string(),
             message: "Provide --collection, --tag, or --search".to_string(),
             hint: None,
         }
         .into());
-    };
+    }
+    let collection = args.collection;
+    let tag = args.tag;
+    let search = args.search;
+    let items = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+        if let Some(collection) = collection.as_deref() {
+            library.get_collection_items(collection)
+        } else if let Some(tag) = tag.as_deref() {
+            Ok(library
+                .list_items(None, 10_000, 0)?
+                .into_iter()
+                .filter(|item| item.tags.iter().any(|existing| existing == tag))
+                .collect())
+        } else if let Some(query) = search {
+            Ok(library
+                .search(SearchOptions {
+                    query,
+                    limit: 10_000,
+                    ..SearchOptions::default()
+                })?
+                .items)
+        } else {
+            unreachable!("workspace import mode validated before blocking query")
+        }
+    })
+    .await?;
     let added = store.add_items(&mut workspace, &items);
     store.save(&workspace)?;
     let payload = serde_json::json!({ "added": added });
@@ -132,16 +144,20 @@ async fn search_workspace(
         .iter()
         .map(|item| item.key.clone())
         .collect::<HashSet<_>>();
-    let result = ctx.local_library()?.search(SearchOptions {
-        query: args.query,
-        limit: 10_000,
-        ..SearchOptions::default()
-    })?;
-    let filtered = result
-        .items
-        .into_iter()
-        .filter(|item| allowed.contains(&item.key))
-        .collect::<Vec<_>>();
+    let query = args.query;
+    let filtered = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+        let result = library.search(SearchOptions {
+            query,
+            limit: 10_000,
+            ..SearchOptions::default()
+        })?;
+        Ok(result
+            .items
+            .into_iter()
+            .filter(|item| allowed.contains(&item.key))
+            .collect::<Vec<_>>())
+    })
+    .await?;
     CommandOutput::new(ctx, filtered, None, |filtered| print_items(filtered))
 }
 

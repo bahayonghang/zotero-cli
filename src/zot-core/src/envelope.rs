@@ -11,6 +11,8 @@ pub struct EnvelopeMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub trash_policy: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<u32>,
 }
 
@@ -99,6 +101,7 @@ mod tests {
                 count: None,
                 total: None,
                 profile: Some("work".to_string()),
+                trash_policy: Some("excluded".to_string()),
                 api_version: Some(1),
             },
         );
@@ -107,6 +110,7 @@ mod tests {
         assert_eq!(value["ok"], false);
         assert_eq!(value["error"]["code"], "runtime-error");
         assert_eq!(value["meta"]["profile"], "work");
+        assert_eq!(value["meta"]["trash_policy"], "excluded");
         assert_eq!(value["meta"]["api_version"], 1);
     }
 

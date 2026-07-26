@@ -17,9 +17,9 @@ use strsim::normalized_levenshtein;
 use tempfile::TempDir;
 use zot_core::{
     AnnotationRecord, Attachment, ChildAnnotation, ChildAttachment, ChildItem, ChildNote,
-    CitationKeyMatch, Collection, Creator, DuplicateGroup, FeedInfo, GraphOptions, Item,
-    KnowledgeGraph, LibraryInfo, LibraryScope, LibraryStats, Note, NoteSearchResult, SearchResult,
-    TagSummary, ZotError, ZotResult,
+    CitationKeyMatch, Collection, Creator, DuplicateGroup, DuplicateScanResult, FeedInfo,
+    GraphOptions, Item, KnowledgeGraph, LibraryInfo, LibraryScope, LibraryStats, Note,
+    NoteSearchResult, SearchResult, TagSummary, ZotError, ZotResult,
 };
 
 use crate::citation::export_item;
@@ -29,6 +29,8 @@ const EXCLUDED_TYPE_NAMES: &[&str] = &["attachment", "note", "annotation"];
 const ZOTERO_DB_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 const SNAPSHOT_STEP_PAUSE: Duration = Duration::from_millis(5);
 const SNAPSHOT_PAGES_PER_STEP: i32 = 256;
+const DUPLICATE_TITLE_THRESHOLD: f64 = 0.92;
+const DUPLICATE_TITLE_PREFIX_CHARS: usize = 12;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LibrarySnapshotMeta {
@@ -72,18 +74,6 @@ fn escape_like(value: &str) -> String {
     out
 }
 
-/// SQL fragment that drops items sitting in Zotero's trash, mirroring the
-/// `deletedItems` filter used by `search_notes`. Appended to search
-/// statements only when [`SearchOptions::exclude_trashed`] is set, so
-/// default `search`/`list_items` behavior still returns trashed items.
-fn trashed_exclusion(exclude_trashed: bool) -> &'static str {
-    if exclude_trashed {
-        " AND i.itemID NOT IN (SELECT itemID FROM deletedItems)"
-    } else {
-        ""
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortField {
     DateAdded,
@@ -118,8 +108,7 @@ pub struct SearchOptions {
     pub limit: usize,
     pub offset: usize,
     /// Drop items sitting in Zotero's trash (`deletedItems`). Defaults to
-    /// `false` so `search`/`list_items` keep returning trashed items;
-    /// duplicate detection opts in to avoid re-reporting cleaned-up groups.
+    /// `true`; callers must explicitly opt into returning trashed items.
     pub exclude_trashed: bool,
 }
 
@@ -136,7 +125,7 @@ impl Default for SearchOptions {
             direction: SortDirection::Desc,
             limit: 50,
             offset: 0,
-            exclude_trashed: false,
+            exclude_trashed: true,
         }
     }
 }
@@ -223,91 +212,123 @@ impl LocalLibrary {
     }
 
     pub fn search(&self, options: SearchOptions) -> ZotResult<SearchResult> {
-        let mut item_ids: HashSet<i64> = HashSet::new();
+        let mut predicates = vec![
+            "i.libraryID = ?".to_string(),
+            "it.typeName NOT IN ('attachment','note','annotation')".to_string(),
+        ];
+        let mut values = vec![rusqlite::types::Value::from(self.library_id)];
 
-        if options.query.is_empty() {
-            let sql = format!(
-                "SELECT i.itemID FROM items i
-                 JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
-                 WHERE i.libraryID = ?1
-                 AND it.typeName NOT IN ('attachment','note','annotation'){}",
-                trashed_exclusion(options.exclude_trashed)
+        if options.exclude_trashed {
+            predicates.push(
+                "NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = i.itemID)".to_string(),
             );
-            let mut stmt = self
-                .conn
-                .prepare_cached(&sql)
-                .map_err(sql_err("search-all"))?;
-            let rows = stmt
-                .query_map(params![self.library_id], |row| row.get::<_, i64>(0))
-                .map_err(sql_err("search-all"))?;
-            for row in rows {
-                item_ids.insert(row.map_err(sql_err("search-all"))?);
-            }
-        } else {
-            let like = format!("%{}%", escape_like(&options.query));
-            self.collect_matching_item_ids_from_field_search(
-                &like,
-                options.exclude_trashed,
-                &mut item_ids,
-            )?;
-            self.collect_matching_item_ids_from_creator_search(
-                &like,
-                options.exclude_trashed,
-                &mut item_ids,
-            )?;
-            self.collect_matching_item_ids_from_tag_search(
-                &like,
-                options.exclude_trashed,
-                &mut item_ids,
-            )?;
-            self.collect_matching_item_ids_from_fulltext_search(
-                &like,
-                options.exclude_trashed,
-                &mut item_ids,
-            )?;
         }
-
+        if !options.query.is_empty() {
+            let like = format!("%{}%", escape_like(&options.query));
+            predicates.push(
+                "(EXISTS (SELECT 1 FROM itemData id JOIN itemDataValues iv ON id.valueID = iv.valueID WHERE id.itemID = i.itemID AND iv.value LIKE ? ESCAPE '\\')
+                  OR EXISTS (SELECT 1 FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE ic.itemID = i.itemID AND (c.firstName LIKE ? ESCAPE '\\' OR c.lastName LIKE ? ESCAPE '\\'))
+                  OR EXISTS (SELECT 1 FROM itemTags itq JOIN tags tq ON itq.tagID = tq.tagID WHERE itq.itemID = i.itemID AND tq.name LIKE ? ESCAPE '\\')
+                  OR EXISTS (SELECT 1 FROM itemAttachments ia JOIN fulltextItemWords fw ON ia.itemID = fw.itemID JOIN fulltextWords w ON fw.wordID = w.wordID WHERE ia.parentItemID = i.itemID AND w.word LIKE ? ESCAPE '\\'))"
+                    .to_string(),
+            );
+            values.extend(std::iter::repeat_n(rusqlite::types::Value::from(like), 5));
+        }
         if let Some(collection) = options.collection.as_deref() {
             let collection_id = self.resolve_collection_id(collection)?;
-            let mut stmt = self
-                .conn
-                .prepare_cached("SELECT itemID FROM collectionItems WHERE collectionID = ?1")
-                .map_err(sql_err("collection-filter"))?;
-            let rows = stmt
-                .query_map(params![collection_id], |row| row.get::<_, i64>(0))
-                .map_err(sql_err("collection-filter"))?;
-            let collection_items = rows
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(sql_err("collection-filter"))?
-                .into_iter()
-                .collect::<HashSet<_>>();
-            item_ids.retain(|item_id| collection_items.contains(item_id));
+            predicates.push(
+                "EXISTS (SELECT 1 FROM collectionItems ci WHERE ci.itemID = i.itemID AND ci.collectionID = ?)"
+                    .to_string(),
+            );
+            values.push(rusqlite::types::Value::from(collection_id));
         }
-
         if let Some(item_type) = options.item_type.as_deref() {
-            item_ids = self.filter_item_ids_by_type_name(item_ids, item_type)?;
+            predicates.push("it.typeName = ?".to_string());
+            values.push(rusqlite::types::Value::from(item_type.to_string()));
         }
-
         if let Some(tag) = options.tag.as_deref() {
-            item_ids = self.filter_item_ids_by_tag(item_ids, tag)?;
+            predicates.push(
+                "EXISTS (SELECT 1 FROM itemTags itf JOIN tags tf ON itf.tagID = tf.tagID WHERE itf.itemID = i.itemID AND LOWER(tf.name) = ?)"
+                    .to_string(),
+            );
+            values.push(rusqlite::types::Value::from(tag.to_lowercase()));
         }
-
         if let Some(creator) = options.creator.as_deref() {
-            item_ids = self.filter_item_ids_by_creator(item_ids, creator)?;
+            predicates.push(
+                "EXISTS (SELECT 1 FROM itemCreators icf JOIN creators cf ON icf.creatorID = cf.creatorID WHERE icf.itemID = i.itemID AND LOWER(TRIM(COALESCE(cf.firstName, '') || ' ' || cf.lastName)) LIKE ? ESCAPE '\\')"
+                    .to_string(),
+            );
+            values.push(rusqlite::types::Value::from(format!(
+                "%{}%",
+                escape_like(&creator.to_lowercase())
+            )));
         }
-
         if let Some(year) = options.year.as_deref() {
-            item_ids = self.filter_item_ids_by_year(item_ids, year)?;
+            predicates.push(
+                "EXISTS (SELECT 1 FROM itemData idy JOIN fields fy ON idy.fieldID = fy.fieldID JOIN itemDataValues ivy ON idy.valueID = ivy.valueID WHERE idy.itemID = i.itemID AND fy.fieldName = 'date' AND ivy.value LIKE ? ESCAPE '\\')"
+                    .to_string(),
+            );
+            values.push(rusqlite::types::Value::from(format!(
+                "{}%",
+                escape_like(year)
+            )));
         }
 
-        let total = item_ids.len();
-        let mut items = self.get_items_batch(&item_ids.into_iter().collect::<Vec<_>>())?;
-        sort_items(&mut items, options.sort, options.direction);
-        let items = items
-            .into_iter()
-            .skip(options.offset)
-            .take(options.limit)
-            .collect::<Vec<_>>();
+        let from_where = format!(
+            "FROM items i JOIN itemTypes it ON i.itemTypeID = it.itemTypeID WHERE {}",
+            predicates.join(" AND ")
+        );
+        let total = self
+            .conn
+            .prepare_cached(&format!("SELECT COUNT(*) {from_where}"))
+            .map_err(sql_err("search-count"))?
+            .query_row(params_from_iter(values.iter()), |row| row.get::<_, i64>(0))
+            .map_err(sql_err("search-count"))? as usize;
+
+        let sort_expression = match options.sort {
+            Some(SortField::Title) => {
+                "COALESCE((SELECT LOWER(iv.value) FROM itemData id JOIN fields f ON id.fieldID = f.fieldID JOIN itemDataValues iv ON id.valueID = iv.valueID WHERE id.itemID = i.itemID AND f.fieldName = 'title' LIMIT 1), '')"
+            }
+            Some(SortField::Creator) => {
+                "COALESCE((SELECT LOWER(TRIM(COALESCE(c.firstName, '') || ' ' || c.lastName)) FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE ic.itemID = i.itemID ORDER BY ic.orderIndex LIMIT 1), '')"
+            }
+            Some(SortField::DateAdded) => "COALESCE(i.dateAdded, '')",
+            Some(SortField::DateModified) => "COALESCE(i.dateModified, '')",
+            None => "i.key",
+        };
+        let direction = match options.direction {
+            SortDirection::Asc => "ASC",
+            SortDirection::Desc => "DESC",
+        };
+        let limit = i64::try_from(options.limit).map_err(|_| ZotError::InvalidInput {
+            code: "search-limit".to_string(),
+            message: "Search limit is too large".to_string(),
+            hint: Some("Use a smaller --limit value".to_string()),
+        })?;
+        let offset = i64::try_from(options.offset).map_err(|_| ZotError::InvalidInput {
+            code: "search-offset".to_string(),
+            message: "Search offset is too large".to_string(),
+            hint: Some("Use a smaller --offset value".to_string()),
+        })?;
+        let page_sql = format!(
+            "SELECT i.itemID {from_where} ORDER BY {sort_expression} {direction}, i.key {direction} LIMIT ? OFFSET ?"
+        );
+        let mut page_values = values;
+        page_values.push(rusqlite::types::Value::from(limit));
+        page_values.push(rusqlite::types::Value::from(offset));
+        let mut stmt = self
+            .conn
+            .prepare_cached(&page_sql)
+            .map_err(sql_err("search-page"))?;
+        let rows = stmt
+            .query_map(params_from_iter(page_values.iter()), |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(sql_err("search-page"))?;
+        let item_ids = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("search-page"))?;
+        let items = self.get_items_batch(&item_ids)?;
 
         Ok(SearchResult {
             items,
@@ -355,10 +376,14 @@ impl LocalLibrary {
             })
             .map_err(sql_err("get-notes"))?;
 
-        let mut notes = Vec::new();
-        for row in rows {
-            let (note_item_id, note_key, note_html) = row.map_err(sql_err("get-notes"))?;
-            let tags = self.get_item_tags(note_item_id)?;
+        let rows = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("get-notes"))?;
+        let note_item_ids = rows.iter().map(|row| row.0).collect::<Vec<_>>();
+        let tags_by_id = self.load_item_tags_batch(&note_item_ids)?;
+        let mut notes = Vec::with_capacity(rows.len());
+        for (note_item_id, note_key, note_html) in rows {
+            let tags = tags_by_id.get(&note_item_id).cloned().unwrap_or_default();
             notes.push(Note {
                 key: note_key,
                 parent_key: key.to_string(),
@@ -1152,84 +1177,147 @@ impl LocalLibrary {
         method: DuplicateMatchMethod,
         collection: Option<&str>,
         limit: usize,
-    ) -> ZotResult<Vec<DuplicateGroup>> {
-        // Trashed items must never join a duplicate group: cleaned-up
-        // duplicates would otherwise be re-reported on the next scan.
-        let items = self
-            .search(SearchOptions {
-                collection: collection.map(ToOwned::to_owned),
-                limit: 10_000,
-                exclude_trashed: true,
-                ..SearchOptions::default()
-            })?
-            .items;
-        let mut groups = Vec::new();
-        let mut seen: BTreeSet<String> = BTreeSet::new();
+        candidate_budget: usize,
+    ) -> ZotResult<DuplicateScanResult> {
+        if candidate_budget == 0 {
+            return Err(ZotError::InvalidInput {
+                code: "duplicate-candidate-budget".to_string(),
+                message: "Duplicate candidate budget must be greater than zero".to_string(),
+                hint: Some("Pass --candidate-budget with a positive integer".to_string()),
+            });
+        }
+
+        let collection_id = collection
+            .map(|value| self.resolve_collection_id(value))
+            .transpose()?;
+        let (scope_filter, scope_values) = duplicate_scope(collection_id, self.library_id);
+        let mut raw_groups = Vec::<(&'static str, f32, Vec<i64>)>::new();
 
         if matches!(
             method,
             DuplicateMatchMethod::Doi | DuplicateMatchMethod::Both
         ) {
-            let mut doi_map: HashMap<String, Vec<Item>> = HashMap::new();
-            for item in &items {
-                if let Some(doi) = item.doi.as_deref() {
-                    doi_map
-                        .entry(doi.trim().to_lowercase())
-                        .or_default()
-                        .push(item.clone());
-                }
-            }
-            for items in doi_map.into_values() {
-                if items.len() > 1 {
-                    let group_key = items
-                        .iter()
-                        .map(|item| item.key.clone())
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    if seen.insert(format!("doi:{group_key}")) {
-                        groups.push(DuplicateGroup {
-                            match_type: "doi".to_string(),
-                            score: 1.0,
-                            items,
-                        });
-                    }
+            let sql = format!(
+                "SELECT LOWER(TRIM(iv.value)), GROUP_CONCAT(i.itemID, ',')
+                 FROM items i
+                 JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+                 JOIN itemData id ON i.itemID = id.itemID
+                 JOIN fields f ON id.fieldID = f.fieldID
+                 JOIN itemDataValues iv ON id.valueID = iv.valueID
+                 WHERE {scope_filter} AND f.fieldName = 'DOI' AND TRIM(iv.value) <> ''
+                 GROUP BY LOWER(TRIM(iv.value)) HAVING COUNT(*) > 1
+                 ORDER BY LOWER(TRIM(iv.value))"
+            );
+            let mut stmt = self
+                .conn
+                .prepare_cached(&sql)
+                .map_err(sql_err("duplicates-doi-groups"))?;
+            let rows = stmt
+                .query_map(params_from_iter(scope_values.iter()), |row| {
+                    row.get::<_, String>(1)
+                })
+                .map_err(sql_err("duplicates-doi-groups"))?;
+            for row in rows {
+                let ids = row
+                    .map_err(sql_err("duplicates-doi-groups"))?
+                    .split(',')
+                    .filter_map(|value| value.parse::<i64>().ok())
+                    .collect::<Vec<_>>();
+                if ids.len() > 1 {
+                    raw_groups.push(("doi", 1.0, ids));
                 }
             }
         }
 
+        let title_candidates =
+            self.load_duplicate_title_candidates(&scope_filter, &scope_values)?;
+        let mut candidate_pair_count = 0usize;
+        let mut skipped_oversize_blocks = 0usize;
+        let mut truncated = false;
         if matches!(
             method,
             DuplicateMatchMethod::Title | DuplicateMatchMethod::Both
         ) {
-            let mut used = HashSet::new();
-            for index in 0..items.len() {
-                if used.contains(&items[index].key) {
-                    continue;
-                }
-                let mut cluster = vec![items[index].clone()];
-                let left = normalize_title(&items[index].title);
-                for other in items.iter().skip(index + 1) {
-                    if used.contains(&other.key) {
-                        continue;
-                    }
-                    let right = normalize_title(&other.title);
-                    if normalized_levenshtein(&left, &right) >= 0.92 {
-                        cluster.push(other.clone());
-                        used.insert(other.key.clone());
-                    }
-                }
-                if cluster.len() > 1 {
-                    used.insert(items[index].key.clone());
-                    groups.push(DuplicateGroup {
-                        match_type: "title".to_string(),
-                        score: 0.92,
-                        items: cluster,
-                    });
-                }
-            }
+            let (components, scan_meta) = title_duplicate_components(
+                &title_candidates,
+                candidate_budget,
+                DUPLICATE_TITLE_THRESHOLD,
+            );
+            candidate_pair_count = scan_meta.candidate_pair_count;
+            skipped_oversize_blocks = scan_meta.skipped_oversize_blocks;
+            truncated = scan_meta.truncated;
+            raw_groups.extend(
+                components
+                    .into_iter()
+                    .map(|ids| ("title", DUPLICATE_TITLE_THRESHOLD as f32, ids)),
+            );
         }
 
-        Ok(groups.into_iter().take(limit).collect())
+        raw_groups.truncate(limit);
+        let all_ids = raw_groups
+            .iter()
+            .flat_map(|(_, _, ids)| ids.iter().copied())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        let items = self.get_items_batch(&all_ids)?;
+        let by_id = all_ids.into_iter().zip(items).collect::<HashMap<_, _>>();
+        let groups = raw_groups
+            .into_iter()
+            .filter_map(|(match_type, score, ids)| {
+                let mut items = ids
+                    .into_iter()
+                    .filter_map(|item_id| by_id.get(&item_id).cloned())
+                    .collect::<Vec<_>>();
+                items.sort_by(|left, right| left.key.cmp(&right.key));
+                (items.len() > 1).then_some(DuplicateGroup {
+                    match_type: match_type.to_string(),
+                    score,
+                    items,
+                })
+            })
+            .collect();
+
+        Ok(DuplicateScanResult {
+            groups,
+            scanned_count: title_candidates.len(),
+            candidate_pair_count,
+            skipped_oversize_blocks,
+            threshold: DUPLICATE_TITLE_THRESHOLD as f32,
+            candidate_budget,
+            truncated,
+        })
+    }
+
+    fn load_duplicate_title_candidates(
+        &self,
+        scope_filter: &str,
+        scope_values: &[rusqlite::types::Value],
+    ) -> ZotResult<Vec<DuplicateTitleCandidate>> {
+        let sql = format!(
+            "SELECT i.itemID,
+                    COALESCE((SELECT iv.value FROM itemData id JOIN fields f ON id.fieldID = f.fieldID JOIN itemDataValues iv ON id.valueID = iv.valueID WHERE id.itemID = i.itemID AND f.fieldName = 'title' LIMIT 1), ''),
+                    COALESCE((SELECT iv.value FROM itemData id JOIN fields f ON id.fieldID = f.fieldID JOIN itemDataValues iv ON id.valueID = iv.valueID WHERE id.itemID = i.itemID AND f.fieldName = 'date' LIMIT 1), ''),
+                    COALESCE((SELECT c.lastName FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE ic.itemID = i.itemID ORDER BY ic.orderIndex LIMIT 1), '')
+             FROM items i JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+             WHERE {scope_filter} ORDER BY i.key"
+        );
+        let mut stmt = self
+            .conn
+            .prepare_cached(&sql)
+            .map_err(sql_err("duplicates-title-candidates"))?;
+        let rows = stmt
+            .query_map(params_from_iter(scope_values.iter()), |row| {
+                Ok(DuplicateTitleCandidate {
+                    item_id: row.get(0)?,
+                    title: row.get(1)?,
+                    year: year_bucket(&row.get::<_, String>(2)?),
+                    author: normalize_block_value(&row.get::<_, String>(3)?),
+                })
+            })
+            .map_err(sql_err("duplicates-title-candidates"))?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("duplicates-title-candidates"))
     }
 
     /// Rank items related to `key`. This method only fetches raw signals
@@ -1314,7 +1402,15 @@ impl LocalLibrary {
     /// edge data come from existing batched loaders; assembly and structural
     /// analysis live in [`crate::graph`].
     pub fn build_knowledge_graph(&self, opts: &GraphOptions) -> ZotResult<KnowledgeGraph> {
-        let items = self.list_items(opts.collection.as_deref(), usize::MAX, 0)?;
+        if opts.edge_budget == 0 {
+            return Err(ZotError::InvalidInput {
+                code: "graph-edge-budget".to_string(),
+                message: "Graph edge budget must be greater than zero".to_string(),
+                hint: Some("Pass --edge-budget with a positive integer".to_string()),
+            });
+        }
+        let unbounded_limit = usize::try_from(i64::MAX).unwrap_or(usize::MAX);
+        let items = self.list_items(opts.collection.as_deref(), unbounded_limit, 0)?;
         let explicit = if opts.relations.related {
             self.load_explicit_relations()?
         } else {
@@ -1363,50 +1459,74 @@ impl LocalLibrary {
     }
 
     pub fn get_stats(&self) -> ZotResult<LibraryStats> {
-        let total_items = self.stats_total_items()?;
+        self.get_stats_with_trashed(false)
+    }
+
+    pub fn get_stats_with_trashed(&self, include_trashed: bool) -> ZotResult<LibraryStats> {
+        let item_trash = if include_trashed {
+            ""
+        } else {
+            " AND NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = i.itemID)"
+        };
+        let parent_trash = if include_trashed {
+            ""
+        } else {
+            " AND NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = pi.itemID)"
+        };
+        let total_items = self.stats_total_items(include_trashed)?;
         let by_type = self.stats_grouped(
-            "SELECT it.typeName, COUNT(*) FROM items i
+            &format!(
+                "SELECT it.typeName, COUNT(*) FROM items i
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE i.libraryID = ?1
-             AND it.typeName NOT IN ('attachment','note','annotation')
-             GROUP BY it.typeName",
+             AND it.typeName NOT IN ('attachment','note','annotation'){item_trash}
+             GROUP BY it.typeName"
+            ),
             "stats-by-type",
         )?;
         let top_tags = self.stats_grouped(
-            "SELECT t.name, COUNT(*) FROM itemTags itg
+            &format!(
+                "SELECT t.name, COUNT(*) FROM itemTags itg
              JOIN tags t ON itg.tagID = t.tagID
              JOIN items i ON itg.itemID = i.itemID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE i.libraryID = ?1
-             AND it.typeName NOT IN ('attachment','note','annotation')
-             GROUP BY t.tagID, t.name",
+             AND it.typeName NOT IN ('attachment','note','annotation'){item_trash}
+             GROUP BY t.tagID, t.name"
+            ),
             "stats-tags",
         )?;
         let collections = self.stats_grouped(
-            "SELECT c.key, COUNT(*) FROM collectionItems ci
+            &format!(
+                "SELECT c.key, COUNT(*) FROM collectionItems ci
              JOIN collections c ON ci.collectionID = c.collectionID
              JOIN items i ON ci.itemID = i.itemID
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE i.libraryID = ?1
-             AND it.typeName NOT IN ('attachment','note','annotation')
-             GROUP BY c.key",
+             AND it.typeName NOT IN ('attachment','note','annotation'){item_trash}
+             GROUP BY c.key"
+            ),
             "stats-collections",
         )?;
         let pdf_attachments = self.stats_count(
-            "SELECT COUNT(DISTINCT ia.parentItemID) FROM itemAttachments ia
+            &format!(
+                "SELECT COUNT(DISTINCT ia.parentItemID) FROM itemAttachments ia
              JOIN items pi ON ia.parentItemID = pi.itemID
              JOIN itemTypes it ON pi.itemTypeID = it.itemTypeID
              WHERE pi.libraryID = ?1
              AND ia.contentType = 'application/pdf'
-             AND it.typeName NOT IN ('attachment','note','annotation')",
+             AND it.typeName NOT IN ('attachment','note','annotation'){parent_trash}"
+            ),
             "stats-pdf-attachments",
         )?;
         let notes = self.stats_count(
-            "SELECT COUNT(*) FROM itemNotes n
+            &format!(
+                "SELECT COUNT(*) FROM itemNotes n
              JOIN items pi ON n.parentItemID = pi.itemID
              JOIN itemTypes it ON pi.itemTypeID = it.itemTypeID
              WHERE pi.libraryID = ?1
-             AND it.typeName NOT IN ('attachment','note','annotation')",
+             AND it.typeName NOT IN ('attachment','note','annotation'){parent_trash}"
+            ),
             "stats-notes",
         )?;
         Ok(LibraryStats {
@@ -1419,12 +1539,19 @@ impl LocalLibrary {
         })
     }
 
-    fn stats_total_items(&self) -> ZotResult<usize> {
+    fn stats_total_items(&self, include_trashed: bool) -> ZotResult<usize> {
+        let trash = if include_trashed {
+            ""
+        } else {
+            " AND NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = i.itemID)"
+        };
         self.stats_count(
-            "SELECT COUNT(*) FROM items i
+            &format!(
+                "SELECT COUNT(*) FROM items i
              JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
              WHERE i.libraryID = ?1
-             AND it.typeName NOT IN ('attachment','note','annotation')",
+             AND it.typeName NOT IN ('attachment','note','annotation'){trash}"
+            ),
             "stats-total",
         )
     }
@@ -1547,19 +1674,52 @@ impl LocalLibrary {
     }
 
     fn resolve_collection_id(&self, collection: &str) -> ZotResult<i64> {
-        self.conn
+        if let Some(collection_id) = self
+            .conn
             .query_row(
-                "SELECT collectionID FROM collections WHERE libraryID = ?1 AND (key = ?2 OR collectionName = ?2)",
+                "SELECT collectionID FROM collections WHERE libraryID = ?1 AND key = ?2",
                 params![self.library_id, collection],
                 |row| row.get::<_, i64>(0),
             )
             .optional()
-            .map_err(sql_err("resolve-collection"))?
-            .ok_or_else(|| ZotError::InvalidInput {
+            .map_err(sql_err("resolve-collection-key"))?
+        {
+            return Ok(collection_id);
+        }
+
+        let mut stmt = self
+            .conn
+            .prepare_cached(
+                "SELECT collectionID, key FROM collections WHERE libraryID = ?1 AND collectionName = ?2 ORDER BY key",
+            )
+            .map_err(sql_err("resolve-collection-name"))?;
+        let matches = stmt
+            .query_map(params![self.library_id, collection], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(sql_err("resolve-collection-name"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("resolve-collection-name"))?;
+        match matches.as_slice() {
+            [(collection_id, _)] => Ok(*collection_id),
+            [] => Err(ZotError::InvalidInput {
                 code: "collection-not-found".to_string(),
                 message: format!("Collection '{collection}' not found"),
                 hint: Some("Use 'zot collection list' to inspect collection names".to_string()),
-            })
+            }),
+            candidates => Err(ZotError::InvalidInput {
+                code: "collection-ambiguous".to_string(),
+                message: format!("Collection name '{collection}' matches multiple collections"),
+                hint: Some(format!(
+                    "Use one of these collection keys: {}",
+                    candidates
+                        .iter()
+                        .map(|(_, key)| key.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )),
+            }),
+        }
     }
 
     fn item_id_by_key(&self, key: &str) -> ZotResult<Option<i64>> {
@@ -1663,119 +1823,6 @@ impl LocalLibrary {
             counts.push((item_id, usize::try_from(count).unwrap_or(0)));
         }
         Ok(counts)
-    }
-
-    fn collect_matching_item_ids_from_field_search(
-        &self,
-        like: &str,
-        exclude_trashed: bool,
-        item_ids: &mut HashSet<i64>,
-    ) -> ZotResult<()> {
-        let sql = format!(
-            "SELECT DISTINCT i.itemID FROM items i
-             JOIN itemData id ON i.itemID = id.itemID
-             JOIN itemDataValues iv ON id.valueID = iv.valueID
-             JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
-             WHERE iv.value LIKE ?1 ESCAPE '\\' AND i.libraryID = ?2
-             AND it.typeName NOT IN ('attachment','note','annotation'){}",
-            trashed_exclusion(exclude_trashed)
-        );
-        let mut stmt = self
-            .conn
-            .prepare_cached(&sql)
-            .map_err(sql_err("search-fields"))?;
-        let rows = stmt
-            .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
-            .map_err(sql_err("search-fields"))?;
-        for row in rows {
-            item_ids.insert(row.map_err(sql_err("search-fields"))?);
-        }
-        Ok(())
-    }
-
-    fn collect_matching_item_ids_from_creator_search(
-        &self,
-        like: &str,
-        exclude_trashed: bool,
-        item_ids: &mut HashSet<i64>,
-    ) -> ZotResult<()> {
-        let sql = format!(
-            "SELECT DISTINCT ic.itemID FROM itemCreators ic
-             JOIN creators c ON ic.creatorID = c.creatorID
-             JOIN items i ON ic.itemID = i.itemID
-             JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
-             WHERE (c.firstName LIKE ?1 ESCAPE '\\' OR c.lastName LIKE ?1 ESCAPE '\\') AND i.libraryID = ?2
-             AND it.typeName NOT IN ('attachment','note','annotation'){}",
-            trashed_exclusion(exclude_trashed)
-        );
-        let mut stmt = self
-            .conn
-            .prepare_cached(&sql)
-            .map_err(sql_err("search-creators"))?;
-        let rows = stmt
-            .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
-            .map_err(sql_err("search-creators"))?;
-        for row in rows {
-            item_ids.insert(row.map_err(sql_err("search-creators"))?);
-        }
-        Ok(())
-    }
-
-    fn collect_matching_item_ids_from_tag_search(
-        &self,
-        like: &str,
-        exclude_trashed: bool,
-        item_ids: &mut HashSet<i64>,
-    ) -> ZotResult<()> {
-        let sql = format!(
-            "SELECT DISTINCT it.itemID FROM itemTags it
-             JOIN tags t ON it.tagID = t.tagID
-             JOIN items i ON it.itemID = i.itemID
-             JOIN itemTypes ity ON i.itemTypeID = ity.itemTypeID
-             WHERE t.name LIKE ?1 ESCAPE '\\' AND i.libraryID = ?2
-             AND ity.typeName NOT IN ('attachment','note','annotation'){}",
-            trashed_exclusion(exclude_trashed)
-        );
-        let mut stmt = self
-            .conn
-            .prepare_cached(&sql)
-            .map_err(sql_err("search-tags"))?;
-        let rows = stmt
-            .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
-            .map_err(sql_err("search-tags"))?;
-        for row in rows {
-            item_ids.insert(row.map_err(sql_err("search-tags"))?);
-        }
-        Ok(())
-    }
-
-    fn collect_matching_item_ids_from_fulltext_search(
-        &self,
-        like: &str,
-        exclude_trashed: bool,
-        item_ids: &mut HashSet<i64>,
-    ) -> ZotResult<()> {
-        let sql = format!(
-            "SELECT DISTINCT ia.parentItemID FROM fulltextItemWords fw
-             JOIN fulltextWords w ON fw.wordID = w.wordID
-             JOIN itemAttachments ia ON fw.itemID = ia.itemID
-             JOIN items i ON ia.parentItemID = i.itemID
-             JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
-             WHERE w.word LIKE ?1 ESCAPE '\\' AND ia.parentItemID IS NOT NULL AND i.libraryID = ?2
-             AND it.typeName NOT IN ('attachment','note','annotation'){}",
-            trashed_exclusion(exclude_trashed)
-        );
-        let mut stmt = self
-            .conn
-            .prepare_cached(&sql)
-            .map_err(sql_err("search-fulltext"))?;
-        let rows = stmt
-            .query_map(params![like, self.library_id], |row| row.get::<_, i64>(0))
-            .map_err(sql_err("search-fulltext"))?;
-        for row in rows {
-            item_ids.insert(row.map_err(sql_err("search-fulltext"))?);
-        }
-        Ok(())
     }
 
     fn get_items_batch(&self, item_ids: &[i64]) -> ZotResult<Vec<Item>> {
@@ -2022,86 +2069,6 @@ impl LocalLibrary {
             collections.entry(item_id).or_default().push(collection_key);
         }
         Ok(collections)
-    }
-
-    fn filter_item_ids_by_tag(&self, item_ids: HashSet<i64>, tag: &str) -> ZotResult<HashSet<i64>> {
-        self.filter_item_ids_by_exact_name(
-            item_ids,
-            "SELECT DISTINCT it.itemID FROM itemTags it JOIN tags t ON it.tagID = t.tagID WHERE LOWER(t.name) = ? AND it.itemID IN",
-            tag.to_lowercase(),
-            "tag-filter-batch",
-        )
-    }
-
-    fn filter_item_ids_by_creator(
-        &self,
-        item_ids: HashSet<i64>,
-        creator: &str,
-    ) -> ZotResult<HashSet<i64>> {
-        self.filter_item_ids_by_exact_name(
-            item_ids,
-            "SELECT DISTINCT ic.itemID FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE LOWER(TRIM(COALESCE(c.firstName, '') || ' ' || c.lastName)) LIKE ? ESCAPE '\\' AND ic.itemID IN",
-            format!("%{}%", escape_like(&creator.to_lowercase())),
-            "creator-filter-batch",
-        )
-    }
-
-    fn filter_item_ids_by_year(
-        &self,
-        item_ids: HashSet<i64>,
-        year: &str,
-    ) -> ZotResult<HashSet<i64>> {
-        self.filter_item_ids_by_exact_name(
-            item_ids,
-            "SELECT DISTINCT id.itemID FROM itemData id JOIN fields f ON id.fieldID = f.fieldID JOIN itemDataValues iv ON id.valueID = iv.valueID WHERE f.fieldName = 'date' AND iv.value LIKE ? AND id.itemID IN",
-            format!("{year}%"),
-            "year-filter-batch",
-        )
-    }
-
-    fn filter_item_ids_by_type_name(
-        &self,
-        item_ids: HashSet<i64>,
-        type_name: &str,
-    ) -> ZotResult<HashSet<i64>> {
-        self.filter_item_ids_by_exact_name(
-            item_ids,
-            "SELECT i.itemID FROM items i JOIN itemTypes it ON i.itemTypeID = it.itemTypeID WHERE it.typeName = ? AND i.itemID IN",
-            type_name.to_string(),
-            "type-filter-batch",
-        )
-    }
-
-    fn filter_item_ids_by_exact_name(
-        &self,
-        item_ids: HashSet<i64>,
-        sql_prefix: &str,
-        filter_value: String,
-        context: &'static str,
-    ) -> ZotResult<HashSet<i64>> {
-        if item_ids.is_empty() {
-            return Ok(item_ids);
-        }
-
-        const CHUNK: usize = 500;
-        let candidate_ids = item_ids.into_iter().collect::<Vec<_>>();
-        let mut matched = HashSet::new();
-        for chunk in candidate_ids.chunks(CHUNK) {
-            let placeholders = repeat_placeholders(chunk.len());
-            let sql = format!("{sql_prefix} ({placeholders})");
-            let mut params = Vec::with_capacity(chunk.len() + 1);
-            params.push(rusqlite::types::Value::from(filter_value.clone()));
-            params.extend(chunk.iter().copied().map(rusqlite::types::Value::from));
-
-            let mut stmt = self.conn.prepare_cached(&sql).map_err(sql_err(context))?;
-            let rows = stmt
-                .query_map(params_from_iter(params.iter()), |row| row.get::<_, i64>(0))
-                .map_err(sql_err(context))?;
-            for row in rows {
-                matched.insert(row.map_err(sql_err(context))?);
-            }
-        }
-        Ok(matched)
     }
 
     fn get_item_by_id(&self, item_id: i64) -> ZotResult<Item> {
@@ -2353,35 +2320,160 @@ struct BatchItemRow {
     date_modified: Option<String>,
 }
 
-fn sort_items(items: &mut [Item], sort: Option<SortField>, direction: SortDirection) {
-    match sort {
-        Some(SortField::Title) => items.sort_by_key(|item| item.title.to_lowercase()),
-        Some(SortField::Creator) => items.sort_by(|left, right| {
-            let left_name = left
-                .creators
-                .first()
-                .map(Creator::full_name)
-                .unwrap_or_default()
-                .to_lowercase();
-            let right_name = right
-                .creators
-                .first()
-                .map(Creator::full_name)
-                .unwrap_or_default()
-                .to_lowercase();
-            left_name.cmp(&right_name)
-        }),
-        Some(SortField::DateAdded) => {
-            items.sort_by(|left, right| left.date_added.cmp(&right.date_added))
-        }
-        Some(SortField::DateModified) => {
-            items.sort_by(|left, right| left.date_modified.cmp(&right.date_modified))
-        }
-        None => items.sort_by(|left, right| left.key.cmp(&right.key)),
+#[derive(Debug, Clone)]
+struct DuplicateTitleCandidate {
+    item_id: i64,
+    title: String,
+    year: String,
+    author: String,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct DuplicateTitleScanMeta {
+    candidate_pair_count: usize,
+    skipped_oversize_blocks: usize,
+    truncated: bool,
+}
+
+fn duplicate_scope(
+    collection_id: Option<i64>,
+    library_id: i64,
+) -> (String, Vec<rusqlite::types::Value>) {
+    let mut filter = "i.libraryID = ? AND it.typeName NOT IN ('attachment','note','annotation') AND NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = i.itemID)".to_string();
+    let mut values = vec![rusqlite::types::Value::from(library_id)];
+    if let Some(collection_id) = collection_id {
+        filter.push_str(" AND EXISTS (SELECT 1 FROM collectionItems ci WHERE ci.itemID = i.itemID AND ci.collectionID = ?)");
+        values.push(rusqlite::types::Value::from(collection_id));
     }
-    if matches!(direction, SortDirection::Desc) {
-        items.reverse();
+    (filter, values)
+}
+
+fn title_duplicate_components(
+    candidates: &[DuplicateTitleCandidate],
+    candidate_budget: usize,
+    threshold: f64,
+) -> (Vec<Vec<i64>>, DuplicateTitleScanMeta) {
+    let mut blocks = BTreeMap::<String, Vec<&DuplicateTitleCandidate>>::new();
+    for candidate in candidates {
+        let normalized = normalize_title(&candidate.title);
+        if normalized.is_empty() {
+            continue;
+        }
+        let prefix = normalized
+            .chars()
+            .filter(|ch| !ch.is_whitespace())
+            .take(DUPLICATE_TITLE_PREFIX_CHARS)
+            .collect::<String>();
+        blocks
+            .entry(format!("prefix:{prefix}"))
+            .or_default()
+            .push(candidate);
+        if !candidate.year.is_empty() {
+            blocks
+                .entry(format!("prefix-year:{prefix}|{}", candidate.year))
+                .or_default()
+                .push(candidate);
+        }
+        if !candidate.author.is_empty() {
+            blocks
+                .entry(format!("prefix-author:{prefix}|{}", candidate.author))
+                .or_default()
+                .push(candidate);
+        }
     }
+
+    let mut adjacency = BTreeMap::<i64, BTreeSet<i64>>::new();
+    let mut seen_pairs = BTreeSet::new();
+    let mut meta = DuplicateTitleScanMeta::default();
+    for block in blocks.values() {
+        if block.len() < 2 {
+            continue;
+        }
+        let mut block_truncated = false;
+        'pairs: for left in 0..block.len() {
+            let normalized_left = normalize_title(&block[left].title);
+            for right in (left + 1)..block.len() {
+                let pair = if block[left].item_id < block[right].item_id {
+                    (block[left].item_id, block[right].item_id)
+                } else {
+                    (block[right].item_id, block[left].item_id)
+                };
+                if seen_pairs.contains(&pair) {
+                    continue;
+                }
+                if meta.candidate_pair_count >= candidate_budget {
+                    meta.truncated = true;
+                    block_truncated = true;
+                    break 'pairs;
+                }
+                seen_pairs.insert(pair);
+                meta.candidate_pair_count += 1;
+                let normalized_right = normalize_title(&block[right].title);
+                if normalized_levenshtein(&normalized_left, &normalized_right) >= threshold {
+                    adjacency
+                        .entry(block[left].item_id)
+                        .or_default()
+                        .insert(block[right].item_id);
+                    adjacency
+                        .entry(block[right].item_id)
+                        .or_default()
+                        .insert(block[left].item_id);
+                }
+            }
+        }
+        if block_truncated {
+            meta.skipped_oversize_blocks += 1;
+        }
+    }
+
+    let mut visited = BTreeSet::new();
+    let mut components = Vec::new();
+    for &start in adjacency.keys() {
+        if !visited.insert(start) {
+            continue;
+        }
+        let mut pending = vec![start];
+        let mut component = Vec::new();
+        while let Some(item_id) = pending.pop() {
+            component.push(item_id);
+            if let Some(neighbours) = adjacency.get(&item_id) {
+                for &neighbour in neighbours.iter().rev() {
+                    if visited.insert(neighbour) {
+                        pending.push(neighbour);
+                    }
+                }
+            }
+        }
+        component.sort_unstable();
+        if component.len() > 1 {
+            components.push(component);
+        }
+    }
+    components.sort();
+    (components, meta)
+}
+
+fn normalize_block_value(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn year_bucket(value: &str) -> String {
+    let mut digits = String::new();
+    for ch in value.chars() {
+        if ch.is_ascii_digit() {
+            digits.push(ch);
+            if digits.len() == 4 {
+                return digits;
+            }
+        } else {
+            digits.clear();
+        }
+    }
+    String::new()
 }
 
 fn normalize_title(title: &str) -> String {
@@ -2561,7 +2653,10 @@ mod tests {
     use tempfile::TempDir;
     use zot_core::LibraryScope;
 
-    use super::{DuplicateMatchMethod, LocalLibrary, SearchOptions, SnapshotPolicy, escape_like};
+    use super::{
+        DuplicateMatchMethod, DuplicateTitleCandidate, LocalLibrary, SearchOptions, SnapshotPolicy,
+        escape_like, title_duplicate_components,
+    };
     use zot_core::ChildItem;
 
     #[test]
@@ -3523,11 +3618,11 @@ Original Date: 2017');
             DuplicateMatchMethod::Doi,
             DuplicateMatchMethod::Both,
         ] {
-            let groups = match lib.find_duplicates(method, None, 10) {
+            let scan = match lib.find_duplicates(method, None, 10, 250_000) {
                 Ok(groups) => groups,
                 Err(err) => panic!("find duplicates failed for {:?}: {err}", method),
             };
-            assert!(groups.iter().any(|group| {
+            assert!(scan.groups.iter().any(|group| {
                 let keys = group
                     .items
                     .iter()
@@ -3553,12 +3648,12 @@ Original Date: 2017');
             DuplicateMatchMethod::Doi,
             DuplicateMatchMethod::Both,
         ] {
-            let groups = match lib.find_duplicates(method, None, 10) {
+            let scan = match lib.find_duplicates(method, None, 10, 250_000) {
                 Ok(groups) => groups,
                 Err(err) => panic!("find duplicates failed for {:?}: {err}", method),
             };
             assert!(
-                groups
+                scan.groups
                     .iter()
                     .flat_map(|group| group.items.iter())
                     .all(|item| item.key != "DUPE008"),
@@ -3568,10 +3663,59 @@ Original Date: 2017');
     }
 
     #[test]
-    fn search_excludes_trashed_items_only_when_opted_in() {
-        // R3 scope control: TRSH007 is seeded in `deletedItems`. Default
-        // search (both the full-scan and the LIKE branch) keeps returning it;
-        // only `exclude_trashed: true` filters it out.
+    fn collection_resolution_prefers_exact_key_and_rejects_ambiguous_names() {
+        let fixture = rich_fixture_library_with_extra_sql(
+            "INSERT INTO collections VALUES (6, 'Key Winner', NULL, 1, 'Transformers');
+             INSERT INTO collectionItems VALUES (6, 2, 0);
+             INSERT INTO collections VALUES (7, 'Shared Shelf', NULL, 1, 'ZZZZ0002');
+             INSERT INTO collections VALUES (8, 'Shared Shelf', NULL, 1, 'AAAA0001');",
+        );
+
+        let keyed = fixture
+            .lib
+            .get_collection_items("Transformers")
+            .expect("exact collection key");
+        assert_eq!(
+            keyed
+                .iter()
+                .map(|item| item.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["BERT002"]
+        );
+
+        let error = fixture
+            .lib
+            .get_collection_items("Shared Shelf")
+            .expect_err("duplicate collection names must fail closed");
+        let payload = error.payload();
+        assert_eq!(payload.code, "collection-ambiguous");
+        assert_eq!(
+            payload.hint.as_deref(),
+            Some("Use one of these collection keys: AAAA0001, ZZZZ0002")
+        );
+    }
+
+    #[test]
+    fn duplicate_title_scan_bounds_ten_thousand_candidates_by_budget() {
+        let candidates = (0..10_000)
+            .map(|index| DuplicateTitleCandidate {
+                item_id: i64::from(index),
+                title: format!("Deterministic duplicate title {index:05}"),
+                year: "2026".to_string(),
+                author: "auditor".to_string(),
+            })
+            .collect::<Vec<_>>();
+
+        let (_, meta) = title_duplicate_components(&candidates, 1_000, 0.92);
+        assert_eq!(meta.candidate_pair_count, 1_000);
+        assert!(meta.truncated);
+        assert!(meta.skipped_oversize_blocks >= 1);
+    }
+
+    #[test]
+    fn search_excludes_trashed_items_by_default_and_allows_explicit_inclusion() {
+        // TRSH007 is seeded in `deletedItems`. Default search excludes it;
+        // callers can restore the legacy projection explicitly.
         let fixture = rich_fixture_library();
         let lib = &fixture.lib;
 
@@ -3579,16 +3723,16 @@ Original Date: 2017');
             Ok(result) => result,
             Err(err) => panic!("default full-scan search failed: {err}"),
         };
-        assert!(default_all.items.iter().any(|item| item.key == "TRSH007"));
+        assert!(default_all.items.iter().all(|item| item.key != "TRSH007"));
 
-        let filtered_all = match lib.search(SearchOptions {
-            exclude_trashed: true,
+        let included_all = match lib.search(SearchOptions {
+            exclude_trashed: false,
             ..SearchOptions::default()
         }) {
             Ok(result) => result,
-            Err(err) => panic!("filtered full-scan search failed: {err}"),
+            Err(err) => panic!("included full-scan search failed: {err}"),
         };
-        assert!(filtered_all.items.iter().all(|item| item.key != "TRSH007"));
+        assert!(included_all.items.iter().any(|item| item.key == "TRSH007"));
 
         let default_query = match lib.search(SearchOptions {
             query: "Survey".to_string(),
@@ -3597,21 +3741,25 @@ Original Date: 2017');
             Ok(result) => result,
             Err(err) => panic!("default LIKE search failed: {err}"),
         };
-        assert!(default_query.items.iter().any(|item| item.key == "TRSH007"));
+        assert!(default_query.items.iter().all(|item| item.key != "TRSH007"));
 
-        let filtered_query = match lib.search(SearchOptions {
+        let included_query = match lib.search(SearchOptions {
             query: "Survey".to_string(),
-            exclude_trashed: true,
+            exclude_trashed: false,
             ..SearchOptions::default()
         }) {
             Ok(result) => result,
-            Err(err) => panic!("filtered LIKE search failed: {err}"),
+            Err(err) => panic!("included LIKE search failed: {err}"),
         };
         assert!(
-            filtered_query
+            included_query
                 .items
                 .iter()
-                .all(|item| item.key != "TRSH007")
+                .any(|item| item.key == "TRSH007")
         );
+
+        let excluded_stats = lib.get_stats().expect("excluded stats");
+        let included_stats = lib.get_stats_with_trashed(true).expect("included stats");
+        assert_eq!(included_stats.total_items, excluded_stats.total_items + 1);
     }
 }

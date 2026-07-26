@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use tempfile::TempDir;
 use zot_core::LibraryScope;
-use zot_local::{LocalLibrary, SearchOptions};
+use zot_local::{LocalLibrary, SearchOptions, SortDirection, SortField};
 
 const CHILD_TYPES: &[&str] = &["attachment", "note", "annotation"];
 
@@ -170,4 +170,44 @@ fn get_item_returns_none_for_unknown_key() {
         .get_item("NONE_SUCH_FIXTURE_KEY_0000")
         .expect("should not error on miss");
     assert!(miss.is_none(), "unknown key must map to None, not error");
+}
+
+#[test]
+fn sorting_and_sql_pagination_match_the_full_golden_order() {
+    let (_dir, library) = open_fixture_library();
+    for sort in [
+        SortField::Title,
+        SortField::Creator,
+        SortField::DateAdded,
+        SortField::DateModified,
+    ] {
+        let full = library
+            .search(SearchOptions {
+                sort: Some(sort),
+                direction: SortDirection::Asc,
+                limit: 1_000,
+                ..SearchOptions::default()
+            })
+            .expect("full sorted search");
+        let page = library
+            .search(SearchOptions {
+                sort: Some(sort),
+                direction: SortDirection::Asc,
+                limit: 3,
+                offset: 2,
+                ..SearchOptions::default()
+            })
+            .expect("paged sorted search");
+
+        assert_eq!(page.total, full.total);
+        assert_eq!(
+            page.items.iter().map(|item| &item.key).collect::<Vec<_>>(),
+            full.items
+                .iter()
+                .skip(2)
+                .take(3)
+                .map(|item| &item.key)
+                .collect::<Vec<_>>()
+        );
+    }
 }

@@ -19,14 +19,11 @@ categories with different rules:
   and tags.
 - Return `Ok(None)` or `Ok(Vec::new())` for expected misses, as
   `get_item` and `get_notes` do.
-- Trash filtering on item search is **opt-in**: `SearchOptions::exclude_trashed`
-  (default `false`) appends the `deletedItems` exclusion via `trashed_exclusion()`
-  to the list-all branch and every LIKE collector. `find_duplicates` must always
-  opt in — a duplicate group must never pair a live item with one already in the
-  trash, or re-running cleanup keeps reporting groups it already resolved.
-  Note/annotation queries exclude `deletedItems` unconditionally, but
-  `library search` / `list` intentionally keep returning trashed items by
-  default; flipping that default is a breaking behavior decision, not a bug fix.
+- Trash filtering on primary-item search is the default:
+  `SearchOptions::default().exclude_trashed == true`. Callers may explicitly set
+  it to `false` only for a surface that advertises trash inclusion. Notes,
+  annotations, duplicates, graph, collection, and workspace reads stay
+  non-trash by default.
 
 ## Scenario: Consistent Zotero database snapshot
 
@@ -112,6 +109,89 @@ loop {
         _ => return Err(unsupported_backup_state()),
     }
 }
+```
+
+## Scenario: Bounded local search, duplicate, and graph queries
+
+### 1. Scope / Trigger
+
+Apply this contract when changing primary-item search, collection resolution,
+note hydration, duplicate detection, graph construction, or their public result
+models. It prevents trash leakage, nondeterministic collection selection,
+whole-result hydration, and unbounded pair expansion.
+
+### 2. Signatures
+
+```rust
+LocalLibrary::search(SearchOptions) -> ZotResult<SearchResult>
+LocalLibrary::find_duplicates(method, collection, group_limit, candidate_budget)
+    -> ZotResult<DuplicateScanResult>
+LocalLibrary::build_knowledge_graph(&GraphOptions) -> ZotResult<KnowledgeGraph>
+```
+
+`GraphOptions.edge_budget` defaults to `100_000`; duplicate candidate budget
+defaults are owned by the CLI and passed explicitly.
+
+### 3. Contracts
+
+- Search builds one bound predicate set, runs a separate `COUNT(*)`, selects
+  page IDs with deterministic `ORDER BY ... , i.key`, then hydrates only those
+  IDs through `get_items_batch`.
+- Query field/creator/tag/fulltext branches are OR; collection/type/tag/creator/
+  year filters are AND. User `LIKE` values remain escaped and bound.
+- Collection lookup checks exact key first. A name resolves only when exactly
+  one key matches; multiple names fail with sorted candidate keys.
+- `get_notes` collects IDs first and calls `load_item_tags_batch`; never restore
+  per-note tag queries.
+- Duplicate DOI groups are exact and title comparisons are admitted through
+  deterministic blocks. `group_limit` truncates output groups only; it must not
+  truncate scanned input. Every result reports scan, pair, budget, skipped-block,
+  threshold, and truncation metadata.
+- Graph budget limits only new unique pairs. An admitted pair may still receive
+  later relation signals; oversize groups are skipped and counted.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+| --- | --- |
+| duplicate candidate budget is zero | `duplicate-candidate-budget` |
+| graph edge budget is zero | `graph-edge-budget` |
+| collection key/name missing | `collection-not-found` |
+| collection name matches multiple keys | `collection-ambiguous`, sorted keys in hint |
+| duplicate pair budget exhausted | partial groups plus `truncated=true` |
+| graph pair budget exhausted | bounded graph plus `build.truncated=true` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: a 50-item page hydrates 50 IDs while `total` comes from SQL count.
+- Base: an untruncated small duplicate/graph fixture keeps stable groups,
+  nodes, edges, metrics, and key ordering.
+- Bad: load 10,000 full items before pagination, use `key=? OR name=? LIMIT 1`,
+  silently stop duplicate input at 10,000, or expand every graph clique.
+
+### 6. Tests Required
+
+- Fixture tests cover trash inclusion/exclusion, OR/AND and literal-LIKE
+  semantics, all sort fields, offset/limit, key-first collection lookup, and
+  deterministic ambiguity hints.
+- Duplicate tests assert DOI/title groups, scan metadata, exact budget
+  saturation, fail-visible truncation, and a 10k synthetic bound.
+- Graph tests assert admitted-pair updates, edge budget, oversize counts,
+  unchanged small-fixture metrics, and a 50k synthetic no-clique bound.
+- Run `cargo test -p zot-local` and `just ci`.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: hydrate and sort the full candidate set in Rust.
+let all = get_items_batch(&candidate_ids)?;
+all.sort_by(...);
+let page = all.into_iter().skip(offset).take(limit).collect();
+
+// Correct: count and page in SQL, then hydrate page IDs only.
+let total = count_matching(&predicates, &params)?;
+let page_ids = select_page(&predicates, &params, sort, limit, offset)?;
+let page = get_items_batch(&page_ids)?;
 ```
 
 ## Sidecar Databases

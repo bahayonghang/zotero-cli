@@ -274,7 +274,7 @@ impl From<DuplicateMethodArg> for DuplicateMatchMethod {
 mod tests {
     use clap::Parser;
 
-    use super::{Cli, Commands, ItemCommand, ItemTagCommand, LibraryCommand};
+    use super::{Cli, Commands, GraphCommand, ItemCommand, ItemTagCommand, LibraryCommand};
 
     #[test]
     fn parses_new_library_and_item_command_surfaces() {
@@ -471,5 +471,54 @@ mod tests {
             .expect_err("zero limit must fail");
 
         assert_eq!(error.payload().code, "config-value");
+    }
+
+    #[test]
+    fn parses_trash_and_candidate_budget_contracts() {
+        let search =
+            Cli::try_parse_from(["zot", "library", "search", "attention", "--include-trashed"])
+                .expect("parse search trash flag");
+        match search.command {
+            Commands::Library {
+                command: LibraryCommand::Search(args),
+            } => assert!(args.include_trashed),
+            _ => panic!("unexpected search command"),
+        }
+
+        let stats = Cli::try_parse_from(["zot", "library", "stats", "--include-trashed"])
+            .expect("parse stats trash flag");
+        match stats.command {
+            Commands::Library {
+                command: LibraryCommand::Stats(args),
+            } => assert!(args.include_trashed),
+            _ => panic!("unexpected stats command"),
+        }
+
+        let duplicates =
+            Cli::try_parse_from(["zot", "library", "duplicates", "--candidate-budget", "1234"])
+                .expect("parse duplicate budget");
+        match duplicates.command {
+            Commands::Library {
+                command: LibraryCommand::Duplicates(args),
+            } => assert_eq!(args.candidate_budget, 1_234),
+            _ => panic!("unexpected duplicates command"),
+        }
+
+        let graph = Cli::try_parse_from(["zot", "graph", "--edge-budget", "4321"])
+            .expect("parse graph budget");
+        match graph.command {
+            Commands::Graph(args) => assert_eq!(args.edge_budget, 4_321),
+            _ => panic!("unexpected graph command"),
+        }
+
+        let serve = Cli::try_parse_from(["zot", "graph", "serve", "--edge-budget", "5678"])
+            .expect("parse graph serve budget");
+        match serve.command {
+            Commands::Graph(args) => match args.command {
+                Some(GraphCommand::Serve(args)) => assert_eq!(args.edge_budget, 5_678),
+                _ => panic!("unexpected graph subcommand"),
+            },
+            _ => panic!("unexpected graph command"),
+        }
     }
 }

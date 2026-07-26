@@ -20,7 +20,7 @@ pub(crate) enum LibraryCommand {
     Search(LibrarySearchArgs),
     List(LibraryListArgs),
     Recent(LibraryRecentArgs),
-    Stats,
+    Stats(LibraryStatsArgs),
     Citekey(LibraryCiteKeyArgs),
     Tags,
     Libraries,
@@ -233,6 +233,8 @@ pub(crate) struct LibrarySearchArgs {
     pub(crate) limit: Option<usize>,
     #[arg(long, default_value_t = 0)]
     pub(crate) offset: usize,
+    #[arg(long)]
+    pub(crate) include_trashed: bool,
 }
 
 #[derive(Args)]
@@ -243,6 +245,14 @@ pub(crate) struct LibraryListArgs {
     pub(crate) limit: Option<usize>,
     #[arg(long, default_value_t = 0)]
     pub(crate) offset: usize,
+    #[arg(long)]
+    pub(crate) include_trashed: bool,
+}
+
+#[derive(Args)]
+pub(crate) struct LibraryStatsArgs {
+    #[arg(long)]
+    pub(crate) include_trashed: bool,
 }
 
 #[derive(Args)]
@@ -299,6 +309,8 @@ pub(crate) struct LibraryDuplicatesArgs {
     pub(crate) collection: Option<String>,
     #[arg(long)]
     pub(crate) limit: Option<usize>,
+    #[arg(long, default_value_t = 250_000)]
+    pub(crate) candidate_budget: usize,
 }
 
 #[derive(Args)]
@@ -323,6 +335,8 @@ pub(crate) struct LibraryDedupeArgs {
     pub(crate) confirm: bool,
     #[arg(long)]
     pub(crate) include_low_confidence: bool,
+    #[arg(long, default_value_t = 250_000)]
+    pub(crate) candidate_budget: usize,
 }
 
 #[derive(Args)]
@@ -350,6 +364,9 @@ pub(crate) struct GraphArgs {
     /// Restrict the graph to a single collection key (default: whole library).
     #[arg(long)]
     pub(crate) collection: Option<String>,
+    /// Maximum unique candidate edges retained during graph assembly.
+    #[arg(long, default_value_t = 100_000)]
+    pub(crate) edge_budget: usize,
 }
 
 #[derive(Subcommand)]
@@ -363,6 +380,9 @@ pub(crate) struct GraphServeArgs {
     /// Restrict the graph to a single collection key (default: whole library).
     #[arg(long)]
     pub(crate) collection: Option<String>,
+    /// Maximum unique candidate edges retained during graph assembly.
+    #[arg(long, default_value_t = 100_000)]
+    pub(crate) edge_budget: usize,
     /// Port to bind on 127.0.0.1 (falls back to a free port if taken).
     #[arg(long, default_value_t = 7878)]
     pub(crate) port: u16,

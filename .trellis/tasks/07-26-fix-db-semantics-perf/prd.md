@@ -73,16 +73,16 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1: 默认 search/list/stats 不含 deleted item；三个命令的 `--include-trashed` 恢复旧结果，JSON `meta.trash_policy` 与实际行为一致。
-- [ ] AC2: collection key 与同名 name 冲突时 key 优先；同名多 collection 返回 `collection-ambiguous` 并列出稳定候选 keys。
-- [ ] AC3: `get_notes` 复用 batch tag loader，结果内容、顺序和标签排序不回归。
-- [ ] AC4: search 的 total、OR/AND filters、LIKE literal 语义、四种排序和 offset/limit golden tests 通过；实现只 hydrate page IDs。
-- [ ] AC5: duplicate scan 不含 10,000 silent cap，输出完整 scan 元数据；DOI exact 与 title blocking 的 golden groups 正确，budget 截断可见且 dedupe fail closed。
-- [ ] AC6: graph candidate pairs 不超过 edge budget，oversize groups 与预算截断均有结构化元数据，未截断小 fixture 的 nodes/edges/metrics 保持一致。
-- [ ] AC7: `run_local` 在 single-thread Tokio 测试中证明工作运行于 blocking thread；指定 library/graph/annotation/workspace 路径不再直接执行重 rusqlite 查询。
-- [ ] AC8: 10k/50k synthetic complexity tests 通过且不依赖墙钟阈值。
-- [ ] AC9: CLI parse、JSON/human output、dedupe safety、zot-local fixture 回归和 specs/docs 同步完成。
-- [ ] AC10: 聚焦测试、`cargo test -p zot-local`、`cargo test -p zot-cli` 与最终 `just ci` 全部通过。
+- [x] AC1: 默认 search/list/stats 不含 deleted item；三个命令的 `--include-trashed` 恢复旧结果，JSON `meta.trash_policy` 与实际行为一致。
+- [x] AC2: collection key 与同名 name 冲突时 key 优先；同名多 collection 返回 `collection-ambiguous` 并列出稳定候选 keys。
+- [x] AC3: `get_notes` 复用 batch tag loader，结果内容、顺序和标签排序不回归。
+- [x] AC4: search 的 total、OR/AND filters、LIKE literal 语义、四种排序和 offset/limit golden tests 通过；实现只 hydrate page IDs。
+- [x] AC5: duplicate scan 不含 10,000 silent cap，输出完整 scan 元数据；DOI exact 与 title blocking 的 golden groups 正确，budget 截断可见且 dedupe fail closed。
+- [x] AC6: graph candidate pairs 不超过 edge budget，oversize groups 与预算截断均有结构化元数据，未截断小 fixture 的 nodes/edges/metrics 保持一致。
+- [x] AC7: `run_local` 在 single-thread Tokio 测试中证明工作运行于 blocking thread；指定 library/graph/annotation/workspace 路径不再直接执行重 rusqlite 查询。
+- [x] AC8: 10k/50k synthetic complexity tests 通过且不依赖墙钟阈值。
+- [x] AC9: CLI parse、JSON/human output、dedupe safety、zot-local fixture 回归和 specs/docs 同步完成。
+- [x] AC10: 聚焦测试、`cargo test -p zot-local`、`cargo test -p zot-cli` 与最终 `just ci` 全部通过。
 
 ## Out Of Scope
 

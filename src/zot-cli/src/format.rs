@@ -11,6 +11,7 @@ pub const ENVELOPE_API_VERSION: u32 = 1;
 pub struct EnvelopeMetaSeed {
     pub count: Option<usize>,
     pub total: Option<usize>,
+    pub trash_policy: Option<String>,
 }
 
 pub fn to_pretty_json<T: serde::Serialize>(value: &T) -> anyhow::Result<String> {
@@ -24,6 +25,7 @@ pub fn render_error_json(err: &AppError, profile: Option<&str>) -> anyhow::Resul
             count: None,
             total: None,
             profile: profile.map(str::to_string),
+            trash_policy: None,
             api_version: Some(ENVELOPE_API_VERSION),
         },
     ))
@@ -142,6 +144,12 @@ pub fn print_graph_summary(graph: &KnowledgeGraph) {
         metrics.connected_components,
         metrics.communities.len()
     );
+    if graph.build.truncated {
+        println!(
+            "Warning: graph candidate edges were truncated at budget {}.",
+            graph.build.edge_budget
+        );
+    }
     if !metrics.top_by_weighted_degree.is_empty() {
         println!("\nTop papers (by weighted connections):");
         for ranked in &metrics.top_by_weighted_degree {
@@ -204,6 +212,7 @@ mod tests {
                 count: Some(1),
                 total: Some(1),
                 profile: Some("default".to_string()),
+                trash_policy: Some("excluded".to_string()),
                 api_version: Some(1),
             },
         ))
@@ -213,6 +222,7 @@ mod tests {
         assert!(json.contains("\"data\""));
         assert!(json.contains("\"count\": 1"));
         assert!(json.contains("\"profile\": \"default\""));
+        assert!(json.contains("\"trash_policy\": \"excluded\""));
         assert!(json.contains("\"api_version\": 1"));
     }
 
@@ -228,6 +238,7 @@ mod tests {
                 count: Some(1),
                 total: None,
                 profile: Some("work".to_string()),
+                trash_policy: None,
                 api_version: Some(super::ENVELOPE_API_VERSION),
             },
         ))

@@ -23,9 +23,9 @@ Keep the existing `exclude_trashed` field for source compatibility but flip its 
 
 ## Duplicate Scan
 
-Load a minimal ordered projection `(item_id, key, title, doi, date, first_creator_surname)` for the full non-trash scope. DOI candidates are exact normalized groups. Title candidates enter deterministic blocks keyed by normalized first 12 characters plus year and normalized first-author surname; empty optional dimensions use stable sentinel values.
+Load a minimal ordered projection `(item_id, key, title, doi, date, first_creator_surname)` for the full non-trash scope. DOI candidates are exact normalized groups. Every title candidate enters a deterministic normalized 12-character prefix baseline block; candidates with metadata also enter prefix+year and prefix+first-author-surname blocks. A sorted pair set deduplicates candidates shared across blocks. The baseline preserves recall when one side lacks year/author metadata, while the optional blocks retain deterministic locality for richer records.
 
-A sorted pair set deduplicates candidates shared across blocks. Each new title comparison consumes one unit from `candidate_budget`; on exhaustion, later new pairs are skipped and `truncated=true`. Exact DOI groups do not consume Levenshtein budget. Only item IDs participating in accepted groups are hydrated, then group order and item order are stabilized by keys. `DuplicateScanResult` carries scan count, comparisons, skipped oversize blocks, threshold, budget and truncation.
+Each new title comparison consumes one unit from `candidate_budget`; on exhaustion, later new pairs are skipped and `truncated=true`. Exact DOI groups do not consume Levenshtein budget. Only item IDs participating in accepted groups are hydrated, then group order and item order are stabilized by keys. `DuplicateScanResult` carries scan count, comparisons, skipped oversize blocks, threshold, budget and truncation.
 
 Oversize title blocks are skipped rather than expanded beyond the remaining budget and increment `skipped_oversize_blocks`. Dedupe rejects any truncated scan before writer construction.
 

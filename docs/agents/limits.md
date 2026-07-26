@@ -42,6 +42,45 @@ libraries. Keep it accurate as the implementation evolves.
 - That means a query like `50%` will only match strings that contain
   `50%` literally, and `foo_bar` will only match `foo_bar` (not `fooXbar`).
 
+## Local library search and trash policy
+
+- `zot library search`, `list`, and `stats` exclude Zotero `deletedItems` by
+  default. Their explicit `--include-trashed` flag restores the legacy broad
+  view; JSON envelopes report the applied choice as
+  `meta.trash_policy = "excluded" | "included"`.
+- Search computes `total` with SQL and applies deterministic SQL
+  `ORDER BY/LIMIT/OFFSET` before hydrating item fields, creators, tags, and
+  collections. Memory use therefore follows the requested page size rather
+  than the full number of matches.
+- Collection arguments resolve an exact key first. A non-key display name is
+  accepted only when unique; duplicate names return `collection-ambiguous`
+  with sorted candidate keys.
+
+## Duplicate and graph candidate budgets
+
+- `zot library duplicates` and `zot library dedupe` default to
+  `--candidate-budget 250000`. This bounds title-similarity pair comparisons;
+  it does not cap scanned items. Read-only duplicate results expose
+  `scanned_count`, `candidate_pair_count`, `skipped_oversize_blocks`,
+  `candidate_budget`, and `truncated`.
+- A truncated `library dedupe` run fails with `duplicate-scan-truncated` before
+  any Web writer is constructed. Increase the budget and rerun; never apply a
+  partial duplicate scan.
+- `zot graph` and `zot graph serve` default to `--edge-budget 100000` unique
+  candidate pairs. Graph JSON reports the budget, admitted pair count,
+  skipped oversize groups, and truncation under `build`. Existing admitted
+  pairs may still accumulate later relation signals after the budget fills.
+- Zero candidate or edge budgets are invalid. These ceilings bound candidate
+  work, not output-node count; graph still includes every node in scope.
+
+## Async local database boundary
+
+- Heavy library search/list/stats, duplicate/dedupe planning, graph builds,
+  annotation reads, and workspace membership/import/search queries run through
+  the CLI `run_local` blocking boundary. The snapshot open and rusqlite query
+  execute together on a blocking worker; remote HTTP writes remain async and
+  outside that closure.
+
 ## Scite batch endpoints
 
 - `SciteClient::get_reports_batch` calls Scite's `/tallies` and `/papers`

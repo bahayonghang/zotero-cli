@@ -1,6 +1,9 @@
 use anyhow::Result;
 use chrono::Utc;
-use zot_core::{Item, SavedSearchCondition, SemanticHit, SemanticIndexStatus};
+use zot_core::{
+    DuplicateScanResult, Item, SavedSearchCondition, SemanticHit, SemanticIndexStatus, ZotError,
+    ZotResult,
+};
 use zot_local::{HybridMode, LocalLibrary, ReindexOpts, SearchOptions, SemanticStore};
 use zot_remote::{BetterBibTexClient, EmbeddingClient};
 
@@ -14,13 +17,47 @@ use crate::commands::library_dedupe::{WriterGroupMerger, apply_dedupe_plan, buil
 use crate::context::AppContext;
 use crate::format::{EnvelopeMetaSeed, print_items, print_stats};
 use crate::output::CommandOutput;
-use crate::util::{maybe_embed_query, parse_json_input, run_pdf};
+use crate::util::{maybe_embed_query, parse_json_input, run_local, run_pdf};
+
+fn trash_policy(include_trashed: bool) -> String {
+    if include_trashed {
+        "included"
+    } else {
+        "excluded"
+    }
+    .to_string()
+}
+
+fn ensure_complete_duplicate_scan(scan: &DuplicateScanResult) -> ZotResult<()> {
+    if scan.truncated {
+        return Err(ZotError::InvalidInput {
+            code: "duplicate-scan-truncated".to_string(),
+            message: format!(
+                "Duplicate scan reached candidate budget {}",
+                scan.candidate_budget
+            ),
+            hint: Some("Increase --candidate-budget and rerun before applying dedupe".to_string()),
+        });
+    }
+    Ok(())
+}
+
+fn validate_candidate_budget(candidate_budget: usize) -> ZotResult<usize> {
+    if candidate_budget == 0 {
+        return Err(ZotError::InvalidInput {
+            code: "duplicate-candidate-budget".to_string(),
+            message: "Duplicate candidate budget must be greater than zero".to_string(),
+            hint: Some("Pass --candidate-budget with a positive integer".to_string()),
+        });
+    }
+    Ok(candidate_budget)
+}
 
 pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<CommandOutput> {
-    let library = ctx.local_library()?;
     match command {
         LibraryCommand::Search(args) => {
-            let result = library.search(SearchOptions {
+            let include_trashed = args.include_trashed;
+            let options = SearchOptions {
                 query: args.query,
                 collection: args.collection,
                 item_type: args.item_type,
@@ -31,27 +68,41 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 direction: args.direction.into(),
                 limit: resolved_output_limit(args.limit),
                 offset: args.offset,
-                exclude_trashed: false,
-            })?;
+                exclude_trashed: !include_trashed,
+            };
+            let result = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                library.search(options)
+            })
+            .await?;
             let seed = Some(EnvelopeMetaSeed {
                 count: Some(result.items.len()),
                 total: Some(result.total),
+                trash_policy: Some(trash_policy(include_trashed)),
             });
             CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
         }
         LibraryCommand::List(args) => {
-            let items = library.list_items(
-                args.collection.as_deref(),
-                resolved_output_limit(args.limit),
-                args.offset,
-            )?;
+            let include_trashed = args.include_trashed;
+            let options = SearchOptions {
+                collection: args.collection,
+                limit: resolved_output_limit(args.limit),
+                offset: args.offset,
+                exclude_trashed: !include_trashed,
+                ..SearchOptions::default()
+            };
+            let result = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                library.search(options)
+            })
+            .await?;
             let seed = Some(EnvelopeMetaSeed {
-                count: Some(items.len()),
-                total: None,
+                count: Some(result.items.len()),
+                total: Some(result.total),
+                trash_policy: Some(trash_policy(include_trashed)),
             });
-            CommandOutput::new(ctx, items, seed, |items| print_items(items))
+            CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
         }
         LibraryCommand::Recent(args) => {
+            let library = ctx.local_library()?;
             let items = if let Some(count) = args.count {
                 library.get_recent_items_by_count(count)?
             } else if let Some(since) = args.since.as_deref() {
@@ -65,11 +116,21 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             };
             CommandOutput::new(ctx, items, None, |items| print_items(items))
         }
-        LibraryCommand::Stats => {
-            let stats = library.get_stats()?;
-            CommandOutput::new(ctx, stats, None, print_stats)
+        LibraryCommand::Stats(args) => {
+            let include_trashed = args.include_trashed;
+            let stats = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                library.get_stats_with_trashed(include_trashed)
+            })
+            .await?;
+            let seed = Some(EnvelopeMetaSeed {
+                count: None,
+                total: Some(stats.total_items),
+                trash_policy: Some(trash_policy(include_trashed)),
+            });
+            CommandOutput::new(ctx, stats, seed, print_stats)
         }
         LibraryCommand::Citekey(args) => {
+            let library = ctx.local_library()?;
             let match_opt = match library.search_by_citation_key(&args.citekey)? {
                 Some(result) => Some(result),
                 None => {
@@ -105,6 +166,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             })
         }
         LibraryCommand::Tags => {
+            let library = ctx.local_library()?;
             let tags = library.get_tags()?;
             CommandOutput::new(ctx, tags, None, |tags| {
                 for tag in tags {
@@ -113,6 +175,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             })
         }
         LibraryCommand::Libraries => {
+            let library = ctx.local_library()?;
             let libraries = library.get_libraries()?;
             CommandOutput::new(ctx, libraries, None, |libraries| {
                 for entry in libraries {
@@ -136,6 +199,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             })
         }
         LibraryCommand::Feeds => {
+            let library = ctx.local_library()?;
             let feeds = library.get_feeds()?;
             CommandOutput::new(ctx, feeds, None, |feeds| {
                 if feeds.is_empty() {
@@ -149,11 +213,13 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             })
         }
         LibraryCommand::FeedItems(args) => {
+            let library = ctx.local_library()?;
             let items =
                 library.get_feed_items(args.library_id, resolved_output_limit(args.limit))?;
             CommandOutput::new(ctx, items, None, |items| print_items(items))
         }
         LibraryCommand::SemanticSearch(args) => {
+            let library = ctx.local_library()?;
             let hits = semantic_search(ctx, &library, args).await?;
             CommandOutput::new(ctx, hits, None, |hits| {
                 for hit in hits {
@@ -183,16 +249,25 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             })
         }
         LibraryCommand::Duplicates(args) => {
-            let groups = library.find_duplicates(
-                args.method.into(),
-                args.collection.as_deref(),
-                resolved_output_limit(args.limit),
-            )?;
-            CommandOutput::new(ctx, groups, None, |groups| {
-                for group in groups {
+            let method = args.method.into();
+            let collection = args.collection;
+            let limit = resolved_output_limit(args.limit);
+            let candidate_budget = validate_candidate_budget(args.candidate_budget)?;
+            let scan = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                library.find_duplicates(method, collection.as_deref(), limit, candidate_budget)
+            })
+            .await?;
+            CommandOutput::new(ctx, scan, None, |scan| {
+                for group in &scan.groups {
                     println!("{} ({:.2})", group.match_type, group.score);
                     print_items(&group.items);
                     println!();
+                }
+                if scan.truncated {
+                    println!(
+                        "Warning: duplicate candidate scan was truncated at budget {}.",
+                        scan.candidate_budget
+                    );
                 }
             })
         }
@@ -207,12 +282,22 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             })
         }
         LibraryCommand::Dedupe(args) => {
-            let groups = library.find_duplicates(
-                args.method.into(),
-                args.collection.as_deref(),
-                args.limit,
-            )?;
-            let plan = build_dedupe_plan(&library, &groups, args.include_low_confidence)?;
+            let method = args.method.into();
+            let collection = args.collection;
+            let limit = args.limit;
+            let candidate_budget = validate_candidate_budget(args.candidate_budget)?;
+            let include_low_confidence = args.include_low_confidence;
+            let plan = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
+                let scan = library.find_duplicates(
+                    method,
+                    collection.as_deref(),
+                    limit,
+                    candidate_budget,
+                )?;
+                ensure_complete_duplicate_scan(&scan)?;
+                build_dedupe_plan(&library, &scan.groups, include_low_confidence)
+            })
+            .await?;
             if args.confirm {
                 // Only the apply path needs write credentials; the default
                 // dry-run stays fully local.
@@ -247,6 +332,7 @@ async fn handle_saved_search(
             let seed = Some(EnvelopeMetaSeed {
                 count: Some(searches.len()),
                 total: Some(searches.len()),
+                trash_policy: None,
             });
             CommandOutput::new(ctx, searches, seed, |searches| {
                 if searches.is_empty() {
@@ -447,7 +533,7 @@ mod tests {
 
     use super::{
         create_saved_search, delete_saved_searches, effective_semantic_index_limit,
-        truncate_semantic_index_items,
+        ensure_complete_duplicate_scan, truncate_semantic_index_items, validate_candidate_budget,
     };
     use crate::cli::{LibrarySavedSearchCreateArgs, LibrarySavedSearchDeleteArgs};
     use crate::context::AppContext;
@@ -477,6 +563,29 @@ mod tests {
     fn truncate_semantic_index_items_applies_collection_limit() {
         let limited = truncate_semantic_index_items(vec![1, 2, 3], 2);
         assert_eq!(limited, vec![1, 2]);
+    }
+
+    #[test]
+    fn truncated_duplicate_scan_fails_before_dedupe_can_build_a_writer() {
+        let scan = zot_core::DuplicateScanResult {
+            groups: Vec::new(),
+            scanned_count: 10_000,
+            candidate_pair_count: 25,
+            skipped_oversize_blocks: 1,
+            threshold: 0.92,
+            candidate_budget: 25,
+            truncated: true,
+        };
+
+        let error =
+            ensure_complete_duplicate_scan(&scan).expect_err("truncated scan must fail closed");
+        assert_eq!(error.payload().code, "duplicate-scan-truncated");
+    }
+
+    #[test]
+    fn zero_candidate_budget_fails_before_local_database_open() {
+        let error = validate_candidate_budget(0).expect_err("zero budget must fail");
+        assert_eq!(error.payload().code, "duplicate-candidate-budget");
     }
 
     #[test]

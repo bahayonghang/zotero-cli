@@ -15,7 +15,9 @@ stability, and safety around writes matter more than clever abstractions.
   modules — the decision lives once inside `CommandOutput::new`.
 - Preserve human output helpers in `format.rs` for table/text output rather
   than open-coding repeated printing in command modules.
-- Offload blocking PDF backend calls through `util::run_pdf`.
+- Offload blocking PDF backend calls through `util::run_pdf`. Offload the
+  named heavy SQLite paths through `util::run_local`, which must open
+  `LocalLibrary` inside the blocking closure.
 - Keep workspace dependency declarations centralized. The
   `workspace_version_guard` integration test verifies root internal path
   dependencies and member `.workspace = true` inheritance.
@@ -56,6 +58,7 @@ assembles stable envelope metadata (`count`, `total`, active profile,
 let seed = Some(EnvelopeMetaSeed {
     count: Some(items.len()),
     total: Some(total),
+    trash_policy: Some("excluded".to_string()),
 });
 CommandOutput::new(ctx, items, seed, |items| print_items(items))
 ```
