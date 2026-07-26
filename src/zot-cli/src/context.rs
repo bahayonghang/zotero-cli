@@ -37,12 +37,17 @@ impl fmt::Debug for AppContext {
 
 impl AppContext {
     pub(crate) fn from_cli(cli: &Cli) -> Result<Self> {
+        Self::from_cli_with_config(cli, AppConfig::load_raw()?)
+    }
+
+    fn from_cli_with_config(cli: &Cli, raw: AppConfig) -> Result<Self> {
         let scope = zot_core::parse_library_scope(&cli.library)?;
-        let config = AppConfig::load(cli.profile.as_deref())?;
+        let (config, profile) = raw.into_effective(cli.profile.as_deref());
+        let json = cli.json || config.output.default_format == "json";
         let http = Arc::new(HttpRuntime::new()?);
         Ok(Self {
-            json: cli.json,
-            profile: cli.profile.clone(),
+            json,
+            profile,
             scope,
             config,
             http,
@@ -81,7 +86,7 @@ impl AppContext {
         ZoteroRemote::new(
             &self.http,
             library_id,
-            &self.config.zotero.api_key,
+            self.config.zotero.api_key.expose_secret(),
             self.scope.clone(),
         )
     }
@@ -95,7 +100,7 @@ impl AppContext {
             LibraryScope::User => "user".to_string(),
             LibraryScope::Group { group_id } => format!("group-{group_id}"),
         };
-        AppConfig::config_dir()
+        AppConfig::state_dir()
             .join("indexes")
             .join(format!("{scope}.idx.sqlite"))
     }
@@ -103,8 +108,50 @@ impl AppContext {
     /// Markdown cache for library-wide PDF text extraction, colocated here
     /// with [`Self::library_index_path`] so sidecar paths have one owner.
     pub(crate) fn library_md_cache_path(&self) -> PathBuf {
-        AppConfig::config_dir()
+        AppConfig::state_dir()
             .join("cache")
             .join("library_md_cache.sqlite")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+    use zot_core::config::{OutputConfig, ProfileConfig};
+
+    use super::*;
+
+    #[test]
+    fn default_profile_controls_context_metadata_and_output_mode() {
+        let cli = Cli::try_parse_from(["zot", "doctor"]).expect("parse cli");
+        let mut raw = AppConfig::default();
+        raw.profile.insert(
+            "work".to_string(),
+            ProfileConfig {
+                output: OutputConfig {
+                    default_format: "json".to_string(),
+                    limit: 17,
+                },
+                ..ProfileConfig::default()
+            },
+        );
+        raw.set_default_profile(Some("work"));
+
+        let context = AppContext::from_cli_with_config(&cli, raw).expect("build context");
+
+        assert!(context.json);
+        assert_eq!(context.profile.as_deref(), Some("work"));
+        assert_eq!(context.config.output.limit, 17);
+    }
+
+    #[test]
+    fn context_debug_never_exposes_secret_canary() {
+        let cli = Cli::try_parse_from(["zot", "doctor"]).expect("parse cli");
+        let mut raw = AppConfig::default();
+        raw.zotero.api_key = "context-secret-canary".into();
+
+        let context = AppContext::from_cli_with_config(&cli, raw).expect("build context");
+
+        assert!(!format!("{context:?}").contains("context-secret-canary"));
     }
 }

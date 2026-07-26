@@ -1,7 +1,7 @@
 use anyhow::Result;
 use zot_local::PdfBackend;
 
-use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand};
+use crate::cli::{AnnotationCreateAreaArgs, ItemAnnotationCommand, resolved_output_limit};
 use crate::context::AppContext;
 use crate::output::CommandOutput;
 use crate::util::{require_pdf_attachment, run_pdf};
@@ -14,7 +14,7 @@ pub(crate) async fn handle(
         ItemAnnotationCommand::List(args) => {
             let annotations = ctx
                 .local_library()?
-                .get_annotations(args.item_key.as_deref(), args.limit)?;
+                .get_annotations(args.item_key.as_deref(), resolved_output_limit(args.limit))?;
             CommandOutput::new(ctx, annotations, None, |annotations| {
                 if annotations.is_empty() {
                     println!("No annotations found.");
@@ -31,7 +31,7 @@ pub(crate) async fn handle(
         ItemAnnotationCommand::Search(args) => {
             let annotations = ctx
                 .local_library()?
-                .search_annotations(&args.query, args.limit)?;
+                .search_annotations(&args.query, resolved_output_limit(args.limit))?;
             CommandOutput::new(ctx, annotations, None, |annotations| {
                 if annotations.is_empty() {
                     println!("No annotations found.");

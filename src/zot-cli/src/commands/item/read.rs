@@ -5,7 +5,7 @@ use zot_local::{PdfBackend, PdfCache};
 
 use crate::cli::{
     ItemChildrenArgs, ItemCiteArgs, ItemDeletedArgs, ItemDownloadArgs, ItemExportArgs, ItemKeyArgs,
-    ItemOpenArgs, ItemPdfArgs, ItemRelatedArgs, ItemVersionsArgs,
+    ItemOpenArgs, ItemPdfArgs, ItemRelatedArgs, ItemVersionsArgs, resolved_output_limit,
 };
 use crate::context::AppContext;
 use crate::format::{print_item, print_items};
@@ -35,7 +35,7 @@ pub(crate) async fn handle_related(
     args: ItemRelatedArgs,
 ) -> Result<CommandOutput> {
     let library = ctx.local_library()?;
-    let items = library.get_related_items(&args.key, args.limit)?;
+    let items = library.get_related_items(&args.key, resolved_output_limit(args.limit))?;
     CommandOutput::new(ctx, items, None, |items| print_items(items))
 }
 
@@ -166,7 +166,9 @@ pub(crate) async fn handle_deleted(
     ctx: &AppContext,
     args: ItemDeletedArgs,
 ) -> Result<CommandOutput> {
-    let items = ctx.local_library()?.get_trash_items(args.limit)?;
+    let items = ctx
+        .local_library()?
+        .get_trash_items(resolved_output_limit(args.limit))?;
     CommandOutput::new(ctx, items, None, |items| print_items(items))
 }
 

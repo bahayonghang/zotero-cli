@@ -9,7 +9,7 @@ use zot_remote::EmbeddingClient;
 
 use crate::cli::{
     WorkspaceCommand, WorkspaceExportArgs, WorkspaceImportArgs, WorkspaceQueryArgs,
-    WorkspaceSearchArgs,
+    WorkspaceSearchArgs, resolved_output_limit,
 };
 use crate::context::AppContext;
 use crate::format::{print_items, print_query_chunks, print_workspace, to_pretty_json};
@@ -41,7 +41,8 @@ pub(crate) async fn handle(ctx: &AppContext, command: WorkspaceCommand) -> Resul
         }
         WorkspaceCommand::Show(args) => {
             let name = WorkspaceName::parse(&args.name)?;
-            let workspace = store.load(&name)?;
+            let mut workspace = store.load(&name)?;
+            workspace.items.truncate(resolved_output_limit(args.limit));
             CommandOutput::new(ctx, workspace, None, print_workspace)
         }
         WorkspaceCommand::Add(args) => {
@@ -245,7 +246,7 @@ async fn query_workspace(
         &args.question,
         mode,
         embedding.as_deref(),
-        args.limit,
+        resolved_output_limit(args.limit),
     )?;
     CommandOutput::new(ctx, chunks, None, |chunks| print_query_chunks(chunks))
 }

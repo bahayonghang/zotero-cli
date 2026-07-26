@@ -170,3 +170,71 @@ apply_all_and_record(&writer, plan).await
   boundaries without fallback?
 - If `skills/zot` changed, were mirrors regenerated and `just skills-check`
   run instead of editing mirror files directly?
+
+## Scenario: Effective config options and doctor write capability
+
+### 1. Scope / Trigger
+
+- Trigger: changing `--json`, `--profile`, result `--limit`, config output fields, or doctor Web-write fields.
+- Why: agent envelopes must describe the options actually used, while output defaults must not weaken write ceilings.
+
+### 2. Signatures
+
+```rust
+AppConfig::into_effective(profile) -> (AppConfig, Option<String>)
+Cli::resolve_effective_options(configured_limit) -> Result<(), ZotError>
+AppContext { json, profile, config, .. }
+```
+
+Doctor Web-write payload:
+
+```json
+{"configured": true, "verified": false, "permissions": null,
+ "last_error": null, "checked": "credentials-only"}
+```
+
+### 3. Contracts
+
+- Explicit profile wins; otherwise envelope `meta.profile` contains the materialized default profile.
+- `--json` enables JSON; configured `output-format=json` is the default for success, runtime errors, and protocol rejection.
+- Configured `output-limit` fills only whitelisted read-result commands with no explicit limit.
+- Index, dedupe, tag-batch, and sync limits remain command-owned safety/workload bounds.
+- Doctor does not emit `available` for credential-only Web checks and does not claim verification.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| explicit/profile output limit zero | `config-value` before dispatch |
+| configured JSON on server/raw command | `json-protocol-unsupported` before command I/O |
+| profile init includes root-only key | `config-key`, no saved partial mutation |
+| Web credentials exist but unprobed | `configured=true`, `verified=false` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: default profile selects JSON and limit 17; an explicit `--limit 3` remains 3.
+- Base: root config defaults to table and limit 50.
+- Bad: replace every field named `limit`, report credentials as `available`, or keep only explicit CLI profile in metadata.
+
+### 6. Tests Required
+
+- Unit tests cover default/explicit profile, configured/explicit limits, zero rejection, and excluded write/index commands.
+- Context Debug uses a secret canary.
+- Doctor schema asserts all five fields and absence of `available`.
+- JSON integration tests retain one-document success/error and protocol rejection.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```rust
+ctx.profile = cli.profile.clone();
+args.limit = config.output.limit; // also overwrites write ceilings
+```
+
+Correct:
+
+```rust
+let (config, profile) = raw.into_effective(cli.profile.as_deref());
+cli.resolve_effective_options(config.output.limit)?; // exhaustive read whitelist
+```

@@ -1,9 +1,12 @@
 use std::env;
+use std::fmt;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
 
 use crate::error::{ZotError, ZotResult};
 
@@ -32,12 +35,61 @@ impl LibraryScope {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct SecretString(String);
+
+impl SecretString {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn expose_secret(&self) -> &str {
+        &self.0
+    }
+
+    pub fn set(&mut self, value: String) {
+        self.0 = value;
+    }
+}
+
+impl fmt::Debug for SecretString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_empty() {
+            f.write_str("SecretString(empty)")
+        } else {
+            f.write_str("SecretString([REDACTED])")
+        }
+    }
+}
+
+impl From<String> for SecretString {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+impl From<&str> for SecretString {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputConfig {
     #[serde(default = "default_format")]
     pub default_format: String,
     #[serde(default = "default_limit")]
     pub limit: usize,
+}
+
+impl Default for OutputConfig {
+    fn default() -> Self {
+        Self {
+            default_format: default_format(),
+            limit: default_limit(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -51,7 +103,7 @@ pub struct EmbeddingConfig {
     #[serde(default = "default_embedding_url")]
     pub url: String,
     #[serde(default)]
-    pub api_key: String,
+    pub api_key: SecretString,
     #[serde(default = "default_embedding_model")]
     pub model: String,
 }
@@ -60,7 +112,7 @@ impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
             url: default_embedding_url(),
-            api_key: String::new(),
+            api_key: SecretString::default(),
             model: default_embedding_model(),
         }
     }
@@ -76,7 +128,7 @@ impl EmbeddingConfig {
             self.url = value;
         }
         if let Ok(value) = env::var("ZOT_EMBEDDING_KEY") {
-            self.api_key = value;
+            self.api_key.set(value);
         }
         if let Ok(value) = env::var("ZOT_EMBEDDING_MODEL") {
             self.model = value;
@@ -91,9 +143,9 @@ pub struct ZoteroConfig {
     #[serde(default)]
     pub library_id: String,
     #[serde(default)]
-    pub api_key: String,
+    pub api_key: SecretString,
     #[serde(default)]
-    pub semantic_scholar_api_key: String,
+    pub semantic_scholar_api_key: SecretString,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -103,9 +155,9 @@ pub struct ProfileConfig {
     #[serde(default)]
     pub library_id: String,
     #[serde(default)]
-    pub api_key: String,
+    pub api_key: SecretString,
     #[serde(default)]
-    pub semantic_scholar_api_key: String,
+    pub semantic_scholar_api_key: SecretString,
     #[serde(default)]
     pub output: OutputConfig,
     #[serde(default)]
@@ -129,18 +181,22 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub fn config_dir() -> PathBuf {
+    pub fn config_dir() -> ZotResult<PathBuf> {
+        config_dir_from(dirs::config_dir())
+    }
+
+    pub fn config_file() -> ZotResult<PathBuf> {
+        Ok(Self::config_dir()?.join(CONFIG_FILE_NAME))
+    }
+
+    pub fn state_dir() -> PathBuf {
         dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
+            .unwrap_or_else(env::temp_dir)
             .join(CONFIG_DIR_NAME)
     }
 
-    pub fn config_file() -> PathBuf {
-        Self::config_dir().join(CONFIG_FILE_NAME)
-    }
-
     pub fn load_raw() -> ZotResult<Self> {
-        let path = Self::config_file();
+        let path = Self::config_file()?;
         if !path.exists() {
             return Ok(Self::default());
         }
@@ -148,40 +204,93 @@ impl AppConfig {
             path: path.clone(),
             source,
         })?;
-        let parsed: Self = toml::from_str(&raw).map_err(|source| ZotError::ConfigParse {
+        let mut parsed: Self = toml::from_str(&raw).map_err(|source| ZotError::ConfigParse {
             path: path.clone(),
             detail: source.to_string(),
         })?;
+        parsed.normalize_legacy_output_defaults();
+        parsed.validate()?;
         Ok(parsed)
     }
 
     pub fn load(profile: Option<&str>) -> ZotResult<Self> {
-        Ok(Self::load_raw()?.materialize_profile(profile))
+        Self::load_effective(profile).map(|(config, _)| config)
+    }
+
+    pub fn load_effective(profile: Option<&str>) -> ZotResult<(Self, Option<String>)> {
+        let raw = Self::load_raw()?;
+        Ok(raw.into_effective(profile))
+    }
+
+    pub fn into_effective(self, profile: Option<&str>) -> (Self, Option<String>) {
+        let effective_profile = self.effective_profile_name(profile);
+        (self.materialize_profile(profile), effective_profile)
     }
 
     pub fn save(&self) -> ZotResult<PathBuf> {
-        let path = Self::config_file();
-        ensure_config_dir()?;
+        let path = Self::config_file()?;
+        self.save_to(&path)?;
+        Ok(path)
+    }
+
+    fn save_to(&self, path: &Path) -> ZotResult<()> {
+        self.validate()?;
         let encoded = toml::to_string_pretty(self).map_err(|source| ZotError::ConfigParse {
-            path: path.clone(),
+            path: path.to_path_buf(),
             detail: source.to_string(),
         })?;
-        std::fs::write(&path, encoded).map_err(|source| ZotError::Io {
-            path: path.clone(),
+        let dir = path.parent().ok_or_else(|| ZotError::InvalidInput {
+            code: "config-dir-unavailable".to_string(),
+            message: "Config file has no parent directory".to_string(),
+            hint: Some("Use the platform user configuration directory".to_string()),
+        })?;
+        std::fs::create_dir_all(dir).map_err(|source| ZotError::Io {
+            path: dir.to_path_buf(),
             source,
         })?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
+        write_config_atomically(path, encoded.as_bytes())
+    }
 
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).map_err(
-                |source| ZotError::Io {
-                    path: path.clone(),
-                    source,
-                },
-            )?;
+    fn validate(&self) -> ZotResult<()> {
+        Self::validate_output(&self.output)?;
+        for profile in self.profile.values() {
+            Self::validate_output(&profile.output)?;
         }
-        Ok(path)
+        Ok(())
+    }
+
+    fn normalize_legacy_output_defaults(&mut self) {
+        Self::normalize_output(&mut self.output);
+        for profile in self.profile.values_mut() {
+            Self::normalize_output(&mut profile.output);
+        }
+    }
+
+    fn normalize_output(output: &mut OutputConfig) {
+        if output.default_format.is_empty() {
+            output.default_format = default_format();
+        }
+        if output.limit == 0 {
+            output.limit = default_limit();
+        }
+    }
+
+    fn validate_output(output: &OutputConfig) -> ZotResult<()> {
+        if !matches!(output.default_format.as_str(), "table" | "json") {
+            return Err(ZotError::InvalidInput {
+                code: "config-value".to_string(),
+                message: format!("Invalid output format '{}'", output.default_format),
+                hint: Some("Use 'table' or 'json'".to_string()),
+            });
+        }
+        if output.limit == 0 {
+            return Err(ZotError::InvalidInput {
+                code: "config-value".to_string(),
+                message: "Output limit must be greater than zero".to_string(),
+                hint: Some("Set output-limit to a positive integer".to_string()),
+            });
+        }
+        Ok(())
     }
 
     fn materialize_profile(mut self, profile_name: Option<&str>) -> Self {
@@ -213,13 +322,13 @@ impl AppConfig {
             self.zotero.library_id = value;
         }
         if let Ok(value) = env::var("ZOT_API_KEY") {
-            self.zotero.api_key = value;
+            self.zotero.api_key.set(value);
         }
         if let Ok(value) = env::var("SEMANTIC_SCHOLAR_API_KEY") {
-            self.zotero.semantic_scholar_api_key = value;
+            self.zotero.semantic_scholar_api_key.set(value);
         }
         if let Ok(value) = env::var("S2_API_KEY") {
-            self.zotero.semantic_scholar_api_key = value;
+            self.zotero.semantic_scholar_api_key.set(value);
         }
     }
 
@@ -229,7 +338,7 @@ impl AppConfig {
 
     pub fn semantic_scholar_key(&self) -> Option<&str> {
         (!self.zotero.semantic_scholar_api_key.is_empty())
-            .then_some(self.zotero.semantic_scholar_api_key.as_str())
+            .then_some(self.zotero.semantic_scholar_api_key.expose_secret())
     }
 
     pub fn default_profile_name(&self) -> Option<&str> {
@@ -328,10 +437,12 @@ fn windows_registry_data_dir() -> Option<PathBuf> {
 }
 
 pub fn redact_secret(value: &str) -> String {
-    if value.len() <= 4 {
+    let mut chars = value.chars().rev();
+    let suffix = chars.by_ref().take(4).collect::<Vec<_>>();
+    if chars.next().is_none() {
         return "(set)".to_string();
     }
-    format!("***{}", &value[value.len() - 4..])
+    format!("***{}", suffix.into_iter().rev().collect::<String>())
 }
 
 fn default_format() -> String {
@@ -355,12 +466,68 @@ fn default_embedding_model() -> String {
 }
 
 pub fn ensure_config_dir() -> ZotResult<PathBuf> {
-    let dir = AppConfig::config_dir();
+    let dir = AppConfig::config_dir()?;
     std::fs::create_dir_all(&dir).map_err(|source| ZotError::Io {
         path: dir.clone(),
         source,
     })?;
     Ok(dir)
+}
+
+fn config_dir_from(base: Option<PathBuf>) -> ZotResult<PathBuf> {
+    base.map(|path| path.join(CONFIG_DIR_NAME))
+        .ok_or_else(|| ZotError::InvalidInput {
+            code: "config-dir-unavailable".to_string(),
+            message: "Platform user configuration directory is unavailable".to_string(),
+            hint: Some("Set up a user home/configuration directory and retry".to_string()),
+        })
+}
+
+fn write_config_atomically(path: &Path, contents: &[u8]) -> ZotResult<()> {
+    let dir = path.parent().ok_or_else(|| ZotError::InvalidInput {
+        code: "config-dir-unavailable".to_string(),
+        message: "Config file has no parent directory".to_string(),
+        hint: Some("Use the platform user configuration directory".to_string()),
+    })?;
+    let mut temp = NamedTempFile::new_in(dir).map_err(|source| ZotError::Io {
+        path: dir.to_path_buf(),
+        source,
+    })?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        temp.as_file()
+            .set_permissions(std::fs::Permissions::from_mode(0o600))
+            .map_err(|source| ZotError::Io {
+                path: temp.path().to_path_buf(),
+                source,
+            })?;
+    }
+    temp.write_all(contents).map_err(|source| ZotError::Io {
+        path: temp.path().to_path_buf(),
+        source,
+    })?;
+    temp.flush().map_err(|source| ZotError::Io {
+        path: temp.path().to_path_buf(),
+        source,
+    })?;
+    temp.as_file().sync_all().map_err(|source| ZotError::Io {
+        path: temp.path().to_path_buf(),
+        source,
+    })?;
+    temp.persist(path).map_err(|error| ZotError::Io {
+        path: path.to_path_buf(),
+        source: error.error,
+    })?;
+    #[cfg(unix)]
+    std::fs::File::open(dir)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|source| ZotError::Io {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+    Ok(())
 }
 
 pub fn canonicalize_or_original(path: &Path) -> PathBuf {
@@ -413,5 +580,87 @@ mod tests {
             config.effective_profile_name(None),
             Some("default".to_string())
         );
+    }
+
+    #[test]
+    fn secret_debug_is_redacted_and_toml_round_trips() {
+        let canary = "secret-canary-1234";
+        let mut config = AppConfig::default();
+        config.zotero.api_key = canary.into();
+        config.zotero.semantic_scholar_api_key = canary.into();
+        config.embedding.api_key = canary.into();
+        config.profile.insert(
+            "work".to_string(),
+            ProfileConfig {
+                api_key: canary.into(),
+                semantic_scholar_api_key: canary.into(),
+                ..ProfileConfig::default()
+            },
+        );
+
+        assert!(!format!("{config:?}").contains(canary));
+        let encoded = toml::to_string(&config).expect("serialize config");
+        let decoded: AppConfig = toml::from_str(&encoded).expect("deserialize config");
+        assert_eq!(decoded.zotero.api_key.expose_secret(), canary);
+        assert_eq!(decoded.embedding.api_key.expose_secret(), canary);
+    }
+
+    #[test]
+    fn config_path_fails_closed_without_platform_directory() {
+        let error = config_dir_from(None).expect_err("missing config dir must fail");
+        assert_eq!(error.payload().code, "config-dir-unavailable");
+    }
+
+    #[test]
+    fn redacts_unicode_secrets_on_character_boundaries() {
+        assert_eq!(redact_secret("abcd"), "(set)");
+        assert_eq!(redact_secret("abcde"), "***bcde");
+        assert_eq!(redact_secret("密钥甲乙丙丁戊"), "***乙丙丁戊");
+        assert_eq!(redact_secret("a🔒b密c钥"), "***b密c钥");
+    }
+
+    #[test]
+    fn save_to_replaces_existing_config_without_temp_residue() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join(CONFIG_FILE_NAME);
+        std::fs::write(&path, "old contents").expect("write old config");
+        let mut config = AppConfig::default();
+        config.zotero.api_key = "replacement-secret".into();
+
+        config.save_to(&path).expect("atomic save");
+
+        let saved = std::fs::read_to_string(&path).expect("read saved config");
+        assert!(saved.contains("replacement-secret"));
+        let entries = std::fs::read_dir(dir.path())
+            .expect("read config dir")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect config dir");
+        assert_eq!(entries.len(), 1);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let mode = std::fs::metadata(&path)
+                .expect("config metadata")
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+    }
+
+    #[test]
+    fn normalizes_legacy_empty_output_defaults_before_validation() {
+        let mut config: AppConfig = toml::from_str(
+            "[output]\ndefault_format = ''\nlimit = 0\n[profile.work.output]\ndefault_format = ''\nlimit = 0\n",
+        )
+        .expect("parse legacy output config");
+
+        config.normalize_legacy_output_defaults();
+        config.validate().expect("normalized config is valid");
+
+        assert_eq!(config.output.default_format, "table");
+        assert_eq!(config.output.limit, 50);
+        assert_eq!(config.profile["work"].output.default_format, "table");
+        assert_eq!(config.profile["work"].output.limit, 50);
     }
 }

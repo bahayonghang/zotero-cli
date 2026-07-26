@@ -537,7 +537,7 @@ impl PdfCache {
 }
 
 fn default_cache_path() -> PathBuf {
-    zot_core::AppConfig::config_dir()
+    zot_core::AppConfig::state_dir()
         .join("cache")
         .join("pdf_cache.sqlite")
 }

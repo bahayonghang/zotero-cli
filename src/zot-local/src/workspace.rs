@@ -1046,7 +1046,7 @@ pub fn chunk_text(text: &str, paper_title: &str, max_tokens: usize, overlap: usi
 }
 
 fn default_workspaces_dir() -> PathBuf {
-    zot_core::AppConfig::config_dir().join("workspaces")
+    zot_core::AppConfig::state_dir().join("workspaces")
 }
 
 fn repeat_placeholders(count: usize) -> String {

@@ -68,16 +68,16 @@
 
 ## Acceptance Criteria
 
-- [ ] AC1: secret canary 在 `SecretString`、各配置结构和 `AppContext` 的 Debug/错误输出中均不可见；TOML round-trip 仍保持原值。
-- [ ] AC2: 原子 save 覆盖已有配置成功，无残留临时文件；Unix 文件 mode 为 `0600`，失败路径不预先破坏目标。
-- [ ] AC3: 缺少系统配置目录的测试 helper 返回 `config-dir-unavailable`，且路径不含 `.`/CWD fallback。
-- [ ] AC4: `redact_secret` 对 ASCII、中文和 emoji 边界均不 panic，并符合四字符尾部契约。
-- [ ] AC5: 显式与默认 profile 的优先级正确，成功/运行期错误 envelope 均携带实际 profile。
-- [ ] AC6: `output.default_format=json` 在未传 `--json` 时产生 JSON，并对 `graph serve`/`completions` 执行协议拒绝；显式 `--json` 行为不回归。
-- [ ] AC7: 配置 limit 只补全白名单只读命令；显式 `--limit` 优先，写入和索引命令默认值不变。
-- [ ] AC8: doctor Web 写能力不再输出 `available`，并稳定输出 `configured/verified/permissions/last_error/checked`。
-- [ ] AC9: profile init 携带 root-only key 时 fail-fast，配置对象和默认 profile 均不发生部分变更。
-- [ ] AC10: `cargo test -p zot-core`、配置/CLI/doctor 聚焦测试和 `just ci` 全部通过。
+- [x] AC1: secret canary 在 `SecretString`、各配置结构和 `AppContext` 的 Debug/错误输出中均不可见；TOML round-trip 仍保持原值。
+- [x] AC2: 原子 save 覆盖已有配置成功，无残留临时文件；Unix 文件 mode 为 `0600`，失败路径不预先破坏目标。
+- [x] AC3: 缺少系统配置目录的测试 helper 返回 `config-dir-unavailable`，且路径不含 `.`/CWD fallback。
+- [x] AC4: `redact_secret` 对 ASCII、中文和 emoji 边界均不 panic，并符合四字符尾部契约。
+- [x] AC5: 显式与默认 profile 的优先级正确，成功/运行期错误 envelope 均携带实际 profile。
+- [x] AC6: `output.default_format=json` 在未传 `--json` 时产生 JSON，并对 `graph serve`/`completions` 执行协议拒绝；显式 `--json` 行为不回归。
+- [x] AC7: 配置 limit 只补全白名单只读命令；显式 `--limit` 优先，写入和索引命令默认值不变。
+- [x] AC8: doctor Web 写能力不再输出 `available`，并稳定输出 `configured/verified/permissions/last_error/checked`。
+- [x] AC9: profile init 携带 root-only key 时 fail-fast，配置对象和默认 profile 均不发生部分变更。
+- [x] AC10: `cargo test -p zot-core`、配置/CLI/doctor 聚焦测试和 `just ci` 全部通过。
 
 ## Out Of Scope
 

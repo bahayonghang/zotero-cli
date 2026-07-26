@@ -51,14 +51,14 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let connector = ctx.connector()?;
     let local_http = connector.probe_local_http().await;
     let connector_ping = connector.ping().await;
-    let migration_hint =
-        legacy_bridge_config_present(&AppConfig::config_file()).then_some(LEGACY_BRIDGE_HINT);
+    let config_file = AppConfig::config_file()?;
+    let migration_hint = legacy_bridge_config_present(&config_file).then_some(LEGACY_BRIDGE_HINT);
     let local_sqlite_available = library.is_ok();
     let web_write_configured = ctx.config.write_credentials_configured();
     let pdf_available = pdf_status.available;
     let semantic_status = library::semantic_status(ctx).await.ok();
     let payload = serde_json::json!({
-        "config_file": AppConfig::config_file(),
+        "config_file": &config_file,
         "data_dir": data_dir,
         "db_exists": db_path.exists(),
         "write_credentials": write_credentials_payload(&ctx.config),
@@ -97,7 +97,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let connector_write_label = capability_label(&connector_ping);
     CommandOutput::new(ctx, payload, None, move |_| {
         println!("{DOCTOR_BANNER}");
-        println!("Config: {}", AppConfig::config_file().display());
+        println!("Config: {}", config_file.display());
         println!("Data dir: {}", data_dir.display());
         println!("Database exists: {}", db_path.exists());
         println!("Write credentials: {write_creds_label}");
@@ -211,7 +211,9 @@ fn web_write_capability(config: &AppConfig) -> serde_json::Value {
     let configured = config.write_credentials_configured();
     serde_json::json!({
         "configured": configured,
-        "available": configured,
+        "verified": false,
+        "permissions": serde_json::Value::Null,
+        "last_error": serde_json::Value::Null,
         "checked": "credentials-only",
         "hint": if configured {
             serde_json::Value::Null
@@ -259,7 +261,7 @@ fn write_credentials_payload(config: &AppConfig) -> serde_json::Value {
     serde_json::json!({
         "configured": config.write_credentials_configured(),
         "library_id": if config.zotero.library_id.is_empty() { "(missing)".to_string() } else { config.zotero.library_id.clone() },
-        "api_key": if config.zotero.api_key.is_empty() { "(missing)".to_string() } else { redact_secret(&config.zotero.api_key) },
+        "api_key": if config.zotero.api_key.is_empty() { "(missing)".to_string() } else { redact_secret(config.zotero.api_key.expose_secret()) },
         "required_for_local_read": false,
         "required_for_remote_write": true,
         "note": "Optional for local reads; required only for Zotero Web API writes.",
@@ -371,8 +373,11 @@ mod tests {
     fn web_capability_is_credentials_only() {
         let payload = web_write_capability(&AppConfig::default());
         assert_eq!(payload["configured"], false);
-        assert_eq!(payload["available"], false);
+        assert_eq!(payload["verified"], false);
+        assert_eq!(payload["permissions"], serde_json::Value::Null);
+        assert_eq!(payload["last_error"], serde_json::Value::Null);
         assert_eq!(payload["checked"], "credentials-only");
+        assert!(payload.get("available").is_none());
     }
 
     #[test]

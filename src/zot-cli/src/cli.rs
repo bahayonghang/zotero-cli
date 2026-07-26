@@ -146,6 +146,78 @@ impl Cli {
             None => Ok(()),
         }
     }
+
+    pub(crate) fn resolve_effective_options(
+        &mut self,
+        configured_limit: usize,
+    ) -> Result<(), zot_core::ZotError> {
+        match &mut self.command {
+            Commands::Library { command } => match command {
+                LibraryCommand::Search(args) => resolve_limit(&mut args.limit, configured_limit),
+                LibraryCommand::List(args) => resolve_limit(&mut args.limit, configured_limit),
+                LibraryCommand::Recent(args) => resolve_limit(&mut args.limit, configured_limit),
+                LibraryCommand::FeedItems(args) => resolve_limit(&mut args.limit, configured_limit),
+                LibraryCommand::SemanticSearch(args) => {
+                    resolve_limit(&mut args.limit, configured_limit)
+                }
+                LibraryCommand::Duplicates(args) => {
+                    resolve_limit(&mut args.limit, configured_limit)
+                }
+                _ => Ok(()),
+            },
+            Commands::Item { command } => match command {
+                ItemCommand::Related(args) => resolve_limit(&mut args.limit, configured_limit),
+                ItemCommand::Deleted(args) => resolve_limit(&mut args.limit, configured_limit),
+                ItemCommand::Note {
+                    command: ItemNoteCommand::Search(args),
+                } => resolve_limit(&mut args.limit, configured_limit),
+                ItemCommand::Annotation {
+                    command: ItemAnnotationCommand::List(args),
+                } => resolve_limit(&mut args.limit, configured_limit),
+                ItemCommand::Annotation {
+                    command: ItemAnnotationCommand::Search(args),
+                } => resolve_limit(&mut args.limit, configured_limit),
+                ItemCommand::Scite {
+                    command: ItemSciteCommand::Search(args),
+                } => resolve_limit(&mut args.limit, configured_limit),
+                ItemCommand::Scite {
+                    command: ItemSciteCommand::Retractions(args),
+                } => resolve_limit(&mut args.limit, configured_limit),
+                _ => Ok(()),
+            },
+            Commands::Collection {
+                command: CollectionCommand::Search(args),
+            } => resolve_limit(&mut args.limit, configured_limit),
+            Commands::Workspace {
+                command: WorkspaceCommand::Show(args),
+            } => resolve_limit(&mut args.limit, configured_limit),
+            Commands::Workspace {
+                command: WorkspaceCommand::Query(args),
+            } => resolve_limit(&mut args.limit, configured_limit),
+            _ => Ok(()),
+        }
+    }
+}
+
+pub(crate) fn resolved_output_limit(limit: Option<usize>) -> usize {
+    limit.unwrap_or(50)
+}
+
+fn resolve_limit(
+    limit: &mut Option<usize>,
+    configured_limit: usize,
+) -> Result<(), zot_core::ZotError> {
+    if limit.is_some_and(|value| value == 0) || configured_limit == 0 {
+        return Err(zot_core::ZotError::InvalidInput {
+            code: "config-value".to_string(),
+            message: "Output limit must be greater than zero".to_string(),
+            hint: Some("Pass --limit with a positive integer or update output-limit".to_string()),
+        });
+    }
+    if limit.is_none() {
+        *limit = Some(configured_limit);
+    }
+    Ok(())
 }
 
 impl From<SortFieldArg> for SortField {
@@ -202,7 +274,7 @@ impl From<DuplicateMethodArg> for DuplicateMatchMethod {
 mod tests {
     use clap::Parser;
 
-    use super::Cli;
+    use super::{Cli, Commands, ItemCommand, ItemTagCommand, LibraryCommand};
 
     #[test]
     fn parses_new_library_and_item_command_surfaces() {
@@ -342,5 +414,62 @@ mod tests {
                 panic!("cli parse failed for {:?}: {err}", argv);
             }
         }
+    }
+
+    #[test]
+    fn resolves_configured_limit_only_for_read_output_commands() {
+        let mut search =
+            Cli::try_parse_from(["zot", "library", "search", "attention"]).expect("parse search");
+        search
+            .resolve_effective_options(17)
+            .expect("resolve search limit");
+        match search.command {
+            Commands::Library {
+                command: LibraryCommand::Search(args),
+            } => assert_eq!(args.limit, Some(17)),
+            _ => panic!("unexpected search command"),
+        }
+
+        let mut explicit =
+            Cli::try_parse_from(["zot", "library", "search", "attention", "--limit", "3"])
+                .expect("parse explicit search");
+        explicit
+            .resolve_effective_options(17)
+            .expect("resolve explicit search limit");
+        match explicit.command {
+            Commands::Library {
+                command: LibraryCommand::Search(args),
+            } => assert_eq!(args.limit, Some(3)),
+            _ => panic!("unexpected explicit search command"),
+        }
+
+        let mut batch =
+            Cli::try_parse_from(["zot", "item", "tag", "batch", "--add-tag", "reviewed"])
+                .expect("parse tag batch");
+        batch
+            .resolve_effective_options(17)
+            .expect("resolve tag batch options");
+        match batch.command {
+            Commands::Item {
+                command:
+                    ItemCommand::Tag {
+                        command: ItemTagCommand::Batch(args),
+                    },
+            } => assert_eq!(args.limit, 50),
+            _ => panic!("unexpected tag batch command"),
+        }
+    }
+
+    #[test]
+    fn rejects_zero_explicit_output_limit() {
+        let mut cli =
+            Cli::try_parse_from(["zot", "collection", "search", "attention", "--limit", "0"])
+                .expect("parse zero limit");
+
+        let error = cli
+            .resolve_effective_options(17)
+            .expect_err("zero limit must fail");
+
+        assert_eq!(error.payload().code, "config-value");
     }
 }

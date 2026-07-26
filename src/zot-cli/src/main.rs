@@ -34,19 +34,23 @@ async fn main() {
             error.exit();
         }
     };
-    let json = cli.json;
+    let mut json = cli.json;
     let verbose = cli.verbose;
-    let profile = cli.profile.clone();
-    if let Err(err) = run(cli).await {
+    let mut profile = cli.profile.clone();
+    if let Err(err) = run(cli, &mut json, &mut profile).await {
         let error = AppError::runtime(err);
         emit_error(&error, json, verbose, profile.as_deref());
         std::process::exit(1);
     }
 }
 
-async fn run(cli: Cli) -> Result<()> {
-    cli.validate_output_protocol()?;
+async fn run(mut cli: Cli, json: &mut bool, profile: &mut Option<String>) -> Result<()> {
     let ctx = AppContext::from_cli(&cli)?;
+    *json = ctx.json;
+    *profile = ctx.profile.clone();
+    cli.json = ctx.json;
+    cli.validate_output_protocol()?;
+    cli.resolve_effective_options(ctx.config.output.limit)?;
     commands::dispatch(&ctx, cli.command).await
 }
 

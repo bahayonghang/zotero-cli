@@ -51,7 +51,7 @@ impl EmbeddingClient {
         let response = self
             .client
             .post(&self.config.url)
-            .bearer_auth(&self.config.api_key)
+            .bearer_auth(self.config.api_key.expose_secret())
             .json(&json!({
                 "model": self.config.model,
                 "input": texts,

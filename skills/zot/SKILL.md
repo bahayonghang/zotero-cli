@@ -276,7 +276,8 @@ cargo run -q -p zot-cli -- --json doctor
 - `capabilities.local_sqlite_read`
 - `capabilities.local_http_read`
 - `capabilities.connector_write`（仅表示本机 BibTeX/RIS import 能力）
-- `capabilities.web_write`
+- `capabilities.web_write.configured`（只表示凭据存在）
+- `capabilities.web_write.verified`（当前为 `false`，doctor 不联网验证 key/scope/permission）
 - `write_credentials.configured`（只表示 Web API credential，不是 connector 导入能力）
 - `pdf_backend.available`
 - `better_bibtex.available`

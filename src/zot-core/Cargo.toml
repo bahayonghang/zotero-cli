@@ -12,6 +12,7 @@ description = "Shared config, models, errors, and JSON envelope support for zot.
 dirs.workspace = true
 regex.workspace = true
 serde.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 

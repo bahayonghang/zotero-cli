@@ -7,6 +7,7 @@ use zot_remote::{BetterBibTexClient, EmbeddingClient};
 use crate::cli::{
     LibraryCommand, LibrarySavedSearchCommand, LibrarySavedSearchCreateArgs,
     LibrarySavedSearchDeleteArgs, LibrarySemanticIndexArgs, LibrarySemanticSearchArgs,
+    resolved_output_limit,
 };
 use crate::commands::item::merge::{merge_item_set, selected_merge_writer};
 use crate::commands::library_dedupe::{WriterGroupMerger, apply_dedupe_plan, build_dedupe_plan};
@@ -28,7 +29,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 year: args.year,
                 sort: args.sort.map(Into::into),
                 direction: args.direction.into(),
-                limit: args.limit,
+                limit: resolved_output_limit(args.limit),
                 offset: args.offset,
                 exclude_trashed: false,
             })?;
@@ -39,7 +40,11 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
         }
         LibraryCommand::List(args) => {
-            let items = library.list_items(args.collection.as_deref(), args.limit, args.offset)?;
+            let items = library.list_items(
+                args.collection.as_deref(),
+                resolved_output_limit(args.limit),
+                args.offset,
+            )?;
             let seed = Some(EnvelopeMetaSeed {
                 count: Some(items.len()),
                 total: None,
@@ -50,7 +55,11 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             let items = if let Some(count) = args.count {
                 library.get_recent_items_by_count(count)?
             } else if let Some(since) = args.since.as_deref() {
-                library.get_recent_items(since, args.sort.into(), args.limit)?
+                library.get_recent_items(
+                    since,
+                    args.sort.into(),
+                    resolved_output_limit(args.limit),
+                )?
             } else {
                 library.get_recent_items_by_count(10)?
             };
@@ -140,7 +149,8 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             })
         }
         LibraryCommand::FeedItems(args) => {
-            let items = library.get_feed_items(args.library_id, args.limit)?;
+            let items =
+                library.get_feed_items(args.library_id, resolved_output_limit(args.limit))?;
             CommandOutput::new(ctx, items, None, |items| print_items(items))
         }
         LibraryCommand::SemanticSearch(args) => {
@@ -176,7 +186,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             let groups = library.find_duplicates(
                 args.method.into(),
                 args.collection.as_deref(),
-                args.limit,
+                resolved_output_limit(args.limit),
             )?;
             CommandOutput::new(ctx, groups, None, |groups| {
                 for group in groups {
@@ -403,7 +413,7 @@ async fn semantic_search(
             mode,
             embedding.as_deref(),
             args.collection.as_deref(),
-            args.limit,
+            resolved_output_limit(args.limit),
         )
         .map_err(Into::into)
 }
