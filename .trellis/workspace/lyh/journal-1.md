@@ -510,3 +510,38 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: 完成凭据与 workspace 路径边界热修
+
+**Date**: 2026-07-26
+**Task**: 完成凭据与 workspace 路径边界热修
+**Branch**: `dev`
+
+### Summary
+
+拆分 Zotero 认证与外部附件上传请求，强制生产上传 HTTPS；引入 WorkspaceName 并统一 TOML/RAG canonical containment，补齐回归测试与安全 code-spec，just ci 全绿。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `2da80f6` | (see git log) |
+| `1f31505` | (see git log) |
+| `242e99d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

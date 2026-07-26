@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 15
+- **Total Sessions**: 16
 - **Last Active**: 2026-07-26
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~512 | Active |
+| `journal-1.md` | ~547 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 16 | 2026-07-26 | 完成凭据与 workspace 路径边界热修 | `2da80f6`, `1f31505`, `242e99d` | `dev` |
 | 15 | 2026-07-26 | 完成 P0 Pdfium CWD 动态库劫持修复 | `982c012`, `c1e2d96` | `dev` |
 | 14 | 2026-07-18 | Finalize connector replacement parent | - | `dev` |
 | 13 | 2026-07-18 | Optimize zot connector skill | `7fd1938` | `dev` |
