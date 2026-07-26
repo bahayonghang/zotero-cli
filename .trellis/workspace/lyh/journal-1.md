@@ -715,3 +715,36 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: 完成本地 DB 语义与性能整改
+
+**Date**: 2026-07-26
+**Task**: 完成本地 DB 语义与性能整改
+**Branch**: `dev`
+
+### Summary
+
+默认排除回收站并标注 envelope 策略；SQL 下推 search 分页与批量 hydration；collection 歧义 fail closed；duplicate/graph 增加可审计预算；重型本地查询迁移至 run_local blocking 边界；聚焦测试、just ci 与 zot doctor 均通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1bfeaae` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
