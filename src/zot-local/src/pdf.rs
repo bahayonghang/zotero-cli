@@ -1,5 +1,6 @@
 use std::env;
-use std::io::Read;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
@@ -8,7 +9,9 @@ use flate2::read::GzDecoder;
 use pdfium_render::prelude::*;
 use reqwest::blocking::Client;
 use rusqlite::{Connection, OptionalExtension, params};
+use sha2::{Digest, Sha256};
 use tar::Archive;
+use tempfile::NamedTempFile;
 use zot_core::{AnnotationSnippet, PdfOutlineEntry, ZotError, ZotResult};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,6 +47,8 @@ pub struct PdfiumAvailability {
 struct PdfiumDownloadTarget {
     archive_name: &'static str,
     library_path_in_archive: &'static str,
+    archive_sha256: &'static str,
+    library_sha256: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +60,9 @@ enum PdfiumLoadMode {
 const PDFIUM_VERSION: &str = "7543";
 const PDFIUM_BASE_URL: &str =
     "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7543";
+const MAX_PDFIUM_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_PDFIUM_LIBRARY_BYTES: u64 = 128 * 1024 * 1024;
+const PDFIUM_INSTALL_LOCK_FILE: &str = ".install.lock";
 const ZOT_PDFIUM_LIB_PATH: &str = "ZOT_PDFIUM_LIB_PATH";
 const ZOT_PDFIUM_CACHE_DIR: &str = "ZOT_PDFIUM_CACHE_DIR";
 const PDFIUM_LIB_PATH: &str = "PDFIUM_LIB_PATH";
@@ -552,30 +560,44 @@ fn download_target_for(os: &str, arch: &str, target_env: &str) -> Option<PdfiumD
         ("windows", "x86_64") => Some(PdfiumDownloadTarget {
             archive_name: "pdfium-win-x64.tgz",
             library_path_in_archive: "bin/pdfium.dll",
+            archive_sha256: "0b08b606792a6cc593426efdefc6622611bce446d9e0270743846956ea1554ca",
+            library_sha256: "6b963c2be9cacbaa0c0c7f4bf6d20d2fd16729ebdaa9989978b0f7b119c1c1cb",
         }),
         ("windows", "aarch64") => Some(PdfiumDownloadTarget {
             archive_name: "pdfium-win-arm64.tgz",
             library_path_in_archive: "bin/pdfium.dll",
+            archive_sha256: "bb4a00113494e25bbee52d3d63b7f4ecf0de2d277b7de75ba9a1d5b987a74509",
+            library_sha256: "368986d82c11a22e0c53728873899cf864dbd7b32a42214a660ac30fe8ba37f4",
         }),
         ("windows", "x86") => Some(PdfiumDownloadTarget {
             archive_name: "pdfium-win-x86.tgz",
             library_path_in_archive: "bin/pdfium.dll",
+            archive_sha256: "25c635e70037c6a20a33126a812a63e891c70974982a2e00112b7aaa07eb3832",
+            library_sha256: "51db7685cc3c9ee11bc4c101d44b4ba30cb11c911c31c5c6da79c5bea0d76ffa",
         }),
         ("macos", "x86_64") => Some(PdfiumDownloadTarget {
             archive_name: "pdfium-mac-x64.tgz",
             library_path_in_archive: "lib/libpdfium.dylib",
+            archive_sha256: "2510460ac106f14b884598a0da3f53a99e23d79512acf027c5e101c2bb2f26cb",
+            library_sha256: "c4ae7ca1583e04449d07f1985ce258a3f935583279fd46fa89f528106301b929",
         }),
         ("macos", "aarch64") => Some(PdfiumDownloadTarget {
             archive_name: "pdfium-mac-arm64.tgz",
             library_path_in_archive: "lib/libpdfium.dylib",
+            archive_sha256: "41c269723b4711793de70ff34e65c00fa79907d6c023741837579e906b846faa",
+            library_sha256: "858f0676a1ac5b666673fc6e56b4401f95907a3fc66fa4635d626097a04c205b",
         }),
         ("linux", "x86_64") if target_env != "musl" => Some(PdfiumDownloadTarget {
             archive_name: "pdfium-linux-x64.tgz",
             library_path_in_archive: "lib/libpdfium.so",
+            archive_sha256: "9329a3c4b19b3c8d0a93af5440f44be84e4bd879a204e47b1a7a160e96809da4",
+            library_sha256: "2383a414050dd21ae5300b119ad8a72360ef92cff820b4c685c047dc272c2794",
         }),
         ("linux", "aarch64") if target_env != "musl" => Some(PdfiumDownloadTarget {
             archive_name: "pdfium-linux-arm64.tgz",
             library_path_in_archive: "lib/libpdfium.so",
+            archive_sha256: "4965a4c0b64c45b5edefa1072e2b483bf90b4d25d7deec44f104dcbdecf05c3e",
+            library_sha256: "deab139b06cba02552d0d695eb4789600da41a2df9d9176f3ec5ce477bff53a8",
         }),
         _ => None,
     }
@@ -662,8 +684,49 @@ fn push_candidate_path(paths: &mut Vec<PathBuf>, candidate: PathBuf) {
 }
 
 fn managed_cache_library_path() -> Option<PathBuf> {
+    let target = current_download_target()?;
     let library_name = pdfium_library_name();
-    Some(pdfium_cache_dir().join(library_name))
+    verified_managed_cache_path(&pdfium_cache_dir(), target, &library_name)
+}
+
+fn managed_cache_target_path_in(
+    cache_dir: &Path,
+    target: PdfiumDownloadTarget,
+    library_name: &Path,
+) -> PathBuf {
+    let hash_prefix = &target.library_sha256[..16];
+    let file_name = format!("sha256-{hash_prefix}-{}", library_name.to_string_lossy());
+    cache_dir.join(file_name)
+}
+
+fn verified_managed_cache_path(
+    cache_dir: &Path,
+    target: PdfiumDownloadTarget,
+    library_name: &Path,
+) -> Option<PathBuf> {
+    let path = managed_cache_target_path_in(cache_dir, target, library_name);
+    file_matches_sha256(&path, target.library_sha256).then_some(path)
+}
+
+fn file_matches_sha256(path: &Path, expected: &str) -> bool {
+    std::fs::File::open(path)
+        .and_then(sha256_reader)
+        .is_ok_and(|(actual, _)| actual == expected)
+}
+
+fn sha256_reader(mut reader: impl Read) -> std::io::Result<(String, u64)> {
+    let mut hasher = Sha256::new();
+    let mut total = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = reader.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+        total += read as u64;
+    }
+    Ok((format!("{:x}", hasher.finalize()), total))
 }
 
 fn pdfium_cache_dir() -> PathBuf {
@@ -710,24 +773,77 @@ fn download_pdfium_library(
     library_name: &Path,
 ) -> ZotResult<PathBuf> {
     let cache_dir = pdfium_cache_dir();
-    std::fs::create_dir_all(&cache_dir).map_err(|source| ZotError::Io {
-        path: cache_dir.clone(),
+    install_pdfium_library(target, library_name, &cache_dir, |url, cache_dir| {
+        download_archive_to_temp(url, cache_dir)
+    })
+}
+
+fn install_pdfium_library<F>(
+    target: PdfiumDownloadTarget,
+    library_name: &Path,
+    cache_dir: &Path,
+    download: F,
+) -> ZotResult<PathBuf>
+where
+    F: FnOnce(&str, &Path) -> ZotResult<NamedTempFile>,
+{
+    std::fs::create_dir_all(cache_dir).map_err(|source| ZotError::Io {
+        path: cache_dir.to_path_buf(),
         source,
     })?;
+    let lock_path = cache_dir.join(PDFIUM_INSTALL_LOCK_FILE);
+    let lock_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock_path)
+        .map_err(|source| ZotError::Io {
+            path: lock_path.clone(),
+            source,
+        })?;
+    fs4::FileExt::lock(&lock_file).map_err(|source| ZotError::Io {
+        path: lock_path,
+        source,
+    })?;
+
+    let library_path = managed_cache_target_path_in(cache_dir, target, library_name);
+    if file_matches_sha256(&library_path, target.library_sha256) {
+        return Ok(library_path);
+    }
+
     let archive_url = format!("{PDFIUM_BASE_URL}/{}", target.archive_name);
-    let archive_bytes = download_archive_bytes(&archive_url)?;
-    let library_path = cache_dir.join(library_name);
-    extract_library_from_archive(
-        &archive_bytes,
-        target.library_path_in_archive,
-        &library_path,
-        &cache_dir,
+    let mut archive_temp = download(&archive_url, cache_dir)?;
+    verify_file_sha256(
+        archive_temp.path(),
+        target.archive_sha256,
+        MAX_PDFIUM_ARCHIVE_BYTES,
+        "pdfium-archive-too-large",
+        "pdfium-archive-checksum",
     )?;
+    let library_temp = extract_verified_library(&mut archive_temp, target, cache_dir)?;
+
+    if file_matches_sha256(&library_path, target.library_sha256) {
+        return Ok(library_path);
+    }
+    if library_path.exists() {
+        std::fs::remove_file(&library_path).map_err(|source| ZotError::Io {
+            path: library_path.clone(),
+            source,
+        })?;
+    }
+    library_temp
+        .persist(&library_path)
+        .map_err(|error| ZotError::Io {
+            path: library_path.clone(),
+            source: error.error,
+        })?;
+    sync_cache_directory(cache_dir)?;
     Ok(library_path)
 }
 
-fn download_archive_bytes(url: &str) -> ZotResult<Vec<u8>> {
-    let client = Client::builder()
+fn pdfium_download_client() -> ZotResult<Client> {
+    Client::builder()
         .connect_timeout(zot_core::net::CONNECT_TIMEOUT)
         .timeout(zot_core::net::REQUEST_TIMEOUT)
         .user_agent(zot_core::net::USER_AGENT)
@@ -738,7 +854,11 @@ fn download_archive_bytes(url: &str) -> ZotResult<Vec<u8>> {
             message: error.to_string(),
             hint: Some("Failed to initialize the managed Pdfium downloader".to_string()),
             status: error.status().map(|status| status.as_u16()),
-        })?;
+        })
+}
+
+fn download_archive_to_temp(url: &str, cache_dir: &Path) -> ZotResult<NamedTempFile> {
+    let client = pdfium_download_client()?;
     let mut response = client.get(url).send().map_err(|error| ZotError::Remote {
         code: "pdfium-download".to_string(),
         message: error.to_string(),
@@ -755,25 +875,70 @@ fn download_archive_bytes(url: &str) -> ZotResult<Vec<u8>> {
             status: Some(response.status().as_u16()),
         });
     }
-    let mut bytes = Vec::new();
-    response
-        .read_to_end(&mut bytes)
-        .map_err(|error| ZotError::Remote {
-            code: "pdfium-download-read".to_string(),
-            message: error.to_string(),
-            hint: Some("Failed to read the downloaded Pdfium archive".to_string()),
-            status: None,
-        })?;
-    Ok(bytes)
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_PDFIUM_ARCHIVE_BYTES)
+    {
+        return Err(pdfium_integrity_error(
+            "pdfium-archive-too-large",
+            format!(
+                "Pdfium archive exceeds the {} byte download limit",
+                MAX_PDFIUM_ARCHIVE_BYTES
+            ),
+        ));
+    }
+
+    let mut temp = NamedTempFile::new_in(cache_dir).map_err(|source| ZotError::Io {
+        path: cache_dir.to_path_buf(),
+        source,
+    })?;
+    let mut total = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = response
+            .read(&mut buffer)
+            .map_err(|error| ZotError::Remote {
+                code: "pdfium-download-read".to_string(),
+                message: error.to_string(),
+                hint: Some("Failed to read the downloaded Pdfium archive".to_string()),
+                status: None,
+            })?;
+        if read == 0 {
+            break;
+        }
+        total += read as u64;
+        if total > MAX_PDFIUM_ARCHIVE_BYTES {
+            return Err(pdfium_integrity_error(
+                "pdfium-archive-too-large",
+                format!(
+                    "Pdfium archive exceeds the {} byte download limit",
+                    MAX_PDFIUM_ARCHIVE_BYTES
+                ),
+            ));
+        }
+        temp.write_all(&buffer[..read])
+            .map_err(|source| ZotError::Io {
+                path: temp.path().to_path_buf(),
+                source,
+            })?;
+    }
+    sync_temp_file(&mut temp)?;
+    Ok(temp)
 }
 
-fn extract_library_from_archive(
-    archive_bytes: &[u8],
-    library_path_in_archive: &str,
-    library_path: &Path,
+fn extract_verified_library(
+    archive_temp: &mut NamedTempFile,
+    target: PdfiumDownloadTarget,
     cache_dir: &Path,
-) -> ZotResult<()> {
-    let decoder = GzDecoder::new(archive_bytes);
+) -> ZotResult<NamedTempFile> {
+    archive_temp
+        .as_file_mut()
+        .seek(SeekFrom::Start(0))
+        .map_err(|source| ZotError::Io {
+            path: archive_temp.path().to_path_buf(),
+            source,
+        })?;
+    let decoder = GzDecoder::new(archive_temp.as_file_mut());
     let mut archive = Archive::new(decoder);
     for entry in archive.entries().map_err(|error| ZotError::Pdf {
         code: "pdfium-archive-open".to_string(),
@@ -792,42 +957,157 @@ fn extract_library_from_archive(
                 "Failed to resolve an entry path inside the downloaded Pdfium archive".to_string(),
             ),
         })?;
-        if entry_path.to_string_lossy() == library_path_in_archive {
-            entry.unpack(library_path).map_err(|error| ZotError::Io {
-                path: library_path.to_path_buf(),
-                source: error,
+        if entry_path.to_string_lossy() == target.library_path_in_archive {
+            if !entry.header().entry_type().is_file() {
+                return Err(pdfium_integrity_error(
+                    "pdfium-archive-entry-type",
+                    "Expected Pdfium archive entry is not a regular file".to_string(),
+                ));
+            }
+            if entry.size() > MAX_PDFIUM_LIBRARY_BYTES {
+                return Err(pdfium_integrity_error(
+                    "pdfium-library-too-large",
+                    format!(
+                        "Pdfium library exceeds the {} byte extraction limit",
+                        MAX_PDFIUM_LIBRARY_BYTES
+                    ),
+                ));
+            }
+            let mut library_temp =
+                NamedTempFile::new_in(cache_dir).map_err(|source| ZotError::Io {
+                    path: cache_dir.to_path_buf(),
+                    source,
+                })?;
+            let copied = std::io::copy(
+                &mut entry.by_ref().take(MAX_PDFIUM_LIBRARY_BYTES + 1),
+                &mut library_temp,
+            )
+            .map_err(|error| ZotError::Pdf {
+                code: "pdfium-archive-entry-read".to_string(),
+                message: error.to_string(),
+                hint: Some("Downloaded Pdfium archive is truncated or invalid".to_string()),
             })?;
+            if copied > MAX_PDFIUM_LIBRARY_BYTES {
+                return Err(pdfium_integrity_error(
+                    "pdfium-library-too-large",
+                    format!(
+                        "Pdfium library exceeds the {} byte extraction limit",
+                        MAX_PDFIUM_LIBRARY_BYTES
+                    ),
+                ));
+            }
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
 
-                let mut permissions = std::fs::metadata(library_path)
+                let mut permissions = library_temp
+                    .as_file()
+                    .metadata()
                     .map_err(|source| ZotError::Io {
-                        path: library_path.to_path_buf(),
+                        path: library_temp.path().to_path_buf(),
                         source,
                     })?
                     .permissions();
                 permissions.set_mode(permissions.mode() | 0o755);
-                std::fs::set_permissions(library_path, permissions).map_err(|source| {
-                    ZotError::Io {
-                        path: library_path.to_path_buf(),
+                library_temp
+                    .as_file()
+                    .set_permissions(permissions)
+                    .map_err(|source| ZotError::Io {
+                        path: library_temp.path().to_path_buf(),
                         source,
-                    }
-                })?;
+                    })?;
             }
-            return Ok(());
+            sync_temp_file(&mut library_temp)?;
+            verify_file_sha256(
+                library_temp.path(),
+                target.library_sha256,
+                MAX_PDFIUM_LIBRARY_BYTES,
+                "pdfium-library-too-large",
+                "pdfium-library-checksum",
+            )?;
+            return Ok(library_temp);
         }
     }
     Err(ZotError::Pdf {
         code: "pdfium-archive-missing-library".to_string(),
         message: format!(
-            "Pdfium archive did not contain the expected library entry {library_path_in_archive}"
+            "Pdfium archive did not contain the expected library entry {}",
+            target.library_path_in_archive
         ),
         hint: Some(format!(
             "Delete {} and retry the command",
             cache_dir.display()
         )),
     })
+}
+
+fn sync_temp_file(temp: &mut NamedTempFile) -> ZotResult<()> {
+    temp.flush().map_err(|source| ZotError::Io {
+        path: temp.path().to_path_buf(),
+        source,
+    })?;
+    temp.as_file_mut()
+        .sync_all()
+        .map_err(|source| ZotError::Io {
+            path: temp.path().to_path_buf(),
+            source,
+        })
+}
+
+fn verify_file_sha256(
+    path: &Path,
+    expected: &str,
+    max_bytes: u64,
+    size_code: &str,
+    checksum_code: &str,
+) -> ZotResult<()> {
+    let file = File::open(path).map_err(|source| ZotError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let (actual, size) = sha256_reader(file).map_err(|source| ZotError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    if size > max_bytes {
+        return Err(pdfium_integrity_error(
+            size_code,
+            format!("Pdfium artifact exceeds the {max_bytes} byte limit"),
+        ));
+    }
+    if actual != expected {
+        return Err(pdfium_integrity_error(
+            checksum_code,
+            format!("Pdfium SHA-256 mismatch: expected {expected}, received {actual}"),
+        ));
+    }
+    Ok(())
+}
+
+fn pdfium_integrity_error(code: &str, message: String) -> ZotError {
+    ZotError::Pdf {
+        code: code.to_string(),
+        message,
+        hint: Some(
+            "Managed Pdfium installation was rejected; retry or set an explicit reviewed library path"
+                .to_string(),
+        ),
+    }
+}
+
+#[cfg(unix)]
+fn sync_cache_directory(cache_dir: &Path) -> ZotResult<()> {
+    File::open(cache_dir)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|source| ZotError::Io {
+            path: cache_dir.to_path_buf(),
+            source,
+        })
+}
+
+#[cfg(not(unix))]
+fn sync_cache_directory(_cache_dir: &Path) -> ZotResult<()> {
+    Ok(())
 }
 
 fn cache_key_for(pdf_path: &Path) -> ZotResult<String> {
@@ -847,21 +1127,82 @@ fn cache_key_for(pdf_path: &Path) -> ZotResult<String> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Barrier, Mutex};
+    use std::thread;
+    use std::time::Duration;
+
     use super::*;
     use flate2::Compression;
     use flate2::write::GzEncoder;
     use tar::Builder;
 
+    static PDFIUM_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    fn sha256_bytes(bytes: &[u8]) -> String {
+        sha256_reader(Cursor::new(bytes)).expect("hash bytes").0
+    }
+
+    fn regular_archive(path: &str, payload: &[u8]) -> Vec<u8> {
+        let encoder = GzEncoder::new(Vec::new(), Compression::default());
+        let mut builder = Builder::new(encoder);
+        let mut header = tar::Header::new_gnu();
+        header.set_path(path).expect("path");
+        header.set_size(payload.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        builder.append(&header, payload).expect("append");
+        let encoder = builder.into_inner().expect("finish tar");
+        encoder.finish().expect("finish gzip")
+    }
+
+    fn symlink_archive(path: &str) -> Vec<u8> {
+        let encoder = GzEncoder::new(Vec::new(), Compression::default());
+        let mut builder = Builder::new(encoder);
+        let mut header = tar::Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Symlink);
+        header.set_size(0);
+        header.set_mode(0o777);
+        header.set_cksum();
+        builder
+            .append_link(&mut header, path, "other-file")
+            .expect("append link");
+        let encoder = builder.into_inner().expect("finish tar");
+        encoder.finish().expect("finish gzip")
+    }
+
+    fn fixture_target(
+        archive: &[u8],
+        library_path_in_archive: &'static str,
+        expected_library: &[u8],
+    ) -> PdfiumDownloadTarget {
+        PdfiumDownloadTarget {
+            archive_name: "fixture.tgz",
+            library_path_in_archive,
+            archive_sha256: Box::leak(sha256_bytes(archive).into_boxed_str()),
+            library_sha256: Box::leak(sha256_bytes(expected_library).into_boxed_str()),
+        }
+    }
+
+    fn archive_temp(cache_dir: &Path, bytes: &[u8]) -> ZotResult<NamedTempFile> {
+        let mut temp = NamedTempFile::new_in(cache_dir).map_err(|source| ZotError::Io {
+            path: cache_dir.to_path_buf(),
+            source,
+        })?;
+        temp.write_all(bytes).map_err(|source| ZotError::Io {
+            path: temp.path().to_path_buf(),
+            source,
+        })?;
+        sync_temp_file(&mut temp)?;
+        Ok(temp)
+    }
+
     #[test]
     fn download_client_builds_with_shared_net_defaults() {
         // 冒烟:引导下载 client 用 zot_core::net 共享常量(超时/UA 与主栈对齐)
         // 能成功构建;不发起真实网络请求。
-        let client = Client::builder()
-            .connect_timeout(zot_core::net::CONNECT_TIMEOUT)
-            .timeout(zot_core::net::REQUEST_TIMEOUT)
-            .user_agent(zot_core::net::USER_AGENT)
-            .redirect(reqwest::redirect::Policy::limited(5))
-            .build();
+        let client = pdfium_download_client();
         assert!(client.is_ok());
         assert!(zot_core::net::USER_AGENT.starts_with("zot-cli/"));
     }
@@ -878,34 +1219,89 @@ mod tests {
          */
         eprintln!("开始校验 Pdfium 下载目标映射...");
 
-        // 1.1 校验 Windows x64
-        assert_eq!(
-            download_target_for("windows", "x86_64", ""),
-            Some(PdfiumDownloadTarget {
-                archive_name: "pdfium-win-x64.tgz",
-                library_path_in_archive: "bin/pdfium.dll",
-            })
-        );
+        let cases = [
+            (
+                "windows",
+                "x86_64",
+                "",
+                PdfiumDownloadTarget {
+                    archive_name: "pdfium-win-x64.tgz",
+                    library_path_in_archive: "bin/pdfium.dll",
+                    archive_sha256: "0b08b606792a6cc593426efdefc6622611bce446d9e0270743846956ea1554ca",
+                    library_sha256: "6b963c2be9cacbaa0c0c7f4bf6d20d2fd16729ebdaa9989978b0f7b119c1c1cb",
+                },
+            ),
+            (
+                "windows",
+                "aarch64",
+                "",
+                PdfiumDownloadTarget {
+                    archive_name: "pdfium-win-arm64.tgz",
+                    library_path_in_archive: "bin/pdfium.dll",
+                    archive_sha256: "bb4a00113494e25bbee52d3d63b7f4ecf0de2d277b7de75ba9a1d5b987a74509",
+                    library_sha256: "368986d82c11a22e0c53728873899cf864dbd7b32a42214a660ac30fe8ba37f4",
+                },
+            ),
+            (
+                "windows",
+                "x86",
+                "",
+                PdfiumDownloadTarget {
+                    archive_name: "pdfium-win-x86.tgz",
+                    library_path_in_archive: "bin/pdfium.dll",
+                    archive_sha256: "25c635e70037c6a20a33126a812a63e891c70974982a2e00112b7aaa07eb3832",
+                    library_sha256: "51db7685cc3c9ee11bc4c101d44b4ba30cb11c911c31c5c6da79c5bea0d76ffa",
+                },
+            ),
+            (
+                "macos",
+                "x86_64",
+                "",
+                PdfiumDownloadTarget {
+                    archive_name: "pdfium-mac-x64.tgz",
+                    library_path_in_archive: "lib/libpdfium.dylib",
+                    archive_sha256: "2510460ac106f14b884598a0da3f53a99e23d79512acf027c5e101c2bb2f26cb",
+                    library_sha256: "c4ae7ca1583e04449d07f1985ce258a3f935583279fd46fa89f528106301b929",
+                },
+            ),
+            (
+                "macos",
+                "aarch64",
+                "",
+                PdfiumDownloadTarget {
+                    archive_name: "pdfium-mac-arm64.tgz",
+                    library_path_in_archive: "lib/libpdfium.dylib",
+                    archive_sha256: "41c269723b4711793de70ff34e65c00fa79907d6c023741837579e906b846faa",
+                    library_sha256: "858f0676a1ac5b666673fc6e56b4401f95907a3fc66fa4635d626097a04c205b",
+                },
+            ),
+            (
+                "linux",
+                "x86_64",
+                "gnu",
+                PdfiumDownloadTarget {
+                    archive_name: "pdfium-linux-x64.tgz",
+                    library_path_in_archive: "lib/libpdfium.so",
+                    archive_sha256: "9329a3c4b19b3c8d0a93af5440f44be84e4bd879a204e47b1a7a160e96809da4",
+                    library_sha256: "2383a414050dd21ae5300b119ad8a72360ef92cff820b4c685c047dc272c2794",
+                },
+            ),
+            (
+                "linux",
+                "aarch64",
+                "gnu",
+                PdfiumDownloadTarget {
+                    archive_name: "pdfium-linux-arm64.tgz",
+                    library_path_in_archive: "lib/libpdfium.so",
+                    archive_sha256: "4965a4c0b64c45b5edefa1072e2b483bf90b4d25d7deec44f104dcbdecf05c3e",
+                    library_sha256: "deab139b06cba02552d0d695eb4789600da41a2df9d9176f3ec5ce477bff53a8",
+                },
+            ),
+        ];
+        for (os, arch, target_env, expected) in cases {
+            assert_eq!(download_target_for(os, arch, target_env), Some(expected));
+        }
 
-        // 1.2 校验 macOS arm64
-        assert_eq!(
-            download_target_for("macos", "aarch64", ""),
-            Some(PdfiumDownloadTarget {
-                archive_name: "pdfium-mac-arm64.tgz",
-                library_path_in_archive: "lib/libpdfium.dylib",
-            })
-        );
-
-        // 1.3 校验 Linux x64 glibc
-        assert_eq!(
-            download_target_for("linux", "x86_64", "gnu"),
-            Some(PdfiumDownloadTarget {
-                archive_name: "pdfium-linux-x64.tgz",
-                library_path_in_archive: "lib/libpdfium.so",
-            })
-        );
-
-        // 1.4 校验 Linux x64 musl 不自动下载
         assert_eq!(download_target_for("linux", "x86_64", "musl"), None);
 
         eprintln!("Pdfium 下载目标映射校验完成");
@@ -913,6 +1309,7 @@ mod tests {
 
     #[test]
     fn cache_dir_uses_override_and_version_suffix() {
+        let _env_guard = PDFIUM_ENV_LOCK.lock().expect("env lock");
         /*
          * ========================================================================
          * 步骤2：校验缓存目录规则
@@ -973,6 +1370,7 @@ mod tests {
 
     #[test]
     fn candidate_library_paths_only_uses_trusted_sources() {
+        let _env_guard = PDFIUM_ENV_LOCK.lock().expect("env lock");
         // Security regression (P0-01 / QW-01): the discovery result must be
         // exactly the documented trusted sources. In particular, it must not
         // grow an implicit current_dir() or bare system-library candidate.
@@ -1006,41 +1404,220 @@ mod tests {
     }
 
     #[test]
-    fn extracts_library_from_memory_archive() {
-        /*
-         * ========================================================================
-         * 步骤4：校验内存归档解压
-         * ========================================================================
-         * 目标：
-         * 1) 保证内存 tar.gz 能正确抽出目标库文件
-         * 2) 保证解压结果可写入目标路径
-         */
-        eprintln!("开始校验 Pdfium 内存归档解压...");
+    fn installs_verified_library_atomically() {
+        let payload = b"pdfium";
+        let archive = regular_archive("bin/pdfium.dll", payload);
+        let target = fixture_target(&archive, "bin/pdfium.dll", payload);
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let output = install_pdfium_library(
+            target,
+            Path::new("pdfium.dll"),
+            tempdir.path(),
+            |_, cache_dir| archive_temp(cache_dir, &archive),
+        )
+        .expect("install");
 
-        // 4.1 构造内存 tar.gz 夹具
-        let mut tar_bytes = Vec::new();
-        {
-            let encoder = GzEncoder::new(&mut tar_bytes, Compression::default());
-            let mut builder = Builder::new(encoder);
-            let mut header = tar::Header::new_gnu();
-            let payload = b"pdfium";
-            header.set_path("bin/pdfium.dll").expect("path");
-            header.set_size(payload.len() as u64);
-            header.set_mode(0o644);
-            header.set_cksum();
-            builder.append(&header, &payload[..]).expect("append");
-            builder.finish().expect("finish");
+        assert_eq!(std::fs::read(&output).expect("read"), payload);
+        assert!(file_matches_sha256(&output, target.library_sha256));
+        assert!(
+            output
+                .file_name()
+                .is_some_and(|name| { name.to_string_lossy().starts_with("sha256-") })
+        );
+    }
+
+    #[test]
+    fn managed_cache_rejects_legacy_and_tampered_libraries() {
+        let payload = b"verified-pdfium";
+        let target = fixture_target(&[], "bin/pdfium.dll", payload);
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let library_name = Path::new("pdfium.dll");
+        std::fs::write(tempdir.path().join(library_name), payload).expect("write legacy cache");
+
+        assert_eq!(
+            verified_managed_cache_path(tempdir.path(), target, library_name),
+            None,
+            "the legacy bare filename is not a verified managed candidate"
+        );
+
+        let verified_path = managed_cache_target_path_in(tempdir.path(), target, library_name);
+        std::fs::write(&verified_path, b"tampered").expect("write tampered cache");
+        assert_eq!(
+            verified_managed_cache_path(tempdir.path(), target, library_name),
+            None
+        );
+
+        std::fs::write(&verified_path, payload).expect("write verified cache");
+        assert_eq!(
+            verified_managed_cache_path(tempdir.path(), target, library_name),
+            Some(verified_path)
+        );
+    }
+
+    #[test]
+    fn tampered_truncated_and_wrong_platform_archives_fail_closed() {
+        let payload = b"pdfium";
+        let valid_archive = regular_archive("bin/pdfium.dll", payload);
+        let target = fixture_target(&valid_archive, "bin/pdfium.dll", payload);
+        let mut tampered = valid_archive.clone();
+        let last = tampered.last_mut().expect("non-empty archive");
+        *last ^= 0xff;
+        let mut truncated = valid_archive.clone();
+        truncated.truncate(truncated.len() / 2);
+        let wrong_platform = regular_archive("lib/libpdfium.so", payload);
+
+        for (label, archive) in [
+            ("tampered", tampered),
+            ("truncated", truncated),
+            ("wrong-platform", wrong_platform),
+        ] {
+            let tempdir = tempfile::tempdir().expect("tempdir");
+            let final_path =
+                managed_cache_target_path_in(tempdir.path(), target, Path::new("pdfium.dll"));
+            let err = install_pdfium_library(
+                target,
+                Path::new("pdfium.dll"),
+                tempdir.path(),
+                |_, cache_dir| archive_temp(cache_dir, &archive),
+            )
+            .expect_err(label);
+            assert_eq!(
+                err.payload().code,
+                "pdfium-archive-checksum",
+                "case: {label}"
+            );
+            assert!(!final_path.exists(), "case published a file: {label}");
+        }
+    }
+
+    #[test]
+    fn archive_shape_and_library_checksum_fail_closed() {
+        let payload = b"pdfium";
+        let missing = regular_archive("bin/other.dll", payload);
+        let link = symlink_archive("bin/pdfium.dll");
+        let mismatched_library = regular_archive("bin/pdfium.dll", payload);
+        let cases = [
+            (
+                "missing",
+                missing.clone(),
+                fixture_target(&missing, "bin/pdfium.dll", payload),
+                "pdfium-archive-missing-library",
+            ),
+            (
+                "symlink",
+                link.clone(),
+                fixture_target(&link, "bin/pdfium.dll", payload),
+                "pdfium-archive-entry-type",
+            ),
+            (
+                "library-mismatch",
+                mismatched_library.clone(),
+                fixture_target(&mismatched_library, "bin/pdfium.dll", b"different"),
+                "pdfium-library-checksum",
+            ),
+        ];
+
+        for (label, archive, target, expected_code) in cases {
+            let tempdir = tempfile::tempdir().expect("tempdir");
+            let final_path =
+                managed_cache_target_path_in(tempdir.path(), target, Path::new("pdfium.dll"));
+            let err = install_pdfium_library(
+                target,
+                Path::new("pdfium.dll"),
+                tempdir.path(),
+                |_, cache_dir| archive_temp(cache_dir, &archive),
+            )
+            .expect_err(label);
+            assert_eq!(err.payload().code, expected_code, "case: {label}");
+            assert!(!final_path.exists(), "case published a file: {label}");
+        }
+    }
+
+    #[test]
+    fn artifact_size_limit_is_enforced_before_checksum_acceptance() {
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let path = tempdir.path().join("oversize.tgz");
+        std::fs::write(&path, b"12345").expect("write fixture");
+
+        let err = verify_file_sha256(
+            &path,
+            &sha256_bytes(b"12345"),
+            4,
+            "pdfium-archive-too-large",
+            "pdfium-archive-checksum",
+        )
+        .expect_err("oversize file must fail");
+        assert_eq!(err.payload().code, "pdfium-archive-too-large");
+    }
+
+    #[test]
+    fn existing_verified_library_survives_failed_redownload_attempt() {
+        let payload = b"verified-pdfium";
+        let archive = regular_archive("bin/pdfium.dll", payload);
+        let target = fixture_target(&archive, "bin/pdfium.dll", payload);
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let first = install_pdfium_library(
+            target,
+            Path::new("pdfium.dll"),
+            tempdir.path(),
+            |_, cache_dir| archive_temp(cache_dir, &archive),
+        )
+        .expect("first install");
+
+        let second =
+            install_pdfium_library(target, Path::new("pdfium.dll"), tempdir.path(), |_, _| {
+                panic!("verified install must skip the downloader")
+            })
+            .expect("reuse verified install");
+
+        assert_eq!(first, second);
+        assert_eq!(std::fs::read(second).expect("read library"), payload);
+    }
+
+    #[test]
+    fn concurrent_installers_download_once() {
+        let payload = b"verified-pdfium";
+        let archive = Arc::new(regular_archive("bin/pdfium.dll", payload));
+        let target = fixture_target(&archive, "bin/pdfium.dll", payload);
+        let tempdir = tempfile::tempdir().expect("tempdir");
+        let cache_dir = Arc::new(tempdir.path().to_path_buf());
+        let barrier = Arc::new(Barrier::new(3));
+        let downloads = Arc::new(AtomicUsize::new(0));
+        let mut workers = Vec::new();
+
+        for _ in 0..2 {
+            let archive = Arc::clone(&archive);
+            let cache_dir = Arc::clone(&cache_dir);
+            let barrier = Arc::clone(&barrier);
+            let downloads = Arc::clone(&downloads);
+            workers.push(thread::spawn(move || {
+                barrier.wait();
+                install_pdfium_library(
+                    target,
+                    Path::new("pdfium.dll"),
+                    &cache_dir,
+                    |_, cache_dir| {
+                        downloads.fetch_add(1, Ordering::SeqCst);
+                        thread::sleep(Duration::from_millis(50));
+                        archive_temp(cache_dir, &archive)
+                    },
+                )
+            }));
         }
 
-        // 4.2 解压到临时目录
-        let tempdir = tempfile::tempdir().expect("tempdir");
-        let output = tempdir.path().join("pdfium.dll");
-        extract_library_from_archive(&tar_bytes, "bin/pdfium.dll", &output, tempdir.path())
-            .expect("extract");
-
-        // 4.3 校验目标文件内容
-        assert_eq!(std::fs::read(&output).expect("read"), b"pdfium");
-
-        eprintln!("Pdfium 内存归档解压校验完成");
+        barrier.wait();
+        let first = workers
+            .remove(0)
+            .join()
+            .expect("first worker")
+            .expect("install");
+        let second = workers
+            .remove(0)
+            .join()
+            .expect("second worker")
+            .expect("install");
+        assert_eq!(first, second);
+        assert_eq!(downloads.load(Ordering::SeqCst), 1);
+        assert_eq!(std::fs::read(first).expect("read library"), payload);
     }
 }

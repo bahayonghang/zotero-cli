@@ -94,6 +94,88 @@ for candidate in candidate_library_paths(library_name) {
 }
 ```
 
+## Scenario: Verified Pdfium download and installation
+
+### 1. Scope / Trigger
+
+This contract applies whenever the managed Pdfium downloader, release manifest,
+archive extraction, cache naming, or cache publication changes. It prevents a
+truncated, substituted, wrong-platform, oversized, or concurrently installed
+artifact from becoming a trusted native-library candidate (P1-01, task
+`07-26-fix-pdfium-download-verify`).
+
+### 2. Signatures
+
+- `download_target_for(os, arch, target_env) -> Option<PdfiumDownloadTarget>`
+  selects a pinned archive path plus archive and library SHA-256 values.
+- `install_pdfium_library(target, library_name, cache_dir, download)
+  -> ZotResult<PathBuf>` owns locking, verification, extraction, and publication.
+- `verified_managed_cache_path(cache_dir, target, library_name)
+  -> Option<PathBuf>` admits only a hash-matching managed artifact to discovery.
+
+### 3. Contracts
+
+- Every supported target has an in-source archive SHA-256, expected regular-file
+  entry path, and extracted-library SHA-256 for the pinned Pdfium version.
+- Hold the per-cache `.install.lock`, then recheck the final library before any
+  download. Stream the archive into a same-directory temporary file with a
+  32 MiB limit; do not buffer an unbounded response in memory.
+- Verify the complete archive SHA-256 before opening it. Copy only the exact
+  expected regular-file entry, cap the extracted library at 128 MiB, and verify
+  its complete SHA-256 before publication.
+- Sync temporary files before `NamedTempFile::persist`, use a final filename
+  containing the library hash prefix, and sync the cache directory where the
+  platform supports it. Temporary files must disappear on every failure.
+- Candidate discovery must recompute the full library SHA-256. A legacy bare
+  cache name or a hash-prefixed file with tampered content is not trusted.
+
+### 4. Validation & Error Matrix
+
+- Unsupported target or musl Linux -> no managed download target.
+- Archive above 32 MiB -> `pdfium-archive-too-large`.
+- Archive SHA-256 mismatch, including truncation or wrong archive ->
+  `pdfium-archive-checksum`.
+- Expected entry missing or not a regular file ->
+  `pdfium-archive-missing-library` or `pdfium-archive-entry-type`.
+- Library above 128 MiB or SHA-256 mismatch -> `pdfium-library-too-large` or
+  `pdfium-library-checksum`.
+- Existing final path with matching full hash -> reuse it without downloading;
+  any nonmatching path must never be returned as a candidate.
+
+### 5. Good / Base / Bad Cases
+
+- Good: two processes contend on `.install.lock`; the second reuses the verified
+  artifact and no second download occurs.
+- Base: a clean cache downloads the pinned archive, verifies both hashes, and
+  publishes one hash-bound library path.
+- Bad: extract the archive wholesale, trust archive entry metadata alone, reuse
+  `pdfium.dll` / `libpdfium.*` by name, or publish before checksum verification.
+
+### 6. Tests Required
+
+- Assert all supported target tuples and their exact archive/library hashes.
+- Reject tampered, truncated, wrong-platform, missing-entry, symlink-entry,
+  library-mismatch, and oversized fixtures without publishing a final file.
+- Prove legacy and tampered managed-cache files are excluded, a verified file is
+  reused, and concurrent installers invoke the downloader exactly once.
+- Run `cargo test -p zot-local`, workspace clippy with `-D warnings`, and `just ci`.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: unbounded bytes and unverified direct extraction become executable state.
+let bytes = response.bytes()?;
+archive.unpack(cache_dir)?;
+
+// Correct: lock, stream with a cap, verify twice, then publish the temp file.
+let _lock = lock_cache(cache_dir)?;
+let archive = download_bounded_temp(url, MAX_PDFIUM_ARCHIVE_BYTES)?;
+verify_sha256(archive.path(), target.archive_sha256)?;
+let library = extract_expected_regular_file(&archive, target)?;
+verify_sha256(library.path(), target.library_sha256)?;
+library.persist(hash_bound_path(target))?;
+```
+
 ## Code Example
 
 `WorkspaceStore::save` writes through a temporary file and syncs before
