@@ -850,3 +850,36 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 26: 完成审计整改父任务集成验收
+
+**Date**: 2026-07-26
+**Task**: 完成审计整改父任务集成验收
+**Branch**: `dev`
+
+### Summary
+
+确认 11 个子任务全部完成归档，逐项复验审计映射、P0/P1 安全回归与跨任务契约；最终 just ci 和 Trellis validate 通过，持久化源审计报告与集成验收工件并归档父任务。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6f1bf1c` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
