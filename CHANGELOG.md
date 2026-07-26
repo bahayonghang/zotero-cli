@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file. Dates use
 `YYYY-MM-DD`. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-07-26
+
+### Fixed
+
+- Synchronized workspace version 1.0.1 lockfile, skill metadata, and changelog.
+
 ## [1.0.0] - 2026-07-26
 
 ### Security
