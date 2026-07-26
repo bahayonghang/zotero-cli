@@ -17,16 +17,8 @@ regressions. Add narrow tests around the behavior being changed.
   embedding counts/dimensions before writeback.
 - Keep heavy PDF work behind the `PdfBackend` trait so CLI code can offload it
   and tests can use focused fakes.
-- Pdfium native-library discovery is a trust boundary. `candidate_library_paths`
-  may only include: explicit `ZOT_PDFIUM_LIB_PATH` / `PDFIUM_LIB_PATH`, the
-  executable-adjacent directory, and the managed cache under
-  `ZOT_PDFIUM_CACHE_DIR` (or the system cache). **Never** add
-  `env::current_dir()` as a load candidate — CWD is untrusted project content
-  and enables dynamic-library hijacking via `zot doctor` / any Pdfium probe
-  (P0-01, task `07-26-fix-pdfium-cwd-rce`). Do not reintroduce CWD “for
-  convenience”; operators who need a custom path must set an env override.
-  Download integrity (checksum / atomic install) is a separate contract owned
-  by download-verify work, not a reason to widen discovery trust.
+- Follow the Pdfium native-library discovery contract below. Discovery is a
+  security boundary, not a convenience path list.
 
 ## Testing Requirements
 
@@ -37,10 +29,70 @@ regressions. Add narrow tests around the behavior being changed.
   `workspace.rs` tests for index schema, migration, and query behavior.
 - Add PDF-specific unit tests in `pdf.rs` when changing Pdfium setup, cache
   paths, archive extraction, page range behavior, or annotation geometry.
-- When touching Pdfium discovery, keep
-  `candidate_library_paths_never_includes_cwd` green (or an equivalent
-  regression that asserts CWD is absent from the candidate list with env
-  overrides cleared).
+
+## Scenario: Pdfium native-library discovery
+
+### 1. Scope / Trigger
+
+This contract applies whenever `pdf.rs` changes Pdfium discovery, probing, or
+binding. It prevents a library planted in an untrusted project CWD from being
+loaded by `zot doctor` or another Pdfium consumer (P0-01, task
+`07-26-fix-pdfium-cwd-rce`).
+
+### 2. Signatures
+
+- `candidate_library_paths(library_name: &Path) -> Vec<PathBuf>` owns ordered
+  path discovery.
+- `PdfiumBackend::pdfium(mode: PdfiumLoadMode) -> ZotResult<Pdfium>` binds only
+  discovered paths, then optionally invokes the managed downloader.
+
+### 3. Contracts
+
+- Candidate order is `ZOT_PDFIUM_LIB_PATH`, `PDFIUM_LIB_PATH`, executable
+  adjacent, then managed cache under `ZOT_PDFIUM_CACHE_DIR` or the system cache.
+- Env overrides may name a file or directory and are explicit operator opt-in.
+- Never add `env::current_dir()` or call `Pdfium::bind_to_system_library()`;
+  the latter loads a bare platform name through the platform default search.
+- Download integrity and atomic installation belong to download-verify work;
+  they must not widen the discovery trust set.
+
+### 4. Validation & Error Matrix
+
+- Candidate missing -> skip it without binding.
+- Candidate exists and binds -> return ready Pdfium.
+- Candidate exists but fails -> preserve the first typed `ZotError::Pdf`.
+- `ProbeOnly` with no usable candidate -> return `pdfium-unavailable`.
+- `AllowDownload` on a supported target -> use the managed download path; on
+  an unsupported target, return the preserved bind error or manual setup error.
+
+### 5. Good / Base / Bad Cases
+
+- Good: set `ZOT_PDFIUM_LIB_PATH` to a reviewed absolute file or directory.
+- Base: use executable-adjacent deployment or the application-managed cache.
+- Bad: place Pdfium in the project CWD or load `pdfium.dll` / `libpdfium.*` by
+  a bare name and rely on platform search order.
+
+### 6. Tests Required
+
+- Keep `candidate_library_paths_only_uses_trusted_sources` green (or an
+  equivalent exact-source regression) without mutating process env or CWD.
+- Run `cargo test -p zot-local` and the workspace clippy gate after changing
+  discovery or binding.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: both forms can reach an untrusted CWD.
+paths.push(env::current_dir()?.join(library_name));
+Pdfium::bind_to_system_library()?;
+
+// Correct: bind only a path-qualified, policy-approved candidate.
+for candidate in candidate_library_paths(library_name) {
+    if candidate.exists() {
+        return bind_pdfium_from_path(&candidate);
+    }
+}
+```
 
 ## Code Example
 

@@ -194,15 +194,6 @@ impl PdfiumBackend {
             }
         }
 
-        match bind_pdfium_from_system() {
-            Ok(pdfium) => return Ok(pdfium),
-            Err(error) => {
-                if last_error.is_none() {
-                    last_error = Some(error);
-                }
-            }
-        }
-
         if matches!(mode, PdfiumLoadMode::AllowDownload)
             && let Some(target) = current_download_target()
         {
@@ -684,35 +675,19 @@ fn pdfium_cache_dir() -> PathBuf {
     base_dir.join(format!("pdfium-{PDFIUM_VERSION}"))
 }
 
-fn bind_pdfium_from_system() -> ZotResult<Pdfium> {
-    match Pdfium::bind_to_system_library() {
-        Ok(bindings) => Ok(Pdfium::new(bindings)),
-        Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => Ok(Pdfium),
-        Err(error) => Err(pdfium_bind_error(error, None)),
-    }
-}
-
 fn bind_pdfium_from_path(path: &Path) -> ZotResult<Pdfium> {
     match Pdfium::bind_to_library(path) {
         Ok(bindings) => Ok(Pdfium::new(bindings)),
         Err(PdfiumError::PdfiumLibraryBindingsAlreadyInitialized) => Ok(Pdfium),
-        Err(error) => Err(pdfium_bind_error(error, Some(path))),
+        Err(error) => Err(pdfium_bind_error(error, path)),
     }
 }
 
-fn pdfium_bind_error(error: PdfiumError, path: Option<&Path>) -> ZotError {
-    let hint = path
-        .map(|path| {
-            format!(
-                "Failed to load Pdfium from {}. Set {ZOT_PDFIUM_LIB_PATH} or {PDFIUM_LIB_PATH} to a compatible library, or let Zot auto-download it on the first local PDF read.",
-                path.display()
-            )
-        })
-        .unwrap_or_else(|| {
-            format!(
-                "Install a compatible Pdfium library, place it next to the executable, or set {ZOT_PDFIUM_LIB_PATH} / {PDFIUM_LIB_PATH}."
-            )
-        });
+fn pdfium_bind_error(error: PdfiumError, path: &Path) -> ZotError {
+    let hint = format!(
+        "Failed to load Pdfium from {}. Set {ZOT_PDFIUM_LIB_PATH} or {PDFIUM_LIB_PATH} to a compatible library, or let Zot auto-download it on the first local PDF read.",
+        path.display()
+    );
     ZotError::Pdf {
         code: "pdfium-unavailable".to_string(),
         message: error.to_string(),
@@ -997,52 +972,37 @@ mod tests {
     }
 
     #[test]
-    fn candidate_library_paths_never_includes_cwd() {
-        // Security regression (P0-01 / QW-01): never add current_dir() as an
-        // implicit native-library load candidate. A same-named decoy in an
-        // untrusted project directory must not enter the bind path unless the
-        // operator explicitly opts in via ZOT_PDFIUM_LIB_PATH / PDFIUM_LIB_PATH.
+    fn candidate_library_paths_only_uses_trusted_sources() {
+        // Security regression (P0-01 / QW-01): the discovery result must be
+        // exactly the documented trusted sources. In particular, it must not
+        // grow an implicit current_dir() or bare system-library candidate.
         let library_name = pdfium_library_name();
-        let cwd = env::current_dir().expect("cwd");
-        let cwd_candidate = cwd.join(&library_name);
-
-        // Clear explicit overrides for the duration of this assertion so an
-        // operator-set env path that happens to equal CWD cannot masquerade as
-        // the removed implicit candidate.
-        let saved_zot = env::var_os(ZOT_PDFIUM_LIB_PATH);
-        let saved_generic = env::var_os(PDFIUM_LIB_PATH);
-        unsafe {
-            env::remove_var(ZOT_PDFIUM_LIB_PATH);
-            env::remove_var(PDFIUM_LIB_PATH);
-        }
-
         let candidates = candidate_library_paths(&library_name);
+        let mut expected = Vec::new();
 
-        unsafe {
-            match saved_zot {
-                Some(value) => env::set_var(ZOT_PDFIUM_LIB_PATH, value),
-                None => env::remove_var(ZOT_PDFIUM_LIB_PATH),
-            }
-            match saved_generic {
-                Some(value) => env::set_var(PDFIUM_LIB_PATH, value),
-                None => env::remove_var(PDFIUM_LIB_PATH),
-            }
+        if let Ok(value) = env::var(ZOT_PDFIUM_LIB_PATH) {
+            push_candidate_path(
+                &mut expected,
+                candidate_from_env_value(&value, &library_name),
+            );
+        }
+        if let Ok(value) = env::var(PDFIUM_LIB_PATH) {
+            push_candidate_path(
+                &mut expected,
+                candidate_from_env_value(&value, &library_name),
+            );
+        }
+        if let Some(executable_dir) = env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(Path::to_path_buf))
+        {
+            push_candidate_path(&mut expected, executable_dir.join(&library_name));
+        }
+        if let Some(cache_path) = managed_cache_library_path() {
+            push_candidate_path(&mut expected, cache_path);
         }
 
-        // Executable-adjacent deploy is still trusted. If the binary itself
-        // lives in CWD, that path may appear — via current_exe, not current_dir.
-        let exe_adjacent = env::current_exe().ok().and_then(|path| {
-            path.parent()
-                .map(|parent| parent.join(&library_name))
-        });
-        if exe_adjacent.as_ref() == Some(&cwd_candidate) {
-            return;
-        }
-
-        assert!(
-            !candidates.iter().any(|path| path == &cwd_candidate),
-            "CWD must not be an implicit Pdfium load candidate; got {candidates:?}"
-        );
+        assert_eq!(candidates, expected);
     }
 
     #[test]

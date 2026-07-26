@@ -25,6 +25,6 @@
     ".trellis/spec/zot-local/backend/quality-guidelines.md",
     ".trellis/spec/zot-local/backend/directory-structure.md"
   ],
-  "notes": "P0 implemented 2026-07-26: removed CWD from candidate_library_paths; regression test + spec trust policy recorded.",
+  "notes": "P0 implemented 2026-07-26: removed implicit CWD candidate and bare-name system fallback; trusted-source regression test + spec policy recorded; just ci passed.",
   "meta": {}
 }
