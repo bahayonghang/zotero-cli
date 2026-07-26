@@ -5,7 +5,9 @@
 
 use std::thread::JoinHandle;
 
-use tiny_http::{Response, Server};
+use tiny_http::{Header, Response, Server};
+
+pub(crate) type ScriptedResponse = (u16, &'static str, Vec<(&'static str, &'static str)>);
 
 /// One request observed by the fake server: HTTP method, url (path + query),
 /// and the headers as sent on the wire.
@@ -36,6 +38,19 @@ impl Captured {
 pub(crate) fn spawn_server(
     responses: Vec<(u16, &'static str)>,
 ) -> (String, JoinHandle<Vec<Captured>>) {
+    spawn_server_with_headers(
+        responses
+            .into_iter()
+            .map(|(status, body)| (status, body, Vec::new()))
+            .collect(),
+    )
+}
+
+/// Header-aware variant used by retry, redirect, and content validation
+/// tests. Header names and values are static fixture data.
+pub(crate) fn spawn_server_with_headers(
+    responses: Vec<ScriptedResponse>,
+) -> (String, JoinHandle<Vec<Captured>>) {
     let server = Server::http(("127.0.0.1", 0)).expect("bind fake server");
     let port = match server.server_addr().to_ip() {
         Some(addr) => addr.port(),
@@ -44,7 +59,7 @@ pub(crate) fn spawn_server(
     let base_url = format!("http://127.0.0.1:{port}");
     let handle = std::thread::spawn(move || {
         let mut captured = Vec::new();
-        for (status, body) in responses {
+        for (status, body, headers) in responses {
             let mut request = match server.recv() {
                 Ok(request) => request,
                 Err(_) => break,
@@ -62,7 +77,13 @@ pub(crate) fn spawn_server(
                     .map(|header| (header.field.to_string(), header.value.to_string()))
                     .collect(),
             });
-            let response = Response::from_string(body).with_status_code(status);
+            let mut response = Response::from_string(body).with_status_code(status);
+            for (name, value) in headers {
+                response.add_header(
+                    Header::from_bytes(name.as_bytes(), value.as_bytes())
+                        .expect("valid fake-server response header"),
+                );
+            }
             let _ = request.respond(response);
         }
         captured

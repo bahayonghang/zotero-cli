@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
 use zot_local::PdfBackend;
 use zot_remote::oa::CreatorName;
-use zot_remote::{HttpRuntime, OaClient, ZoteroRemote, normalize_arxiv_id, normalize_doi};
+use zot_remote::{
+    HttpRuntime, OaClient, ZoteroRemote, download_pdf_to_path, normalize_arxiv_id, normalize_doi,
+};
 
 use super::merge::{merge_item_set, selected_merge_writer};
 use crate::cli::{
@@ -311,43 +312,40 @@ async fn maybe_attach_pdf_url(
                 .await?;
         }
         AttachModeArg::Auto => {
-            let response = runtime.client().get(url).send().await.map_err(|err| {
-                zot_core::ZotError::Remote {
-                    code: "pdf-download".to_string(),
-                    message: err.to_string(),
-                    hint: None,
-                    status: err.status().map(|status| status.as_u16()),
-                }
-            })?;
-            if !response.status().is_success() {
-                return Ok(());
-            }
-            let bytes = response
-                .bytes()
-                .await
-                .map_err(|err| zot_core::ZotError::Remote {
-                    code: "pdf-download-bytes".to_string(),
-                    message: err.to_string(),
-                    hint: None,
-                    status: err.status().map(|status| status.as_u16()),
-                })?;
-            let path = std::env::temp_dir().join(format!("{}-{}", uuid::Uuid::new_v4(), filename));
-            let mut file =
-                std::fs::File::create(&path).map_err(|source| zot_core::ZotError::Io {
-                    path: path.clone(),
-                    source,
-                })?;
-            file.write_all(&bytes)
+            let suffix = safe_temp_pdf_suffix(filename);
+            let temporary = tempfile::Builder::new()
+                .prefix("zot-pdf-")
+                .suffix(&suffix)
+                .tempfile()
                 .map_err(|source| zot_core::ZotError::Io {
-                    path: path.clone(),
+                    path: std::env::temp_dir(),
                     source,
                 })?;
-            let upload_result = remote.upload_attachment(item_key, &path).await;
-            let _ = std::fs::remove_file(&path);
-            upload_result?;
+            download_pdf_to_path(runtime, url, temporary.path()).await?;
+            remote.upload_attachment(item_key, temporary.path()).await?;
         }
     }
     Ok(())
+}
+
+fn safe_temp_pdf_suffix(filename: &str) -> String {
+    let mut sanitized = filename
+        .chars()
+        .take(120)
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    if sanitized.is_empty() {
+        sanitized.push_str("attachment.pdf");
+    } else if !sanitized.to_ascii_lowercase().ends_with(".pdf") {
+        sanitized.push_str(".pdf");
+    }
+    format!("-{sanitized}")
 }
 
 fn build_crossref_item_payload(
@@ -597,5 +595,12 @@ mod tests {
         let legacy = arxiv_pdf_attachment(&work, "cond-mat/0102536", AttachModeArg::Auto)
             .expect("attachment for legacy id");
         assert_eq!(legacy.filename, "arxiv_cond-mat_0102536.pdf");
+    }
+
+    #[test]
+    fn temporary_pdf_suffix_rejects_path_characters() {
+        let suffix = safe_temp_pdf_suffix(r#"..\nested/evil:name?.pdf"#);
+        assert_eq!(suffix, "-.._nested_evil_name_.pdf");
+        assert!(!suffix.contains(['/', '\\', ':']));
     }
 }

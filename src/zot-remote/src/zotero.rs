@@ -1,23 +1,32 @@
 use std::collections::BTreeMap;
+use std::io::SeekFrom;
 use std::path::Path;
 
 use reqwest::header::{CONTENT_TYPE, HeaderValue};
 use reqwest::{Method, StatusCode, Url};
 use serde::Deserialize;
 use serde_json::{Value, json};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use uuid::Uuid;
 use zot_core::{LibraryScope, SavedSearch, SavedSearchCondition, ZotError, ZotResult};
 
-use crate::http::{HttpRuntime, ensure_empty, ensure_status, read_json, remote_err};
+use crate::http::{
+    HttpRuntime, ensure_empty, ensure_status, read_json, remote_err, send_with_retry,
+};
 
 const API_BASE: &str = "https://api.zotero.org";
 const ZOTERO_API_KEY_HEADER: &str = "zotero-api-key";
+const ZOTERO_API_VERSION_HEADER: &str = "Zotero-API-Version";
+const ZOTERO_API_VERSION: &str = "3";
+const MAX_ATTACHMENT_BYTES: u64 = 100 * 1024 * 1024;
+const MAX_UPLOAD_OVERHEAD_BYTES: usize = 1024 * 1024;
 
 #[derive(Clone)]
 pub struct ZoteroRemote {
     client: reqwest::Client,
     library_id: String,
     api_key: String,
+    api_version: HeaderValue,
     scope: LibraryScope,
     base_url: String,
     #[cfg(any(test, feature = "test-support"))]
@@ -43,6 +52,7 @@ impl ZoteroRemote {
             client: runtime.client_clone(),
             library_id: library_id.into(),
             api_key: api_key.to_string(),
+            api_version: HeaderValue::from_static(ZOTERO_API_VERSION),
             scope,
             base_url: std::env::var("ZOT_ZOTERO_API_BASE").unwrap_or_else(|_| API_BASE.to_string()),
             #[cfg(any(test, feature = "test-support"))]
@@ -72,6 +82,7 @@ impl ZoteroRemote {
         self.client
             .request(method, self.endpoint(endpoint))
             .header(ZOTERO_API_KEY_HEADER, &self.api_key)
+            .header(ZOTERO_API_VERSION_HEADER, self.api_version.clone())
     }
 
     fn zotero_get(&self, endpoint: &str) -> reqwest::RequestBuilder {
@@ -293,13 +304,13 @@ impl ZoteroRemote {
             "name": name,
             "parentCollection": parent_key.unwrap_or(""),
         }]);
-        let response = self
-            .zotero_post("collections")
-            .header("Zotero-Write-Token", Uuid::new_v4().to_string())
-            .json(&payload)
-            .send()
-            .await
-            .map_err(remote_err("create-collection"))?;
+        let response = send_with_retry(
+            self.zotero_post("collections")
+                .header("Zotero-Write-Token", Uuid::new_v4().to_string())
+                .json(&payload),
+            "create-collection",
+        )
+        .await?;
         let body: MultiWriteResponse = read_json(response, "create-collection").await?;
         body.successful
             .and_then(|successful| successful.get("0").and_then(|entry| entry.key.clone()))
@@ -403,12 +414,29 @@ impl ZoteroRemote {
     }
 
     pub async fn upload_attachment(&self, parent_key: &str, file_path: &Path) -> ZotResult<String> {
-        let attachment_key = self.create_attachment_item(parent_key, file_path).await?;
-        let (auth, bytes) = self
-            .authorize_attachment_upload(&attachment_key, file_path)
+        let mut source = PreparedAttachment::open(file_path).await?;
+        let attachment_key = self
+            .create_attachment_item(parent_key, &source.filename)
+            .await?;
+        match self
+            .complete_attachment_upload(&attachment_key, &mut source)
+            .await
+        {
+            Ok(()) => Ok(attachment_key),
+            Err(error) => Err(self.with_attachment_cleanup(&attachment_key, error).await),
+        }
+    }
+
+    async fn complete_attachment_upload(
+        &self,
+        attachment_key: &str,
+        source: &mut PreparedAttachment,
+    ) -> ZotResult<()> {
+        let auth = self
+            .authorize_attachment_upload(attachment_key, source)
             .await?;
         if auth.exists.unwrap_or(false) {
-            return Ok(attachment_key);
+            return Ok(());
         }
         let upload_url = auth.url.clone().ok_or_else(|| ZotError::Remote {
             code: "attachment-upload".to_string(),
@@ -428,9 +456,7 @@ impl ZoteroRemote {
             .unwrap_or_else(|| "multipart/form-data".to_string());
         let prefix = auth.prefix.unwrap_or_default();
         let suffix = auth.suffix.unwrap_or_default();
-        let mut payload = prefix.into_bytes();
-        payload.extend_from_slice(&bytes);
-        payload.extend_from_slice(suffix.as_bytes());
+        let payload = source.upload_payload(prefix, suffix).await?;
         let upload_response = self
             .external_upload_request(&upload_url)?
             .header(CONTENT_TYPE, content_type)
@@ -459,7 +485,7 @@ impl ZoteroRemote {
             .await
             .map_err(remote_err("attachment-register"))?;
         ensure_empty(register_response, "attachment-register").await?;
-        Ok(attachment_key)
+        Ok(())
     }
 
     pub async fn add_linked_attachment(
@@ -480,11 +506,7 @@ impl ZoteroRemote {
     }
 
     pub async fn list_saved_searches(&self) -> ZotResult<Vec<SavedSearch>> {
-        let response = self
-            .zotero_get("searches")
-            .send()
-            .await
-            .map_err(remote_err("list-saved-searches"))?;
+        let response = send_with_retry(self.zotero_get("searches"), "list-saved-searches").await?;
         let body: Vec<RawSavedSearch> = read_json(response, "list-saved-searches").await?;
         Ok(body.into_iter().map(Into::into).collect())
     }
@@ -525,11 +547,7 @@ impl ZoteroRemote {
         } else {
             "items?format=versions".to_string()
         };
-        let response = self
-            .zotero_get(&endpoint)
-            .send()
-            .await
-            .map_err(remote_err("list-item-versions"))?;
+        let response = send_with_retry(self.zotero_get(&endpoint), "list-item-versions").await?;
         read_json(response, "list-item-versions").await
     }
 
@@ -547,20 +565,20 @@ impl ZoteroRemote {
     }
 
     pub async fn list_children(&self, key: &str) -> ZotResult<Vec<Value>> {
-        let response = self
-            .zotero_get(&format!("items/{key}/children"))
-            .send()
-            .await
-            .map_err(remote_err("list-children"))?;
+        let response = send_with_retry(
+            self.zotero_get(&format!("items/{key}/children")),
+            "list-children",
+        )
+        .await?;
         read_json(response, "list-children").await
     }
 
     pub async fn list_children_flat(&self, key: &str) -> ZotResult<Vec<Value>> {
-        let response = self
-            .zotero_get(&format!("items/{key}/children"))
-            .send()
-            .await
-            .map_err(remote_err("list-children"))?;
+        let response = send_with_retry(
+            self.zotero_get(&format!("items/{key}/children")),
+            "list-children",
+        )
+        .await?;
         let children: Vec<EditableObject> = read_json(response, "list-children").await?;
         Ok(children
             .into_iter()
@@ -612,13 +630,13 @@ impl ZoteroRemote {
     }
 
     async fn create_items(&self, payload: &Value, code: &str) -> ZotResult<Vec<String>> {
-        let response = self
-            .zotero_post("items")
-            .header("Zotero-Write-Token", Uuid::new_v4().to_string())
-            .json(payload)
-            .send()
-            .await
-            .map_err(remote_err("create-items"))?;
+        let response = send_with_retry(
+            self.zotero_post("items")
+                .header("Zotero-Write-Token", Uuid::new_v4().to_string())
+                .json(payload),
+            "create-items",
+        )
+        .await?;
         let body: MultiWriteResponse = read_json(response, code).await?;
         Ok(body
             .successful
@@ -629,13 +647,13 @@ impl ZoteroRemote {
     }
 
     async fn create_searches(&self, payload: &Value, code: &str) -> ZotResult<Vec<String>> {
-        let response = self
-            .zotero_post("searches")
-            .header("Zotero-Write-Token", Uuid::new_v4().to_string())
-            .json(payload)
-            .send()
-            .await
-            .map_err(remote_err("create-searches"))?;
+        let response = send_with_retry(
+            self.zotero_post("searches")
+                .header("Zotero-Write-Token", Uuid::new_v4().to_string())
+                .json(payload),
+            "create-searches",
+        )
+        .await?;
         let body: MultiWriteResponse = read_json(response, code).await?;
         Ok(body
             .successful
@@ -666,11 +684,11 @@ impl ZoteroRemote {
     }
 
     async fn library_version(&self) -> ZotResult<i64> {
-        let response = self
-            .zotero_get("items?limit=1&format=keys")
-            .send()
-            .await
-            .map_err(remote_err("library-version"))?;
+        let response = send_with_retry(
+            self.zotero_get("items?limit=1&format=keys"),
+            "library-version",
+        )
+        .await?;
         let response = ensure_status(response, "library-version").await?;
         let version = response
             .headers()
@@ -686,15 +704,7 @@ impl ZoteroRemote {
         Ok(version)
     }
 
-    async fn create_attachment_item(
-        &self,
-        parent_key: &str,
-        file_path: &Path,
-    ) -> ZotResult<String> {
-        let filename = file_path
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("attachment.bin");
+    async fn create_attachment_item(&self, parent_key: &str, filename: &str) -> ZotResult<String> {
         let content_type = guess_content_type(filename);
         let payload = json!([{
             "itemType": "attachment",
@@ -704,13 +714,13 @@ impl ZoteroRemote {
             "filename": filename,
             "contentType": content_type,
         }]);
-        let response = self
-            .zotero_post("items")
-            .header("Zotero-Write-Token", Uuid::new_v4().to_string())
-            .json(&payload)
-            .send()
-            .await
-            .map_err(remote_err("create-attachment-item"))?;
+        let response = send_with_retry(
+            self.zotero_post("items")
+                .header("Zotero-Write-Token", Uuid::new_v4().to_string())
+                .json(&payload),
+            "create-attachment-item",
+        )
+        .await?;
         let body: MultiWriteResponse = read_json(response, "create-attachment-item").await?;
         body.successful
             .and_then(|successful| successful.get("0").and_then(|entry| entry.key.clone()))
@@ -725,37 +735,14 @@ impl ZoteroRemote {
     async fn authorize_attachment_upload(
         &self,
         attachment_key: &str,
-        file_path: &Path,
-    ) -> ZotResult<(FileUploadAuthorization, Vec<u8>)> {
-        let bytes = tokio::fs::read(file_path)
-            .await
-            .map_err(|source| ZotError::Io {
-                path: file_path.to_path_buf(),
-                source,
-            })?;
-        let filename = file_path
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("attachment.bin");
-        let metadata = tokio::fs::metadata(file_path)
-            .await
-            .map_err(|source| ZotError::Io {
-                path: file_path.to_path_buf(),
-                source,
-            })?;
-        let modified = metadata
-            .modified()
-            .ok()
-            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|duration| duration.as_millis())
-            .unwrap_or_default();
-        let md5_hash = format!("{:x}", md5::compute(&bytes));
+        source: &PreparedAttachment,
+    ) -> ZotResult<FileUploadAuthorization> {
         let body = format!(
             "md5={}&filename={}&filesize={}&mtime={}",
-            md5_hash,
-            urlencoding::encode(filename),
-            bytes.len(),
-            modified
+            source.md5_hash,
+            urlencoding::encode(&source.filename),
+            source.size,
+            source.modified
         );
         let response = self
             .zotero_post(&format!("items/{attachment_key}/file"))
@@ -766,26 +753,230 @@ impl ZoteroRemote {
             .await
             .map_err(remote_err("attachment-authorize"))?;
         let auth: FileUploadAuthorization = read_json(response, "attachment-authorize").await?;
-        Ok((auth, bytes))
+        Ok(auth)
+    }
+
+    async fn cleanup_attachment_item(&self, attachment_key: &str) -> ZotResult<()> {
+        let item = self.get_item_data(attachment_key).await?;
+        let response = self
+            .zotero_delete(&format!("items/{attachment_key}"))
+            .header("If-Unmodified-Since-Version", item.version().to_string())
+            .send()
+            .await
+            .map_err(remote_err("attachment-cleanup"))?;
+        ensure_empty(response, "attachment-cleanup").await
+    }
+
+    async fn with_attachment_cleanup(&self, attachment_key: &str, error: ZotError) -> ZotError {
+        let original = error.payload();
+        let status = match error {
+            ZotError::Remote { status, .. } | ZotError::Connector { status, .. } => status,
+            _ => None,
+        };
+        let cleanup = match self.cleanup_attachment_item(attachment_key).await {
+            Ok(()) => "Orphan attachment cleanup succeeded".to_string(),
+            Err(cleanup_error) => format!(
+                "Orphan attachment cleanup failed: {}",
+                sanitize_cleanup_message(&cleanup_error.payload().message)
+            ),
+        };
+        let hint = match original.hint {
+            Some(hint) => Some(format!("{hint}; {cleanup}")),
+            None => Some(cleanup),
+        };
+        ZotError::Remote {
+            code: original.code,
+            message: original.message,
+            hint,
+            status,
+        }
     }
 
     async fn get_item_data(&self, key: &str) -> ZotResult<EditableObject> {
-        let response = self
-            .zotero_get(&format!("items/{key}"))
-            .send()
-            .await
-            .map_err(remote_err("get-item"))?;
+        let response =
+            send_with_retry(self.zotero_get(&format!("items/{key}")), "get-item").await?;
         read_json(response, "get-item").await
     }
 
     async fn get_collection_data(&self, key: &str) -> ZotResult<EditableObject> {
-        let response = self
-            .zotero_get(&format!("collections/{key}"))
-            .send()
-            .await
-            .map_err(remote_err("get-collection"))?;
+        let response = send_with_retry(
+            self.zotero_get(&format!("collections/{key}")),
+            "get-collection",
+        )
+        .await?;
         read_json(response, "get-collection").await
     }
+}
+
+struct PreparedAttachment {
+    file: tokio::fs::File,
+    path: std::path::PathBuf,
+    filename: String,
+    size: u64,
+    modified: u128,
+    md5_hash: String,
+}
+
+impl PreparedAttachment {
+    async fn open(path: &Path) -> ZotResult<Self> {
+        let mut file = tokio::fs::File::open(path)
+            .await
+            .map_err(|source| ZotError::Io {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        let metadata = file.metadata().await.map_err(|source| ZotError::Io {
+            path: path.to_path_buf(),
+            source,
+        })?;
+        if !metadata.is_file() {
+            return Err(ZotError::InvalidInput {
+                code: "attachment-file".to_string(),
+                message: "Attachment source must be a regular file".to_string(),
+                hint: Some("Choose a regular local file to attach".to_string()),
+            });
+        }
+        if metadata.len() > MAX_ATTACHMENT_BYTES {
+            return Err(attachment_size_error());
+        }
+
+        let mut digest = md5::Context::new();
+        let mut total = 0_u64;
+        let mut buffer = [0_u8; 64 * 1024];
+        loop {
+            let read = file
+                .read(&mut buffer)
+                .await
+                .map_err(|source| ZotError::Io {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
+            if read == 0 {
+                break;
+            }
+            total = total
+                .checked_add(read as u64)
+                .ok_or_else(attachment_size_error)?;
+            if total > MAX_ATTACHMENT_BYTES {
+                return Err(attachment_size_error());
+            }
+            digest.consume(&buffer[..read]);
+        }
+        if total != metadata.len() {
+            return Err(attachment_changed_error());
+        }
+        file.seek(SeekFrom::Start(0))
+            .await
+            .map_err(|source| ZotError::Io {
+                path: path.to_path_buf(),
+                source,
+            })?;
+
+        let filename = path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("attachment.bin")
+            .to_string();
+        let modified = metadata
+            .modified()
+            .ok()
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_millis())
+            .unwrap_or_default();
+        Ok(Self {
+            file,
+            path: path.to_path_buf(),
+            filename,
+            size: metadata.len(),
+            modified,
+            md5_hash: format!("{:x}", digest.finalize()),
+        })
+    }
+
+    async fn upload_payload(&mut self, prefix: String, suffix: String) -> ZotResult<Vec<u8>> {
+        let overhead = prefix
+            .len()
+            .checked_add(suffix.len())
+            .ok_or_else(attachment_size_error)?;
+        if overhead > MAX_UPLOAD_OVERHEAD_BYTES {
+            return Err(ZotError::Remote {
+                code: "attachment-upload".to_string(),
+                message: "Attachment upload authorization overhead is too large".to_string(),
+                hint: Some("Retry attachment authorization".to_string()),
+                status: None,
+            });
+        }
+        let capacity = usize::try_from(self.size)
+            .ok()
+            .and_then(|size| size.checked_add(overhead))
+            .ok_or_else(attachment_size_error)?;
+        self.file
+            .seek(SeekFrom::Start(0))
+            .await
+            .map_err(|source| ZotError::Io {
+                path: self.path.clone(),
+                source,
+            })?;
+        let mut payload = Vec::with_capacity(capacity);
+        payload.extend_from_slice(prefix.as_bytes());
+        let file_start = payload.len();
+        let mut buffer = [0_u8; 64 * 1024];
+        loop {
+            let read = self
+                .file
+                .read(&mut buffer)
+                .await
+                .map_err(|source| ZotError::Io {
+                    path: self.path.clone(),
+                    source,
+                })?;
+            if read == 0 {
+                break;
+            }
+            if payload.len().saturating_sub(file_start) + read > MAX_ATTACHMENT_BYTES as usize {
+                return Err(attachment_size_error());
+            }
+            payload.extend_from_slice(&buffer[..read]);
+        }
+        if payload.len().saturating_sub(file_start) != self.size as usize {
+            return Err(attachment_changed_error());
+        }
+        payload.extend_from_slice(suffix.as_bytes());
+        Ok(payload)
+    }
+}
+
+fn attachment_size_error() -> ZotError {
+    ZotError::InvalidInput {
+        code: "attachment-size".to_string(),
+        message: format!("Attachment exceeds the {MAX_ATTACHMENT_BYTES}-byte limit"),
+        hint: Some("Choose a smaller attachment".to_string()),
+    }
+}
+
+fn attachment_changed_error() -> ZotError {
+    ZotError::InvalidInput {
+        code: "attachment-changed".to_string(),
+        message: "Attachment changed while it was being prepared".to_string(),
+        hint: Some("Retry after the file is no longer being modified".to_string()),
+    }
+}
+
+fn sanitize_cleanup_message(message: &str) -> String {
+    let mut sanitized = String::new();
+    let mut previous_space = true;
+    for character in message.chars().take(512) {
+        if character.is_whitespace() {
+            if !previous_space {
+                sanitized.push(' ');
+                previous_space = true;
+            }
+        } else if !character.is_control() {
+            sanitized.push(character);
+            previous_space = false;
+        }
+    }
+    sanitized.trim().to_string()
 }
 
 #[derive(Debug, Deserialize)]
@@ -906,7 +1097,7 @@ mod tests {
     use uuid::Uuid;
     use zot_core::{LibraryScope, ZotError};
 
-    use super::ZoteroRemote;
+    use super::{MAX_ATTACHMENT_BYTES, ZoteroRemote};
     use crate::http::HttpRuntime;
     use crate::test_support::spawn_server;
 
@@ -980,9 +1171,162 @@ mod tests {
                 .iter()
                 .all(|request| { request.header("zotero-api-key") == Some("test-key") })
         );
+        assert!(
+            api_requests
+                .iter()
+                .all(|request| request.header("Zotero-API-Version") == Some("3"))
+        );
         assert_eq!(upload_requests.len(), 1);
         assert_eq!(upload_requests[0].method, "POST");
         assert_eq!(upload_requests[0].header("zotero-api-key"), None);
+        assert_eq!(upload_requests[0].header("Zotero-API-Version"), None);
+    }
+
+    #[tokio::test]
+    async fn authorization_failure_hard_deletes_orphan_attachment() {
+        let created = r#"{"successful":{"0":{"key":"ATTACH01"}}}"#;
+        let item = r#"{"key":"ATTACH01","version":7,"data":{"itemType":"attachment"}}"#;
+        let (api_url, api_server) = spawn_server(vec![
+            (200, created),
+            (500, "authorize failed"),
+            (200, item),
+            (204, ""),
+        ]);
+        let remote = client(api_url);
+        let file = tempfile::NamedTempFile::new().expect("create attachment fixture");
+        std::fs::write(file.path(), b"attachment bytes").expect("write attachment fixture");
+
+        let result = remote.upload_attachment("PARENT01", file.path()).await;
+        let captured = api_server.join().expect("API server thread panicked");
+
+        match result {
+            Err(ZotError::Remote { code, hint, .. }) => {
+                assert_eq!(code, "attachment-authorize");
+                assert!(hint.is_some_and(|hint| hint.contains("cleanup succeeded")));
+            }
+            other => panic!("expected authorization failure, got {other:?}"),
+        }
+        assert_eq!(
+            captured
+                .iter()
+                .map(|request| request.method.as_str())
+                .collect::<Vec<_>>(),
+            vec!["POST", "POST", "GET", "DELETE"]
+        );
+        assert_eq!(captured[3].header("If-Unmodified-Since-Version"), Some("7"));
+    }
+
+    #[tokio::test]
+    async fn external_upload_failure_hard_deletes_orphan_attachment() {
+        let (upload_url, upload_server) = spawn_server(vec![(500, "upload failed")]);
+        let auth: &'static str = Box::leak(
+            format!(
+                r#"{{"exists":false,"url":"{upload_url}","uploadKey":"UPLOAD-KEY","contentType":"application/octet-stream","prefix":"","suffix":""}}"#
+            )
+            .into_boxed_str(),
+        );
+        let created = r#"{"successful":{"0":{"key":"ATTACH01"}}}"#;
+        let item = r#"{"key":"ATTACH01","version":8,"data":{"itemType":"attachment"}}"#;
+        let (api_url, api_server) =
+            spawn_server(vec![(200, created), (200, auth), (200, item), (204, "")]);
+        let remote = client(api_url);
+        let file = tempfile::NamedTempFile::new().expect("create attachment fixture");
+        std::fs::write(file.path(), b"attachment bytes").expect("write attachment fixture");
+
+        let result = remote.upload_attachment("PARENT01", file.path()).await;
+        let captured = api_server.join().expect("API server thread panicked");
+        let _ = upload_server.join().expect("upload server thread panicked");
+
+        match result {
+            Err(ZotError::Remote { code, hint, .. }) => {
+                assert_eq!(code, "attachment-upload");
+                assert!(hint.is_some_and(|hint| hint.contains("cleanup succeeded")));
+            }
+            other => panic!("expected upload failure, got {other:?}"),
+        }
+        assert_eq!(captured[2].method, "GET");
+        assert_eq!(captured[3].method, "DELETE");
+    }
+
+    #[tokio::test]
+    async fn registration_failure_hard_deletes_orphan_attachment() {
+        let (upload_url, upload_server) = spawn_server(vec![(201, "")]);
+        let auth: &'static str = Box::leak(
+            format!(
+                r#"{{"exists":false,"url":"{upload_url}","uploadKey":"UPLOAD-KEY","contentType":"application/octet-stream","prefix":"","suffix":""}}"#
+            )
+            .into_boxed_str(),
+        );
+        let created = r#"{"successful":{"0":{"key":"ATTACH01"}}}"#;
+        let item = r#"{"key":"ATTACH01","version":9,"data":{"itemType":"attachment"}}"#;
+        let (api_url, api_server) = spawn_server(vec![
+            (200, created),
+            (200, auth),
+            (500, "register failed"),
+            (200, item),
+            (204, ""),
+        ]);
+        let remote = client(api_url);
+        let file = tempfile::NamedTempFile::new().expect("create attachment fixture");
+        std::fs::write(file.path(), b"attachment bytes").expect("write attachment fixture");
+
+        let result = remote.upload_attachment("PARENT01", file.path()).await;
+        let captured = api_server.join().expect("API server thread panicked");
+        let _ = upload_server.join().expect("upload server thread panicked");
+
+        match result {
+            Err(ZotError::Remote { code, hint, .. }) => {
+                assert_eq!(code, "attachment-register");
+                assert!(hint.is_some_and(|hint| hint.contains("cleanup succeeded")));
+            }
+            other => panic!("expected registration failure, got {other:?}"),
+        }
+        assert_eq!(captured[3].method, "GET");
+        assert_eq!(captured[4].method, "DELETE");
+    }
+
+    #[tokio::test]
+    async fn cleanup_failure_keeps_original_error_and_cleanup_evidence() {
+        let created = r#"{"successful":{"0":{"key":"ATTACH01"}}}"#;
+        let (api_url, api_server) = spawn_server(vec![
+            (200, created),
+            (500, "authorize failed"),
+            (500, "cleanup failed"),
+            (500, "cleanup failed"),
+            (500, "cleanup failed"),
+        ]);
+        let remote = client(api_url);
+        let file = tempfile::NamedTempFile::new().expect("create attachment fixture");
+        std::fs::write(file.path(), b"attachment bytes").expect("write attachment fixture");
+
+        let result = remote.upload_attachment("PARENT01", file.path()).await;
+        let captured = api_server.join().expect("API server thread panicked");
+
+        match result {
+            Err(ZotError::Remote { code, hint, .. }) => {
+                assert_eq!(code, "attachment-authorize");
+                assert!(hint.is_some_and(|hint| hint.contains("cleanup failed")));
+            }
+            other => panic!("expected original failure, got {other:?}"),
+        }
+        assert_eq!(captured.len(), 5);
+        assert!(captured[2..].iter().all(|request| request.method == "GET"));
+    }
+
+    #[tokio::test]
+    async fn oversize_attachment_fails_before_any_request() {
+        let remote = client("http://127.0.0.1:1".to_string());
+        let file = tempfile::NamedTempFile::new().expect("create attachment fixture");
+        file.as_file()
+            .set_len(MAX_ATTACHMENT_BYTES + 1)
+            .expect("make sparse oversize fixture");
+
+        let error = remote
+            .upload_attachment("PARENT01", file.path())
+            .await
+            .expect_err("oversize attachment must fail locally");
+
+        assert_eq!(error.payload().code, "attachment-size");
     }
 
     #[test]
@@ -1032,6 +1376,11 @@ mod tests {
         let captured = server.join().expect("server thread panicked");
         assert!(result.is_ok(), "expected Ok, got {result:?}");
         assert_eq!(captured.len(), 2);
+        assert!(
+            captured
+                .iter()
+                .all(|request| request.header("Zotero-API-Version") == Some("3"))
+        );
         assert_eq!(captured[1].method, "PUT");
         assert_eq!(
             captured[1].header("If-Unmodified-Since-Version"),
@@ -1085,7 +1434,8 @@ mod tests {
 
         let payload = json!({"key":"ABCD1234","version":10,"itemType":"journalArticle"});
         let result = remote.update_flat_item_value(&payload).await;
-        let _ = server.join().expect("server thread panicked");
+        let captured = server.join().expect("server thread panicked");
+        assert_eq!(captured.len(), 1, "conditional PUT must not be retried");
 
         match result {
             Err(ZotError::Remote { status, hint, .. }) => {
@@ -1113,5 +1463,68 @@ mod tests {
             captured[0].url
         );
         assert_eq!(result.ok(), Some("NEWKEY12".to_string()));
+        assert_eq!(captured[0].header("Zotero-API-Version"), Some("3"));
+    }
+
+    #[tokio::test]
+    async fn retries_gets_on_429_and_server_errors() {
+        let (base_url, server) = crate::test_support::spawn_server_with_headers(vec![
+            (429, "limited", vec![("Retry-After", "0")]),
+            (503, "busy", vec![("Retry-After", "0")]),
+            (200, "[]", vec![]),
+        ]);
+        let remote = client(base_url);
+
+        let result = remote.list_saved_searches().await;
+        let captured = server.join().expect("server thread panicked");
+
+        assert!(result.is_ok(), "expected retry recovery, got {result:?}");
+        assert_eq!(captured.len(), 3);
+        assert!(captured.iter().all(|request| request.method == "GET"));
+    }
+
+    #[tokio::test]
+    async fn retries_write_token_create_with_the_same_token() {
+        let created = r#"{"successful":{"0":{"key":"NEWKEY12"}}}"#;
+        let (base_url, server) = crate::test_support::spawn_server_with_headers(vec![
+            (503, "busy", vec![("Retry-After", "0")]),
+            (200, created, vec![]),
+        ]);
+        let remote = client(base_url);
+
+        let result = remote.create_item(Some("10.1234/example"), None).await;
+        let captured = server.join().expect("server thread panicked");
+
+        assert_eq!(result.ok(), Some("NEWKEY12".to_string()));
+        assert_eq!(captured.len(), 2);
+        let first = captured[0]
+            .header("Zotero-Write-Token")
+            .expect("first request has write token");
+        assert_eq!(captured[1].header("Zotero-Write-Token"), Some(first));
+    }
+
+    #[tokio::test]
+    async fn error_bodies_are_bounded_and_sanitized() {
+        let body: &'static str =
+            Box::leak(format!("remote\tmessage\0{}", "x".repeat(8 * 1024)).into_boxed_str());
+        let (base_url, server) = spawn_server(vec![(500, body)]);
+        let remote = client(base_url);
+        let payload = json!({"key":"ABCD1234","version":10,"itemType":"journalArticle"});
+
+        let result = remote.update_flat_item_value(&payload).await;
+        let _ = server.join().expect("server thread panicked");
+
+        match result {
+            Err(ZotError::Remote { message, .. }) => {
+                assert!(message.contains("[truncated]"));
+                assert!(!message.contains('\0'));
+                assert!(
+                    message.len() < 4300,
+                    "bounded message length: {}",
+                    message.len()
+                );
+            }
+            other => panic!("expected bounded Remote error, got {other:?}"),
+        }
     }
 }

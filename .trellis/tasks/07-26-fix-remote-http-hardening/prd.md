@@ -92,20 +92,20 @@ Atom 响应。
 
 ## Acceptance Criteria
 
-- [ ] fake server 证明 GET 对 429/5xx 最多重试 3 次、尊重零秒 `Retry-After`，普通
+- [x] fake server 证明 GET 对 429/5xx 最多重试 3 次、尊重零秒 `Retry-After`，普通
       条件写只发送一次，write-token POST 重试时 token 字节完全相同。
-- [ ] 错误体测试覆盖超长、控制字符与敏感样式内容，输出不超过约定上限且有截断标记。
-- [ ] Zotero 所有 API fake-server 请求均含 `Zotero-API-Version: 3`；external upload
+- [x] 错误体测试覆盖超长、控制字符与敏感样式内容，输出不超过约定上限且有截断标记。
+- [x] Zotero 所有 API fake-server 请求均含 `Zotero-API-Version: 3`；external upload
       同时不含 API key 和 version。
-- [ ] OA URL/redirect 测试覆盖 HTTP、userinfo、loopback/private/link-local literal、
+- [x] OA URL/redirect 测试覆盖 HTTP、userinfo、loopback/private/link-local literal、
       私网 redirect、过多 redirect、非 PDF content type、错误 magic、声明/实际超限；
       任一失败均不调用附件上传。
-- [ ] 合法 PDF 通过有界流式临时文件上传，成功/失败后均不遗留临时文件。
-- [ ] 本地超限附件在零请求下失败；授权/上传/注册故障分别证明 orphan cleanup 成功，
+- [x] 合法 PDF 通过有界流式临时文件上传，成功/失败后均不遗留临时文件。
+- [x] 本地超限附件在零请求下失败；授权/上传/注册故障分别证明 orphan cleanup 成功，
       cleanup 自身失败时错误证据同时保留原始失败与 cleanup failure。
-- [ ] arXiv fixture 覆盖 namespace/entity/CDATA/嵌套 author 内容与 malformed XML，且
+- [x] arXiv fixture 覆盖 namespace/entity/CDATA/嵌套 author 内容与 malformed XML，且
       `oa.rs` 不再以 regex 提取 Atom 字段。
-- [ ] `cargo test -p zot-remote`、相关 `cargo test -p zot-cli`、manifest guard 与最终
+- [x] `cargo test -p zot-remote`、相关 `cargo test -p zot-cli`、manifest guard 与最终
       `just ci` 全部通过；远程安全契约同步到 `.trellis/spec/`。
 
 ## Out Of Scope

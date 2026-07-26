@@ -1,9 +1,11 @@
 use once_cell::sync::Lazy;
+use quick_xml::Reader;
+use quick_xml::events::Event;
 use regex::Regex;
 use serde::Deserialize;
 use zot_core::{ZotError, ZotResult};
 
-use crate::http::{HttpRuntime, ensure_status, remote_err};
+use crate::http::{HttpRuntime, ensure_status, remote_err, send_with_retry};
 
 const CONTACT_EMAIL_ENV: &str = "ZOT_CONTACT_EMAIL";
 const DEFAULT_CONTACT_EMAIL: &str = "noreply@zot.local";
@@ -37,15 +39,6 @@ static ARXIV_RE: Lazy<Regex> = Lazy::new(|| {
 });
 static ARXIV_DOI_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"arXiv\.(\d{4}\.\d{4,5}(?:v\d+)?)").expect("valid arXiv DOI regex"));
-static ARXIV_TITLE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?s)<title>\s*(.*?)\s*</title>").expect("valid title regex"));
-static ARXIV_SUMMARY_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?s)<summary>\s*(.*?)\s*</summary>").expect("valid summary regex"));
-static ARXIV_PUBLISHED_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"<published>([^<]+)</published>").expect("valid published regex"));
-static ARXIV_AUTHOR_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?s)<author>\s*<name>\s*(.*?)\s*</name>\s*</author>").expect("valid author regex")
-});
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CreatorName {
@@ -123,14 +116,14 @@ impl OaClient {
     }
 
     pub async fn fetch_crossref_work(&self, doi: &str) -> ZotResult<CrossRefWork> {
-        let response = self
-            .client
-            .get(format!("{}/works/{}", self.crossref_base, doi))
-            .header("Accept", "application/json")
-            .header("User-Agent", polite_user_agent())
-            .send()
-            .await
-            .map_err(remote_err("crossref-request"))?;
+        let response = send_with_retry(
+            self.client
+                .get(format!("{}/works/{}", self.crossref_base, doi))
+                .header("Accept", "application/json")
+                .header("User-Agent", polite_user_agent()),
+            "crossref-request",
+        )
+        .await?;
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(ZotError::Remote {
                 code: "crossref-not-found".to_string(),
@@ -146,14 +139,13 @@ impl OaClient {
     }
 
     pub async fn fetch_arxiv_work(&self, arxiv_id: &str) -> ZotResult<ArxivWork> {
-        let response = self
-            .client
-            .get(format!(
+        let response = send_with_retry(
+            self.client.get(format!(
                 "https://export.arxiv.org/api/query?id_list={arxiv_id}"
-            ))
-            .send()
-            .await
-            .map_err(remote_err("arxiv-request"))?;
+            )),
+            "arxiv-request",
+        )
+        .await?;
         let response = ensure_status(response, "arxiv-http").await?;
         let body = response.text().await.map_err(remote_err("arxiv-body"))?;
         parse_arxiv_atom(arxiv_id, &body)
@@ -194,17 +186,16 @@ impl OaClient {
     }
 
     async fn try_unpaywall(&self, doi: &str) -> ZotResult<Option<String>> {
-        let response = self
-            .client
-            .get(format!(
+        let response = send_with_retry(
+            self.client.get(format!(
                 "{}/v2/{}?email={}",
                 self.unpaywall_base,
                 doi,
                 urlencoding::encode(&contact_email())
-            ))
-            .send()
-            .await
-            .map_err(remote_err("unpaywall-request"))?;
+            )),
+            "unpaywall-request",
+        )
+        .await?;
         if !response.status().is_success() {
             return Ok(None);
         }
@@ -231,15 +222,14 @@ impl OaClient {
     }
 
     async fn try_semantic_scholar(&self, doi: &str) -> ZotResult<Option<String>> {
-        let response = self
-            .client
-            .get(format!(
+        let response = send_with_retry(
+            self.client.get(format!(
                 "{}/paper/DOI:{}?fields=openAccessPdf",
                 self.ss_base, doi
-            ))
-            .send()
-            .await
-            .map_err(remote_err("ss-oa-request"))?;
+            )),
+            "ss-oa-request",
+        )
+        .await?;
         if !response.status().is_success() {
             return Ok(None);
         }
@@ -249,17 +239,16 @@ impl OaClient {
     }
 
     async fn try_pmc(&self, doi: &str) -> ZotResult<Option<String>> {
-        let response = self
-            .client
-            .get(format!(
+        let response = send_with_retry(
+            self.client.get(format!(
                 "{}/tools/idconv/api/v1/articles/?ids={}&format=json&tool=zot&email={}",
                 self.pmc_base,
                 urlencoding::encode(doi),
                 urlencoding::encode(&contact_email())
-            ))
-            .send()
-            .await
-            .map_err(remote_err("pmc-request"))?;
+            )),
+            "pmc-request",
+        )
+        .await?;
         if !response.status().is_success() {
             return Ok(None);
         }
@@ -299,43 +288,116 @@ pub fn normalize_arxiv_id(raw: &str) -> Option<String> {
 }
 
 fn parse_arxiv_atom(arxiv_id: &str, body: &str) -> ZotResult<ArxivWork> {
-    let mut titles = ARXIV_TITLE_RE.captures_iter(body);
-    let _feed_title = titles.next();
-    let title = titles
-        .next()
-        .and_then(|captures| {
-            captures
-                .get(1)
-                .map(|matched| html_unescape(matched.as_str()))
-        })
-        .ok_or_else(|| ZotError::Remote {
-            code: "arxiv-parse".to_string(),
-            message: format!("No arXiv entry found for {arxiv_id}"),
-            hint: None,
-            status: None,
-        })?;
-    let abstract_note = ARXIV_SUMMARY_RE.captures(body).and_then(|captures| {
-        captures
-            .get(1)
-            .map(|matched| html_unescape(matched.as_str()))
-    });
-    let date = ARXIV_PUBLISHED_RE
-        .captures(body)
-        .and_then(|captures| {
-            captures
-                .get(1)
-                .and_then(|matched| matched.as_str().get(0..10))
-        })
-        .map(|value| value.to_string());
-    let creators = ARXIV_AUTHOR_RE
-        .captures_iter(body)
-        .filter_map(|captures| {
-            captures
-                .get(1)
-                .map(|matched| matched.as_str().trim().to_string())
-        })
-        .map(|name| split_creator_name(&name))
-        .collect::<Vec<_>>();
+    let mut reader = Reader::from_str(body);
+    reader.config_mut().trim_text(false);
+    let mut stack = Vec::<Vec<u8>>::new();
+    let mut entry_depth = None;
+    let mut entry_complete = false;
+    let mut author_depth = None;
+    let mut capture: Option<(AtomField, usize, String)> = None;
+    let mut title = None;
+    let mut abstract_note = None;
+    let mut published = None;
+    let mut creators = Vec::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(start)) => {
+                let local = start.local_name().as_ref().to_vec();
+                let depth = stack.len() + 1;
+                if entry_depth.is_none() && !entry_complete && local.as_slice() == b"entry" {
+                    entry_depth = Some(depth);
+                } else if entry_depth.is_some() {
+                    if local.as_slice() == b"author" {
+                        author_depth = Some(depth);
+                    } else if capture.is_none() {
+                        let field = match local.as_slice() {
+                            b"title" => Some(AtomField::Title),
+                            b"summary" => Some(AtomField::Summary),
+                            b"published" => Some(AtomField::Published),
+                            b"name" if author_depth.is_some() => Some(AtomField::Author),
+                            _ => None,
+                        };
+                        if let Some(field) = field {
+                            capture = Some((field, depth, String::new()));
+                        }
+                    }
+                }
+                stack.push(local);
+            }
+            Ok(Event::Text(text)) => {
+                if let Some((_, _, value)) = capture.as_mut() {
+                    let decoded = text.decode().map_err(arxiv_xml_error)?;
+                    let unescaped =
+                        quick_xml::escape::unescape(decoded.as_ref()).map_err(arxiv_xml_error)?;
+                    value.push_str(unescaped.as_ref());
+                }
+            }
+            Ok(Event::CData(text)) => {
+                if let Some((_, _, value)) = capture.as_mut() {
+                    value.push_str(text.decode().map_err(arxiv_xml_error)?.as_ref());
+                }
+            }
+            Ok(Event::GeneralRef(reference)) => {
+                if let Some((_, _, value)) = capture.as_mut() {
+                    if let Some(character) =
+                        reference.resolve_char_ref().map_err(arxiv_xml_error)?
+                    {
+                        value.push(character);
+                    } else {
+                        let name = reference.decode().map_err(arxiv_xml_error)?;
+                        let resolved = quick_xml::escape::resolve_xml_entity(name.as_ref())
+                            .ok_or_else(|| {
+                                arxiv_xml_error(format!("unknown XML entity &{name};"))
+                            })?;
+                        value.push_str(resolved);
+                    }
+                }
+            }
+            Ok(Event::End(end)) => {
+                let local = end.local_name();
+                let depth = stack.len();
+                if capture
+                    .as_ref()
+                    .is_some_and(|(_, capture_depth, _)| *capture_depth == depth)
+                    && let Some((field, _, value)) = capture.take()
+                {
+                    let value = normalize_xml_text(&value);
+                    if !value.is_empty() {
+                        match field {
+                            AtomField::Title => title = Some(value),
+                            AtomField::Summary => abstract_note = Some(value),
+                            AtomField::Published => published = Some(value),
+                            AtomField::Author => creators.push(split_creator_name(&value)),
+                        }
+                    }
+                }
+                if author_depth == Some(depth) && local.as_ref() == b"author" {
+                    author_depth = None;
+                }
+                if entry_depth == Some(depth) && local.as_ref() == b"entry" {
+                    entry_depth = None;
+                    entry_complete = true;
+                    author_depth = None;
+                }
+                let _ = stack.pop();
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(error) => return Err(arxiv_xml_error(error)),
+        }
+    }
+
+    let title = title.ok_or_else(|| ZotError::Remote {
+        code: "arxiv-parse".to_string(),
+        message: format!("No arXiv entry found for {arxiv_id}"),
+        hint: None,
+        status: None,
+    })?;
+    let date = published
+        .as_deref()
+        .and_then(|value| value.get(0..10))
+        .map(str::to_string);
     Ok(ArxivWork {
         arxiv_id: arxiv_id.to_string(),
         title,
@@ -345,6 +407,27 @@ fn parse_arxiv_atom(arxiv_id: &str, body: &str) -> ZotResult<ArxivWork> {
         abs_url: format!("https://arxiv.org/abs/{arxiv_id}"),
         pdf_url: format!("https://arxiv.org/pdf/{arxiv_id}.pdf"),
     })
+}
+
+#[derive(Clone, Copy)]
+enum AtomField {
+    Title,
+    Summary,
+    Published,
+    Author,
+}
+
+fn arxiv_xml_error(error: impl std::fmt::Display) -> ZotError {
+    ZotError::Remote {
+        code: "arxiv-parse".to_string(),
+        message: format!("Unable to parse arXiv Atom response: {error}"),
+        hint: None,
+        status: None,
+    }
+}
+
+fn normalize_xml_text(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn split_creator_name(name: &str) -> CreatorName {
@@ -664,6 +747,44 @@ mod tests {
             try_arxiv_from_crossref(&crossref),
             Some("https://arxiv.org/pdf/2301.00774.pdf".to_string())
         );
+    }
+
+    #[test]
+    fn parses_namespaced_nested_and_cdata_arxiv_atom() {
+        let atom = r#"
+            <atom:feed xmlns:atom="http://www.w3.org/2005/Atom">
+              <atom:title>Feed title</atom:title>
+              <atom:entry>
+                <atom:title>Structured <em>XML</em> &amp; safety</atom:title>
+                <atom:summary><![CDATA[Bounded <downloads> stay intact.]]></atom:summary>
+                <atom:published>2026-07-26T12:30:00Z</atom:published>
+                <atom:author><atom:name>Ada <suffix>Lovelace</suffix></atom:name></atom:author>
+                <atom:author><atom:name>Grace Hopper</atom:name></atom:author>
+              </atom:entry>
+            </atom:feed>
+        "#;
+        let work = parse_arxiv_atom("2607.12345", atom).expect("parse structured Atom");
+        assert_eq!(work.title, "Structured XML & safety");
+        assert_eq!(
+            work.abstract_note.as_deref(),
+            Some("Bounded <downloads> stay intact.")
+        );
+        assert_eq!(work.date.as_deref(), Some("2026-07-26"));
+        assert_eq!(work.creators.len(), 2);
+        assert_eq!(work.creators[0].first_name, "Ada");
+        assert_eq!(work.creators[0].last_name, "Lovelace");
+    }
+
+    #[test]
+    fn rejects_malformed_or_entryless_arxiv_atom() {
+        for atom in [
+            "<feed><entry><title>broken</entry></feed>",
+            "<feed><title>feed only</title></feed>",
+            "<feed><entry><title>valid first entry</title></entry><broken></feed>",
+        ] {
+            let error = parse_arxiv_atom("2607.12345", atom).expect_err("Atom must fail");
+            assert_eq!(error.payload().code, "arxiv-parse");
+        }
     }
 
     #[test]

@@ -112,6 +112,21 @@ libraries. Keep it accurate as the implementation evolves.
   to enter the CrossRef polite pool. The default is `noreply@zot.local`,
   which is recognised as an opaque placeholder rather than a real mailbox.
 
+## Remote HTTP and attachment limits
+
+- Eligible GET and `Zotero-Write-Token` requests make at most **3 attempts**.
+  `Retry-After` and fallback backoff are capped at **5 seconds** per retry.
+  Other mutations are one-shot.
+- Remote non-success bodies retain at most **4 KiB** after control-character
+  removal and whitespace normalization; larger/unfinished bodies are marked
+  `[truncated]`.
+- OA automatic PDF downloads allow at most **5 redirects**, validate every
+  destination and DNS result, and accept at most **100 MiB** by both declared
+  and streamed size. They also require `application/pdf` and `%PDF-` magic.
+- Local attachment uploads accept regular files up to **100 MiB**. The limit is
+  checked before attachment-item creation; later authorize/upload/register
+  failures trigger best-effort orphan cleanup.
+
 ## JSON envelope contract
 
 - Executed one-shot `zot --json ...` commands always return exactly one standard envelope from

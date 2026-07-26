@@ -3,7 +3,7 @@ use regex::Regex;
 use serde::Deserialize;
 use zot_core::{ZotError, ZotResult};
 
-use crate::http::{HttpRuntime, ensure_status, remote_err};
+use crate::http::{HttpRuntime, ensure_status, remote_err, send_with_retry};
 
 const API_BASE: &str = "https://api.semanticscholar.org/graph/v1";
 static ARXIV_VERSION_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"v\d+$").expect("valid regex"));
@@ -133,7 +133,7 @@ impl SemanticScholarClient {
         if let Some(api_key) = self.api_key.as_deref() {
             request = request.header("x-api-key", api_key);
         }
-        let response = request.send().await.map_err(remote_err("ss-request"))?;
+        let response = send_with_retry(request, "ss-request").await?;
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(None);
         }

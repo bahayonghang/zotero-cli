@@ -1,4 +1,5 @@
 pub mod better_bibtex;
+pub mod download;
 pub mod embedding;
 pub mod http;
 pub mod oa;
@@ -10,6 +11,7 @@ pub mod zotero;
 mod test_support;
 
 pub use better_bibtex::{BetterBibTexClient, BetterBibTexSearchItem};
+pub use download::{MAX_PDF_BYTES, download_pdf_to_path};
 pub use embedding::EmbeddingClient;
 pub use http::HttpRuntime;
 pub use oa::{
