@@ -70,6 +70,64 @@ Err(ZotError::Remote {
 - CrossRef and Unpaywall requests should include polite contact information
   through `ZOT_CONTACT_EMAIL`; `oa.rs` defaults to `noreply@zot.local`.
 
+## Scenario: Origin-scoped Zotero attachment credentials
+
+### 1. Scope / Trigger
+
+This contract applies whenever `zotero.rs` changes Zotero request builders or
+the multi-step attachment upload flow. Zotero API credentials must never inherit
+onto the external upload URL returned by attachment authorization.
+
+### 2. Signatures
+
+- `zotero_request(method: Method, endpoint: &str) -> RequestBuilder`
+- `external_upload_request(upload_url: &str) -> ZotResult<RequestBuilder>`
+- `upload_attachment(parent_key: &str, file_path: &Path) -> ZotResult<String>`
+
+### 3. Contracts
+
+- Authenticated builders accept only a Zotero-relative endpoint and add
+  `zotero-api-key`; they construct the final URL through `self.endpoint()`.
+- External uploads reuse the pooled `HttpRuntime` client but never add the API
+  key. Production upload URLs must use HTTPS.
+- The test-only explicit-base constructor may allow HTTP only for loopback fake
+  servers; the production constructor never enables that exception.
+- The flow remains create item -> authorize -> external upload -> register key.
+
+### 4. Validation & Error Matrix
+
+- Invalid URL syntax -> `InvalidInput` code `attachment-upload-url`.
+- Production URL with a non-HTTPS scheme -> `attachment-upload-url` before send.
+- External send failure -> `Remote` code `attachment-upload`.
+- External status other than 201 -> `Remote` code `attachment-upload` with status.
+
+### 5. Good / Base / Bad Cases
+
+- Good: authorization returns `https://uploads.zotero.org/...`; upload has no
+  `zotero-api-key`, then registration returns 204.
+- Base: test authorization returns an HTTP `127.0.0.1` URL through the test-only
+  constructor and exercises the full flow locally.
+- Bad: pass the authorization URL to an authenticated Zotero builder or permit a
+  production HTTP upload.
+
+### 6. Tests Required
+
+- Use separate API and upload fake servers for the complete flow.
+- Assert every API-server request has the test key and the upload-server request
+  has no `zotero-api-key` header.
+- Assert production construction accepts HTTPS and rejects HTTP, other schemes,
+  and malformed URLs without sending.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: upload_url inherits Zotero ambient authority.
+self.zotero_post(&upload_url).send().await?;
+
+// Correct: validate the external target and build without Zotero credentials.
+self.external_upload_request(&upload_url)?.send().await?;
+```
+
 ## Review Checklist
 
 - Does every mutating Zotero request carry the right version precondition or
