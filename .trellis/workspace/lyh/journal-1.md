@@ -681,3 +681,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: 完成配置与凭据加固
+
+**Date**: 2026-07-26
+**Task**: 完成配置与凭据加固
+**Branch**: `dev`
+
+### Summary
+
+完成 secret Debug 隔离、配置路径 fail-closed 与原子持久化，接入 effective profile/JSON/只读 limit，收紧 doctor 和 config init 契约；聚焦测试、just ci 与 zot doctor 均通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b7bd13e` | (see git log) |
+| `472d1da` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

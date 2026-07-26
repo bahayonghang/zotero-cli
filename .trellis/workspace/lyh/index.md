@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 20
+- **Total Sessions**: 21
 - **Last Active**: 2026-07-26
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~683 | Active |
+| `journal-1.md` | ~717 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 21 | 2026-07-26 | 完成配置与凭据加固 | `b7bd13e`, `472d1da` | `dev` |
 | 20 | 2026-07-26 | 完成批量标签写入安全门禁 | `f5681c9`, `33808ae` | `dev` |
 | 19 | 2026-07-26 | 完成 JSON 错误协议统一 | `1dc7e0b`, `f4810f7` | `dev` |
 | 18 | 2026-07-26 | 完成 SQLite 一致快照整改 | `08a5925`, `b1b7f50` | `dev` |
