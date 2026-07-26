@@ -2,9 +2,17 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::{Duration, Instant};
 
+use chrono::{DateTime, Utc};
 use regex::Regex;
-use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
+use rusqlite::{
+    Connection, ErrorCode, OpenFlags, OptionalExtension,
+    backup::{Backup, StepResult},
+    params, params_from_iter,
+};
+use serde::Serialize;
 use strsim::normalized_levenshtein;
 use tempfile::TempDir;
 use zot_core::{
@@ -18,6 +26,35 @@ use crate::citation::export_item;
 use crate::graph::{PairAccum, score_pair};
 
 const EXCLUDED_TYPE_NAMES: &[&str] = &["attachment", "note", "annotation"];
+const ZOTERO_DB_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+const SNAPSHOT_STEP_PAUSE: Duration = Duration::from_millis(5);
+const SNAPSHOT_PAGES_PER_STEP: i32 = 256;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LibrarySnapshotMeta {
+    pub source_modified_at: Option<String>,
+    pub snapshot_created_at: String,
+    pub schema_version: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SnapshotPolicy {
+    busy_timeout: Duration,
+    busy_retry_limit: Duration,
+    step_pause: Duration,
+    pages_per_step: i32,
+}
+
+impl Default for SnapshotPolicy {
+    fn default() -> Self {
+        Self {
+            busy_timeout: ZOTERO_DB_BUSY_TIMEOUT,
+            busy_retry_limit: ZOTERO_DB_BUSY_TIMEOUT,
+            step_pause: SNAPSHOT_STEP_PAUSE,
+            pages_per_step: SNAPSHOT_PAGES_PER_STEP,
+        }
+    }
+}
 
 /// Escape SQLite `LIKE` wildcards in user-provided text so that `%` and `_`
 /// are matched literally. Pair with `LIKE ? ESCAPE '\\'` in SQL.
@@ -110,7 +147,8 @@ pub struct LocalLibrary {
     library_scope: LibraryScope,
     library_id: i64,
     conn: Connection,
-    _temp_dir: Option<TempDir>,
+    _temp_dir: TempDir,
+    snapshot_meta: LibrarySnapshotMeta,
     collections_cache: std::cell::OnceCell<Vec<Collection>>,
 }
 
@@ -126,7 +164,7 @@ impl LocalLibrary {
             });
         }
 
-        let (conn, temp_dir) = Self::connect(&db_path)?;
+        let (conn, temp_dir, snapshot_meta) = Self::connect(&db_path)?;
         let mut instance = Self {
             db_path,
             data_dir,
@@ -134,6 +172,7 @@ impl LocalLibrary {
             library_id: 1,
             conn,
             _temp_dir: temp_dir,
+            snapshot_meta,
             collections_cache: std::cell::OnceCell::new(),
         };
         instance.library_id = instance.resolve_library_id()?;
@@ -148,6 +187,10 @@ impl LocalLibrary {
         self.library_id
     }
 
+    pub fn snapshot_meta(&self) -> &LibrarySnapshotMeta {
+        &self.snapshot_meta
+    }
+
     pub fn resolve_group_library_id(&self, group_id: i64) -> ZotResult<Option<i64>> {
         self.conn
             .query_row(
@@ -160,14 +203,7 @@ impl LocalLibrary {
     }
 
     pub fn check_schema_compatibility(&self) -> ZotResult<Option<i64>> {
-        self.conn
-            .query_row(
-                "SELECT version FROM version WHERE schema = 'userdata'",
-                [],
-                |row| row.get::<_, i64>(0),
-            )
-            .optional()
-            .map_err(sql_err("schema-version"))
+        Ok(self.snapshot_meta.schema_version)
     }
 
     pub fn list_items(
@@ -1455,41 +1491,46 @@ impl LocalLibrary {
         Ok(items)
     }
 
-    fn connect(db_path: &Path) -> ZotResult<(Connection, Option<TempDir>)> {
-        let uri = format!(
-            "file:{}?mode=ro&immutable=1",
-            db_path.to_string_lossy().replace('\\', "/")
-        );
-        match Connection::open_with_flags(
-            &uri,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-        ) {
-            Ok(conn) => Ok((conn, None)),
-            Err(_) => {
-                let temp_dir = tempfile::tempdir().map_err(|source| ZotError::Io {
-                    path: db_path.to_path_buf(),
-                    source,
-                })?;
-                let temp_db = temp_dir.path().join("zotero.sqlite");
-                fs::copy(db_path, &temp_db).map_err(|source| ZotError::Io {
-                    path: temp_db.clone(),
-                    source,
-                })?;
-                for suffix in ["sqlite-wal", "sqlite-shm"] {
-                    let source_path = db_path.with_extension(suffix);
-                    let target_path = temp_db.with_extension(suffix);
-                    if source_path.exists() {
-                        let _ = fs::copy(source_path, target_path);
-                    }
-                }
-                let conn = Connection::open_with_flags(
-                    &temp_db,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-                )
-                .map_err(sql_err("open-fallback-db"))?;
-                Ok((conn, Some(temp_dir)))
-            }
-        }
+    fn connect(db_path: &Path) -> ZotResult<(Connection, TempDir, LibrarySnapshotMeta)> {
+        Self::connect_with_policy(db_path, SnapshotPolicy::default())
+    }
+
+    fn connect_with_policy(
+        db_path: &Path,
+        policy: SnapshotPolicy,
+    ) -> ZotResult<(Connection, TempDir, LibrarySnapshotMeta)> {
+        let source_modified_at = fs::metadata(db_path)
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .map(|modified| DateTime::<Utc>::from(modified).to_rfc3339());
+        let source = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(snapshot_sql_err("open-zotero-db"))?;
+        source
+            .busy_timeout(policy.busy_timeout)
+            .map_err(snapshot_sql_err("open-zotero-db"))?;
+
+        let temp_dir = tempfile::tempdir().map_err(|source| ZotError::Io {
+            path: db_path.to_path_buf(),
+            source,
+        })?;
+        let snapshot_path = temp_dir.path().join("zotero.sqlite");
+        let mut destination =
+            Connection::open(&snapshot_path).map_err(snapshot_sql_err("snapshot-zotero-db"))?;
+        run_snapshot_backup(&source, &mut destination, policy)?;
+        drop(destination);
+        drop(source);
+
+        let snapshot =
+            Connection::open_with_flags(&snapshot_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .map_err(snapshot_sql_err("open-zotero-snapshot"))?;
+        validate_snapshot(&snapshot)?;
+        let schema_version = snapshot_schema_version(&snapshot)?;
+        let snapshot_meta = LibrarySnapshotMeta {
+            source_modified_at,
+            snapshot_created_at: Utc::now().to_rfc3339(),
+            schema_version,
+        };
+        Ok((snapshot, temp_dir, snapshot_meta))
     }
 
     fn resolve_library_id(&self) -> ZotResult<i64> {
@@ -2416,13 +2457,111 @@ fn sql_err(context: &'static str) -> impl Fn(rusqlite::Error) -> ZotError {
     }
 }
 
+fn snapshot_schema_version(conn: &Connection) -> ZotResult<Option<i64>> {
+    conn.query_row(
+        "SELECT version FROM version WHERE schema = 'userdata'",
+        [],
+        |row| row.get::<_, i64>(0),
+    )
+    .optional()
+    .map_err(snapshot_sql_err("schema-version"))
+}
+
+fn run_snapshot_backup(
+    source: &Connection,
+    destination: &mut Connection,
+    policy: SnapshotPolicy,
+) -> ZotResult<()> {
+    let backup =
+        Backup::new(source, destination).map_err(snapshot_sql_err("snapshot-zotero-db"))?;
+    let mut busy_since = None;
+    loop {
+        match backup
+            .step(policy.pages_per_step)
+            .map_err(snapshot_sql_err("snapshot-zotero-db"))?
+        {
+            StepResult::Done => return Ok(()),
+            StepResult::More => {
+                busy_since = None;
+                thread::sleep(policy.step_pause);
+            }
+            StepResult::Busy | StepResult::Locked => {
+                let started = busy_since.get_or_insert_with(Instant::now);
+                if started.elapsed() >= policy.busy_retry_limit {
+                    return Err(zotero_db_busy_error(
+                        "Timed out while creating a consistent Zotero database snapshot",
+                    ));
+                }
+                thread::sleep(policy.step_pause);
+            }
+            _ => {
+                return Err(ZotError::Database {
+                    code: "snapshot-zotero-db".to_string(),
+                    message: "SQLite backup returned an unsupported step result".to_string(),
+                    hint: None,
+                });
+            }
+        }
+    }
+}
+
+fn validate_snapshot(conn: &Connection) -> ZotResult<()> {
+    let result = conn
+        .query_row("PRAGMA quick_check", [], |row| row.get::<_, String>(0))
+        .map_err(snapshot_sql_err("zotero-db-snapshot-integrity"))?;
+    if result.eq_ignore_ascii_case("ok") {
+        return Ok(());
+    }
+    Err(ZotError::Database {
+        code: "zotero-db-snapshot-integrity".to_string(),
+        message: format!("SQLite quick_check rejected the Zotero snapshot: {result}"),
+        hint: Some(
+            "Close Zotero and retry; do not use this snapshot for write decisions".to_string(),
+        ),
+    })
+}
+
+fn snapshot_sql_err(context: &'static str) -> impl Fn(rusqlite::Error) -> ZotError {
+    move |source| {
+        if matches!(
+            source.sqlite_error_code(),
+            Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked)
+        ) {
+            zotero_db_busy_error(&format!("Zotero database is busy: {source}"))
+        } else {
+            ZotError::Database {
+                code: context.to_string(),
+                message: source.to_string(),
+                hint: None,
+            }
+        }
+    }
+}
+
+fn zotero_db_busy_error(message: &str) -> ZotError {
+    ZotError::Database {
+        code: "zotero-db-busy".to_string(),
+        message: message.to_string(),
+        hint: Some("Close Zotero or wait for its database write to finish, then retry".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    };
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    use chrono::DateTime;
     use rusqlite::Connection;
     use tempfile::TempDir;
     use zot_core::LibraryScope;
 
-    use super::{DuplicateMatchMethod, LocalLibrary, SearchOptions, escape_like};
+    use super::{DuplicateMatchMethod, LocalLibrary, SearchOptions, SnapshotPolicy, escape_like};
     use zot_core::ChildItem;
 
     #[test]
@@ -2435,6 +2574,192 @@ mod tests {
         assert_eq!(escape_like("foo_bar"), "foo\\_bar");
         assert_eq!(escape_like("path\\to"), "path\\\\to");
         assert_eq!(escape_like("a%b_c\\d"), "a\\%b\\_c\\\\d");
+    }
+
+    fn create_snapshot_test_schema(conn: &Connection) {
+        conn.execute_batch(
+            "CREATE TABLE version (schema TEXT PRIMARY KEY, version INTEGER NOT NULL);
+             INSERT INTO version VALUES ('userdata', 42);
+             CREATE TABLE snapshot_totals (id INTEGER PRIMARY KEY, total INTEGER NOT NULL);
+             INSERT INTO snapshot_totals VALUES (1, 0);
+             CREATE TABLE snapshot_events (id INTEGER PRIMARY KEY);",
+        )
+        .expect("create snapshot test schema");
+    }
+
+    #[test]
+    fn snapshot_reads_committed_wal_and_preserves_metadata() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("zotero.sqlite");
+        let writer = Connection::open(&db_path).expect("open writer");
+        writer
+            .execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;")
+            .expect("enable wal");
+        create_snapshot_test_schema(&writer);
+        writer
+            .execute_batch(
+                "PRAGMA wal_checkpoint(TRUNCATE);
+                 BEGIN IMMEDIATE;
+                 UPDATE snapshot_totals SET total = 1 WHERE id = 1;
+                 INSERT INTO snapshot_events VALUES (1);
+                 COMMIT;",
+            )
+            .expect("commit wal-only change");
+        let wal_path = db_path.with_extension("sqlite-wal");
+        let wal_size_before = fs::metadata(&wal_path).expect("wal metadata").len();
+        assert!(wal_size_before > 0);
+
+        let library = LocalLibrary::open(dir.path(), LibraryScope::User).expect("open snapshot");
+        let total: i64 = library
+            .conn
+            .query_row(
+                "SELECT total FROM snapshot_totals WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read snapshot total");
+        assert_eq!(total, 1, "committed WAL content must reach the snapshot");
+        assert_eq!(library.db_path(), db_path);
+        assert_eq!(library.snapshot_meta().schema_version, Some(42));
+        assert!(library.snapshot_meta().source_modified_at.is_some());
+        DateTime::parse_from_rfc3339(&library.snapshot_meta().snapshot_created_at)
+            .expect("snapshot time is RFC 3339");
+        let wal_size_after = fs::metadata(&wal_path).expect("wal still exists").len();
+        assert_eq!(
+            wal_size_after, wal_size_before,
+            "snapshot reads must not checkpoint or truncate Zotero's WAL"
+        );
+    }
+
+    #[test]
+    fn snapshot_lock_contention_returns_stable_busy_error() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("zotero.sqlite");
+        let writer = Connection::open(&db_path).expect("open writer");
+        create_snapshot_test_schema(&writer);
+        writer
+            .execute_batch(
+                "BEGIN EXCLUSIVE;
+                 UPDATE snapshot_totals SET total = 1 WHERE id = 1;",
+            )
+            .expect("hold exclusive write lock");
+
+        let result = LocalLibrary::connect_with_policy(
+            &db_path,
+            SnapshotPolicy {
+                busy_timeout: Duration::from_millis(10),
+                busy_retry_limit: Duration::from_millis(25),
+                step_pause: Duration::from_millis(1),
+                pages_per_step: 1,
+            },
+        );
+        writer.execute_batch("ROLLBACK").expect("release lock");
+        let error = match result {
+            Ok(_) => panic!("exclusive source lock must not produce a snapshot"),
+            Err(error) => error,
+        };
+        let payload = error.payload();
+        assert_eq!(payload.code, "zotero-db-busy");
+        assert!(
+            payload
+                .hint
+                .as_deref()
+                .is_some_and(|hint| hint.contains("Close Zotero"))
+        );
+    }
+
+    #[test]
+    fn concurrent_writer_snapshots_preserve_cross_table_invariant() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("zotero.sqlite");
+        let setup = Connection::open(&db_path).expect("open setup");
+        setup
+            .execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;")
+            .expect("enable wal");
+        create_snapshot_test_schema(&setup);
+        drop(setup);
+
+        let stop = Arc::new(AtomicBool::new(false));
+        let writes = Arc::new(AtomicUsize::new(0));
+        let writer_stop = Arc::clone(&stop);
+        let writer_count = Arc::clone(&writes);
+        let writer_path = db_path.clone();
+        let writer = thread::spawn(move || -> Result<(), String> {
+            let mut conn = Connection::open(writer_path).map_err(|error| error.to_string())?;
+            conn.busy_timeout(Duration::from_secs(1))
+                .map_err(|error| error.to_string())?;
+            while !writer_stop.load(Ordering::Acquire) {
+                let tx = conn.transaction().map_err(|error| error.to_string())?;
+                let next: i64 = tx
+                    .query_row(
+                        "SELECT total + 1 FROM snapshot_totals WHERE id = 1",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .map_err(|error| error.to_string())?;
+                tx.execute("UPDATE snapshot_totals SET total = ?1 WHERE id = 1", [next])
+                    .map_err(|error| error.to_string())?;
+                tx.execute("INSERT INTO snapshot_events VALUES (?1)", [next])
+                    .map_err(|error| error.to_string())?;
+                tx.commit().map_err(|error| error.to_string())?;
+                writer_count.fetch_add(1, Ordering::Release);
+                thread::sleep(Duration::from_millis(1));
+            }
+            Ok(())
+        });
+
+        let writer_ready_deadline = Instant::now() + Duration::from_secs(2);
+        while writes.load(Ordering::Acquire) < 3 && Instant::now() < writer_ready_deadline {
+            thread::yield_now();
+        }
+        if writes.load(Ordering::Acquire) < 3 {
+            stop.store(true, Ordering::Release);
+            let writer_result = writer.join().expect("join stalled writer");
+            panic!("writer did not become ready: {writer_result:?}");
+        }
+        let mut failure = None;
+        for _ in 0..32 {
+            let (snapshot, _snapshot_dir, _) =
+                match LocalLibrary::connect_with_policy(&db_path, SnapshotPolicy::default()) {
+                    Ok(snapshot) => snapshot,
+                    Err(error) => {
+                        failure = Some(format!("snapshot failed: {error}"));
+                        break;
+                    }
+                };
+            let total = snapshot
+                .query_row(
+                    "SELECT total FROM snapshot_totals WHERE id = 1",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("read snapshot total");
+            let events = snapshot
+                .query_row("SELECT COUNT(*) FROM snapshot_events", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .expect("count snapshot events");
+            if total != events {
+                failure = Some(format!(
+                    "inconsistent snapshot: total={total}, events={events}"
+                ));
+                break;
+            }
+            let quick_check: String = snapshot
+                .query_row("PRAGMA quick_check", [], |row| row.get(0))
+                .expect("quick_check snapshot");
+            if quick_check != "ok" {
+                failure = Some(format!("quick_check failed: {quick_check}"));
+                break;
+            }
+        }
+        stop.store(true, Ordering::Release);
+        writer
+            .join()
+            .expect("join writer")
+            .expect("writer stays healthy");
+        assert!(writes.load(Ordering::Acquire) >= 3);
+        assert!(failure.is_none(), "{}", failure.unwrap_or_default());
     }
 
     #[test]

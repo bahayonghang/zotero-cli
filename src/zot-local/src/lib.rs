@@ -9,7 +9,10 @@ pub mod workspace;
 pub mod workspace_rag;
 
 pub use citation::{CitationStyle, export_item, format_citation};
-pub use db::{DuplicateMatchMethod, LocalLibrary, SearchOptions, SortDirection, SortField};
+pub use db::{
+    DuplicateMatchMethod, LibrarySnapshotMeta, LocalLibrary, SearchOptions, SortDirection,
+    SortField,
+};
 pub use library_traits::{
     AttachmentSource, CollectionContent, CollectionNav, ItemReader, NoteReader,
 };

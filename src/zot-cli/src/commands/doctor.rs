@@ -1,7 +1,7 @@
 use anyhow::Result;
 use zot_core::{AppConfig, ZotError, redact_secret};
 use zot_desktop::{ConnectorPing, LocalHttpStatus};
-use zot_local::{PdfiumAvailability, PdfiumBackend};
+use zot_local::{LibrarySnapshotMeta, PdfiumAvailability, PdfiumBackend};
 use zot_remote::BetterBibTexClient;
 
 use crate::commands::library;
@@ -29,11 +29,13 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let pdf_backend = PdfiumBackend;
     let pdf_status = pdf_backend.status();
     let library = ctx.local_library();
-    let schema_version = library
+    let snapshot_meta = library
         .as_ref()
         .ok()
-        .and_then(|library| library.check_schema_compatibility().ok())
-        .flatten();
+        .map(|library| library.snapshot_meta().clone());
+    let schema_version = snapshot_meta
+        .as_ref()
+        .and_then(|snapshot| snapshot.schema_version);
     let libraries = library
         .as_ref()
         .ok()
@@ -139,6 +141,12 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         if let Some(version) = schema_version {
             println!("Schema version: {version}");
         }
+        if let Some(snapshot) = snapshot_meta {
+            println!("SQLite snapshot: {}", snapshot.snapshot_created_at);
+            if let Some(source_modified_at) = snapshot.source_modified_at {
+                println!("SQLite source modified: {source_modified_at}");
+            }
+        }
         if let Some(hint) = migration_hint {
             println!("Migration: {hint}");
         }
@@ -149,16 +157,21 @@ fn local_sqlite_capability(
     library: &zot_core::ZotResult<zot_local::LocalLibrary>,
 ) -> serde_json::Value {
     match library {
-        Ok(_) => serde_json::json!({
-            "configured": true,
-            "available": true,
-        }),
+        Ok(library) => local_sqlite_available_payload(library.snapshot_meta()),
         Err(error) => serde_json::json!({
             "configured": true,
             "available": false,
             "error": error.payload(),
         }),
     }
+}
+
+fn local_sqlite_available_payload(snapshot: &LibrarySnapshotMeta) -> serde_json::Value {
+    serde_json::json!({
+            "configured": true,
+            "available": true,
+            "snapshot": snapshot,
+    })
 }
 
 fn local_http_capability(status: &zot_core::ZotResult<LocalHttpStatus>) -> serde_json::Value {
@@ -283,6 +296,43 @@ fn pdf_backend_label(status: &PdfiumAvailability) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_sqlite_capability_exposes_snapshot_metadata() {
+        let snapshot = LibrarySnapshotMeta {
+            source_modified_at: Some("2026-07-26T10:00:00+00:00".to_string()),
+            snapshot_created_at: "2026-07-26T10:00:01+00:00".to_string(),
+            schema_version: Some(42),
+        };
+        let payload = local_sqlite_available_payload(&snapshot);
+
+        assert_eq!(payload["configured"], true);
+        assert_eq!(payload["available"], true);
+        assert_eq!(
+            payload["snapshot"],
+            serde_json::json!({
+                "source_modified_at": "2026-07-26T10:00:00+00:00",
+                "snapshot_created_at": "2026-07-26T10:00:01+00:00",
+                "schema_version": 42,
+            })
+        );
+    }
+
+    #[test]
+    fn local_sqlite_capability_preserves_typed_snapshot_error() {
+        let library: zot_core::ZotResult<zot_local::LocalLibrary> = Err(ZotError::Database {
+            code: "zotero-db-busy".to_string(),
+            message: "snapshot timed out".to_string(),
+            hint: Some("Close Zotero and retry".to_string()),
+        });
+        let payload = local_sqlite_capability(&library);
+
+        assert_eq!(payload["configured"], true);
+        assert_eq!(payload["available"], false);
+        assert_eq!(payload["error"]["code"], "zotero-db-busy");
+        assert_eq!(payload["error"]["hint"], "Close Zotero and retry");
+        assert!(payload.get("snapshot").is_none());
+    }
 
     #[test]
     fn write_credentials_payload_marks_local_reads_as_optional() {

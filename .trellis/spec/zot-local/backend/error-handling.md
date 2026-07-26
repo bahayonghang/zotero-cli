@@ -21,6 +21,10 @@
 - Include operation-specific codes such as `db-not-found`, `search-notes`,
   `rag-open`, `rag-schema`, `pdf-open`, `pdf-cache-put`, and
   `invalid-workspace-name`.
+- Map SQLite `DatabaseBusy` and `DatabaseLocked` during Zotero snapshot work to
+  `zotero-db-busy` with a close-Zotero-or-retry hint. Integrity rejection uses
+  `zotero-db-snapshot-integrity`; never hide either behind a filesystem-copy
+  fallback.
 - Preserve the path when mapping filesystem errors.
 - Treat missing optional Zotero tables as empty results when that matches
   Zotero version compatibility. For example, annotation reads return an empty

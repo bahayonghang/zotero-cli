@@ -41,6 +41,13 @@ config, database, write credentials, PDF backend, Better BibTeX, semantic
 index, and annotation support status. In human mode it may print a banner and
 short status text.
 
+Successful `capabilities.local_sqlite_read` includes a `snapshot` object owned
+by `zot-local`: nullable `source_modified_at`, `snapshot_created_at`, and
+nullable `schema_version`. Human output prints snapshot time and available
+source mtime/schema version. Snapshot failures keep the existing capability
+shape with `available: false` and the typed error payload; they never emit
+partial snapshot metadata.
+
 ## Code Example
 
 Return a `CommandOutput`; the dispatch layer prints it:
