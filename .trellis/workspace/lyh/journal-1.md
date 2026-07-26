@@ -816,3 +816,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 25: 完成工程化与文档基线整改
+
+**Date**: 2026-07-26
+**Task**: 完成工程化与文档基线整改
+**Branch**: `dev`
+
+### Summary
+
+完成纯检查门禁、三平台与 MSRV CI、依赖审计和未使用依赖治理，补齐 workspace lint、1.0.0 CHANGELOG、控制面文档与可执行规范；just ci、audit、deny、machete、udeps 和 doctor 均通过。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d76211b` | (see git log) |
+| `2e176b7` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

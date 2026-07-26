@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 24
+- **Total Sessions**: 25
 - **Last Active**: 2026-07-26
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~818 | Active |
+| `journal-1.md` | ~852 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 25 | 2026-07-26 | 完成工程化与文档基线整改 | `d76211b`, `2e176b7` | `dev` |
 | 24 | 2026-07-26 | 完成本地边界与 sidecar 杂项加固 | `766b71b`, `8ae247f` | `dev` |
 | 23 | 2026-07-26 | 完成远程 HTTP 与不可信下载安全整改 | `08f5e3c`, `11184bc` | `dev` |
 | 22 | 2026-07-26 | 完成本地 DB 语义与性能整改 | `1bfeaae` | `dev` |
