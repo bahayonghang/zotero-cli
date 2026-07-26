@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 17
+- **Total Sessions**: 18
 - **Last Active**: 2026-07-26
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~581 | Active |
+| `journal-1.md` | ~615 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 18 | 2026-07-26 | 完成 SQLite 一致快照整改 | `08a5925`, `b1b7f50` | `dev` |
 | 17 | 2026-07-26 | 完成 Pdfium 下载校验与原子安装 | `f746f8d`, `6b65241` | `dev` |
 | 16 | 2026-07-26 | 完成凭据与 workspace 路径边界热修 | `2da80f6`, `1f31505`, `242e99d` | `dev` |
 | 15 | 2026-07-26 | 完成 P0 Pdfium CWD 动态库劫持修复 | `982c012`, `c1e2d96` | `dev` |

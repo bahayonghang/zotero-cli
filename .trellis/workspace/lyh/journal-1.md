@@ -579,3 +579,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 18: 完成 SQLite 一致快照整改
+
+**Date**: 2026-07-26
+**Task**: 完成 SQLite 一致快照整改
+**Branch**: `dev`
+
+### Summary
+
+移除 live DB immutable 与手工 DB/WAL/SHM copy，改用只读源连接、限时分页 Backup API、quick_check、稳定 busy error 和 doctor 快照元数据，并通过并发 writer 回归与 just ci。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `08a5925` | (see git log) |
+| `b1b7f50` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
