@@ -545,3 +545,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: 完成 Pdfium 下载校验与原子安装
+
+**Date**: 2026-07-26
+**Task**: 完成 Pdfium 下载校验与原子安装
+**Branch**: `dev`
+
+### Summary
+
+固定七平台双层 SHA-256 manifest，引入有界流式下载、regular-entry 解压、跨进程锁、同步原子发布和受管缓存复核，并通过聚焦测试与 just ci。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f746f8d` | (see git log) |
+| `6b65241` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
