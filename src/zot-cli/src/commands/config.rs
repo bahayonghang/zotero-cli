@@ -272,10 +272,10 @@ fn apply_init(
         }
     }
 
-    if let Some(SettingSlot::Text(data_dir)) = setting_slot(target, &ConfigKeyArg::DataDir)
-        && data_dir.is_empty()
-    {
-        *data_dir = default_data_dir;
+    if let Some(SettingSlot::Text(data_dir)) = setting_slot(target, &ConfigKeyArg::DataDir) {
+        if data_dir.is_empty() {
+            *data_dir = default_data_dir;
+        }
     }
 
     for (key, value) in settings {

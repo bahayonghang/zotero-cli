@@ -298,15 +298,15 @@ impl AppConfig {
             .map(ToOwned::to_owned)
             .or_else(|| self.default.get("profile").cloned());
 
-        if let Some(name) = selected
-            && let Some(profile) = self.profile.get(&name)
-        {
-            self.zotero.data_dir = profile.data_dir.clone();
-            self.zotero.library_id = profile.library_id.clone();
-            self.zotero.api_key = profile.api_key.clone();
-            self.zotero.semantic_scholar_api_key = profile.semantic_scholar_api_key.clone();
-            self.output = profile.output.clone();
-            self.export = profile.export.clone();
+        if let Some(name) = selected {
+            if let Some(profile) = self.profile.get(&name) {
+                self.zotero.data_dir = profile.data_dir.clone();
+                self.zotero.library_id = profile.library_id.clone();
+                self.zotero.api_key = profile.api_key.clone();
+                self.zotero.semantic_scholar_api_key = profile.semantic_scholar_api_key.clone();
+                self.output = profile.output.clone();
+                self.export = profile.export.clone();
+            }
         }
 
         self.apply_env_overrides();
@@ -540,9 +540,12 @@ mod tests {
 
     #[test]
     fn parses_library_scope() {
-        assert_eq!(parse_library_scope("user").unwrap(), LibraryScope::User);
         assert_eq!(
-            parse_library_scope("group:42").unwrap(),
+            parse_library_scope("user").expect("user scope should parse"),
+            LibraryScope::User
+        );
+        assert_eq!(
+            parse_library_scope("group:42").expect("numeric group scope should parse"),
             LibraryScope::Group { group_id: 42 }
         );
         assert!(parse_library_scope("group:abc").is_err());

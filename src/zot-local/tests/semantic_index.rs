@@ -312,7 +312,7 @@ fn semantic_search_rejects_query_embedding_dimension_mismatch() {
             None,
             10,
         )
-        .unwrap_err();
+        .expect_err("query dimension mismatch must fail");
     assert!(matches!(err, ZotError::InvalidInput { .. }));
 }
 
@@ -357,6 +357,6 @@ fn semantic_apply_rejects_mixed_dimensions_in_batch() {
             ],
             vec![vec![1.0, 0.0, 0.0], vec![1.0, 0.0]],
         )
-        .unwrap_err();
+        .expect_err("mixed embedding dimensions must fail");
     assert!(matches!(err, ZotError::InvalidInput { .. }));
 }

@@ -48,30 +48,30 @@ pub fn extract_preprint_info(
         extra.unwrap_or_default(),
     ] {
         for re in ARXIV_PATTERNS.iter() {
-            if let Some(captures) = re.captures(source)
-                && let Some(matched) = captures.get(1)
-            {
-                let id = matched.as_str().to_string();
-                let normalized = ARXIV_VERSION_RE.replace(&id, "").to_string();
-                return Some(PreprintInfo {
-                    preprint_id: normalized.clone(),
-                    source: "arxiv".to_string(),
-                    api_id: format!("arXiv:{normalized}"),
-                });
+            if let Some(captures) = re.captures(source) {
+                if let Some(matched) = captures.get(1) {
+                    let id = matched.as_str().to_string();
+                    let normalized = ARXIV_VERSION_RE.replace(&id, "").to_string();
+                    return Some(PreprintInfo {
+                        preprint_id: normalized.clone(),
+                        source: "arxiv".to_string(),
+                        api_id: format!("arXiv:{normalized}"),
+                    });
+                }
             }
         }
     }
 
     for source in [doi.unwrap_or_default(), url.unwrap_or_default()] {
-        if let Some(captures) = BIORXIV_RE.captures(source)
-            && let Some(matched) = captures.get(1)
-        {
-            let preprint_doi = matched.as_str().to_string();
-            return Some(PreprintInfo {
-                preprint_id: preprint_doi.clone(),
-                source: "doi".to_string(),
-                api_id: format!("DOI:{preprint_doi}"),
-            });
+        if let Some(captures) = BIORXIV_RE.captures(source) {
+            if let Some(matched) = captures.get(1) {
+                let preprint_doi = matched.as_str().to_string();
+                return Some(PreprintInfo {
+                    preprint_id: preprint_doi.clone(),
+                    source: "doi".to_string(),
+                    api_id: format!("DOI:{preprint_doi}"),
+                });
+            }
         }
     }
 

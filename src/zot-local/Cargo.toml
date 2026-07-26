@@ -8,6 +8,9 @@ repository.workspace = true
 rust-version.workspace = true
 description = "Local Zotero SQLite, PDF, and workspace support for zot."
 
+[lints]
+workspace = true
+
 [dependencies]
 chrono.workspace = true
 dirs.workspace = true
@@ -23,6 +26,5 @@ sha2.workspace = true
 strsim.workspace = true
 tar.workspace = true
 tempfile.workspace = true
-thiserror.workspace = true
 toml.workspace = true
 zot-core.workspace = true

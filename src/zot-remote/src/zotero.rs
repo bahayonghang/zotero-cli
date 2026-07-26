@@ -239,10 +239,10 @@ impl ZoteroRemote {
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut merged: Vec<String> = Vec::new();
         for entry in existing {
-            if let Some(tag) = entry.get("tag").and_then(Value::as_str)
-                && seen.insert(tag.to_string())
-            {
-                merged.push(tag.to_string());
+            if let Some(tag) = entry.get("tag").and_then(Value::as_str) {
+                if seen.insert(tag.to_string()) {
+                    merged.push(tag.to_string());
+                }
             }
         }
         for tag in tags {

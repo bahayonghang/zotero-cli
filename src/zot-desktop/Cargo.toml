@@ -8,6 +8,9 @@ repository.workspace = true
 rust-version.workspace = true
 description = "Loopback-only client for Zotero's built-in connector and local API."
 
+[lints]
+workspace = true
+
 [dependencies]
 reqwest.workspace = true
 serde.workspace = true

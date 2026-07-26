@@ -30,8 +30,16 @@ stability, and safety around writes matter more than clever abstractions.
   unconditional internal dependency. Do not gate production behavior behind
   `test-support`; it exists only to expose a test constructor.
 - Treat `skills/zot` as the canonical operator skill. Update
-  `.agents/skills/zot` and `.claude/skills/zot` only through `_install-skills`;
+  `.agents/skills/zot` and `.claude/skills/zot` only through `skills-sync`;
   never hand-edit generated mirrors.
+- Keep `just ci` and `ci-check` pure. Generation belongs to explicit
+  `version-sync`/`skills-sync` recipes; check recipes must fail on drift rather
+  than repairing it.
+- Every workspace member must declare `[lints] workspace = true`. Extend the
+  root member list only together with the manifest guard.
+- Keep locked stable checks compatible with workspace MSRV 1.85. Dependency
+  audit/deny and unused-dependency gates complement, but do not replace,
+  `just ci`.
 
 ## Testing Requirements
 
@@ -39,14 +47,96 @@ stability, and safety around writes matter more than clever abstractions.
   changes.
 - Run `cargo test -p zot-cli --test workspace_version_guard` after manifest
   edits.
-- Run `just ci` before finishing broad changes; it runs fmt, check, clippy, and
-  tests in the repo-defined order, then `skills-check`.
+- Run `just ci` before finishing broad changes; it runs the pure fmt, locked
+  check, clippy, test, version, and `skills-check` gates.
 - Run `just skills-check` after canonical skill edits. It compares relative
   file sets and bytes for both mirrors and runs drift fixtures covering
   content, missing-file, and extra-file failures.
 - Add targeted tests close to behavior: parse tests in `cli.rs`, output
   envelope tests in `format.rs`, helper tests in `util.rs`, command logic tests
   in the owning command module.
+
+## Scenario: Repository quality and dependency gates
+
+### 1. Scope / Trigger
+
+- Trigger: changing a workspace member, dependency manifest, `Cargo.lock`, `justfile`,
+  skill mirror, version metadata, or `.github/workflows/ci.yml`.
+- Why: local and hosted checks must enforce the same read-only contract while preserving
+  Rust 1.85 compatibility and making dependency findings reproducible.
+
+### 2. Signatures
+
+```text
+just ci -> just ci-check
+cargo +1.85.0 check --workspace --locked
+cargo audit
+cargo deny check
+cargo machete
+cargo +nightly-2026-07-01 udeps --workspace --all-targets --locked
+```
+
+Every workspace member manifest declares:
+
+```toml
+[lints]
+workspace = true
+```
+
+### 3. Contracts
+
+- `ci`/`ci-check`, `version-check`, and `skills-check` are read-only. Only explicit
+  `version-sync` and `skills-sync` recipes may rewrite source or mirrors.
+- Stable CI runs `just ci-check` on Linux, Windows, and macOS, then requires a clean diff.
+- MSRV CI uses Rust 1.85.0 with the committed lockfile; unused-dependency analysis uses only
+  the fixed nightly shown above and does not change the workspace toolchain contract.
+- Audit, deny, machete, and udeps tool installs pin versions and use their published lockfiles.
+  Do not ignore advisories or machete findings merely to make CI green.
+- After removing dependencies, regenerate `Cargo.lock` once, then prove both MSRV check and
+  udeps pass with `--locked`.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| canonical skill and mirror differ | `skills-check` fails without repairing either tree |
+| member omits lint inheritance | `workspace_version_guard` fails with the member path |
+| current workspace version lacks CHANGELOG heading | version guard fails |
+| lockfile needs resolution at Rust 1.85 | MSRV job fails |
+| vulnerable, disallowed, or unknown-source dependency | audit/deny job fails |
+| unused direct or target-specific dependency | machete/udeps job fails |
+| a check rewrites tracked files in CI | post-check `git diff --exit-code` fails |
+
+### 5. Good / Base / Bad Cases
+
+- Good: intentionally run a sync recipe, commit the generated result, then run all checks on
+  the committed lockfile without further modifications.
+- Base: a source-only change passes `just ci` locally and the same `ci-check` on all three OSes.
+- Bad: put a generator in `ci`, use floating nightly for udeps, lift the MSRV to solve a lock
+  failure, or restore a global `RUSTFLAGS=-D warnings` that promotes toolchain linker messages.
+
+### 6. Tests Required
+
+- Run the workspace version guard after every member/version/CHANGELOG edit.
+- Exercise a temporary skill mirror drift and assert `just skills-check` fails, then remove it.
+- Run `cargo +1.85.0 check --workspace --locked`, audit, deny, machete, and fixed-nightly udeps.
+- Run `just ci`, compare tracked hashes before/after when changing check recipes, and finish with
+  `git diff --check`.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```make
+ci: version-sync skills-sync test
+```
+
+Correct:
+
+```make
+ci-check: fmt check clippy test skills-check
+ci: ci-check
+```
 
 ## Code Example
 

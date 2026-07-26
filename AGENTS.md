@@ -5,16 +5,20 @@
 - `skills/zot/SKILL.md` is worth checking for real operator workflows around `doctor`, write actions, and workspaces.
 
 ## Workspace map
-- This is a Rust workspace (`edition = 2024`, `rust-version = 1.85`) with 4 crates under `src/`:
+- This is a Rust workspace (`edition = 2024`, `rust-version = 1.85`) with 5 crates under `src/`:
   - `zot-cli` — binary crate for `zot`; real CLI entrypoint is `src/zot-cli/src/main.rs`
   - `zot-core` — config, models, errors, JSON envelope
   - `zot-local` — local `zotero.sqlite` reads, PDF extraction/cache, workspace/RAG
+  - `zot-desktop` — loopback-only Zotero Desktop connector integration
   - `zot-remote` — Zotero Web API writes, Semantic Scholar, embeddings
 - Ignore `ref/` when reasoning about the active app: it is a legacy/reference Python implementation, not part of the Rust workspace.
 
 ## Dev commands
 - Main verification command is `just ci`.
-- `just ci` runs checks in this order: `cargo fmt --all --check` -> `cargo check --workspace` -> `cargo clippy --workspace --all-targets -- -D warnings` -> `cargo test --workspace`.
+- `just ci` is a pure check alias for `just ci-check`; it runs fmt, locked workspace check,
+  clippy, tests, version guards, and canonical-skill mirror checks without rewriting files.
+- Use `just version-sync` and `just skills-sync` only when intentionally regenerating versioned
+  skill metadata or local mirrors.
 - Focused commands:
   - `cargo check -p zot-cli`
   - `cargo test -p zot-local`
@@ -58,8 +62,10 @@
 - Workspace names must be kebab-case (`llm-safety` style).
 
 ## Constraints and repo hygiene
-- Workspace lints forbid `unsafe`, `dbg!`, `todo!`, and `unwrap()`.
-- There is no repo CI workflow checked in under `.github/workflows/`; local `just ci` is the current source of truth.
+- Every workspace member inherits lints that forbid `unsafe`, `dbg!`, `todo!`, and `unwrap()`.
+- `.github/workflows/ci.yml` runs the pure gate on Linux, Windows, and macOS, checks Rust 1.85
+  MSRV, and includes dependency security and unused-dependency jobs. Local `just ci` remains the
+  source of truth for the stable build/test sequence.
 - Tests are inline crate tests, not a large integration suite; `cargo test --workspace` is still the expected gate.
 - Treat `target/`, `.omx/`, `.claude/`, workspace index files, and PDF cache files as generated state, not source.
 

@@ -43,10 +43,10 @@ pub(crate) async fn run(ctx: &AppContext, args: GraphServeArgs) -> Result<()> {
 
     println!("zot graph: serving {node_count} nodes / {edge_count} edges at {url}");
     println!("Press Ctrl-C to stop.");
-    if !args.no_open
-        && let Err(err) = open_target(&url)
-    {
-        eprintln!("Could not open the browser automatically: {err}");
+    if !args.no_open {
+        if let Err(err) = open_target(&url) {
+            eprintln!("Could not open the browser automatically: {err}");
+        }
     }
 
     let worker = {

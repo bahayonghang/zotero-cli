@@ -182,11 +182,16 @@ impl WorkspaceStore {
                 source,
             })?;
             let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) == Some("toml")
-                && let Some(name) = path.file_stem().and_then(|stem| stem.to_str())
-                && let Ok(name) = WorkspaceName::parse(name)
-                && let Ok(workspace) = self.load(&name)
-            {
+            if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+                continue;
+            }
+            let Some(name) = path.file_stem().and_then(|stem| stem.to_str()) else {
+                continue;
+            };
+            let Ok(name) = WorkspaceName::parse(name) else {
+                continue;
+            };
+            if let Ok(workspace) = self.load(&name) {
                 workspaces.push(workspace);
             }
         }

@@ -9,42 +9,118 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
 
 jobs:
-  rust:
-    name: cargo ${{ matrix.job }}
-    runs-on: ubuntu-latest
+  stable:
+    name: stable / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        job: [fmt, check, clippy, test]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.57.0
+
       - name: Cache cargo registry and target
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ matrix.job }}
+          shared-key: stable-${{ matrix.os }}
 
-      - name: cargo fmt --check
-        if: matrix.job == 'fmt'
-        run: cargo fmt --all --check
+      - name: Run repository checks
+        run: just ci-check
 
-      - name: cargo check
-        if: matrix.job == 'check'
-        run: cargo check --workspace
+      - name: Verify checks did not modify the repository
+        run: git diff --exit-code
 
-      - name: cargo clippy
-        if: matrix.job == 'clippy'
-        run: cargo clippy --workspace --all-targets -- -D warnings
+  msrv:
+    name: Rust 1.85.0 / locked workspace
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: cargo test
-        if: matrix.job == 'test'
-        run: cargo test --workspace
+      - name: Install Rust 1.85.0
+        uses: dtolnay/rust-toolchain@1.85.0
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: msrv-1.85.0
+
+      - name: Check workspace at MSRV
+        run: cargo check --workspace --locked
+
+  security:
+    name: dependency security and policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: dependency-security
+          cache-targets: "false"
+
+      - name: Install dependency audit tools
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo install cargo-deny --version 0.20.2 --locked
+
+      - name: Audit advisories
+        run: cargo audit
+
+      - name: Check dependency policy
+        run: cargo deny check
+
+  machete:
+    name: unused direct dependencies / stable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-machete
+        run: cargo install cargo-machete --version 0.9.2 --locked
+
+      - name: Check direct dependencies
+        run: cargo machete
+
+  udeps:
+    name: unused dependencies / nightly-2026-07-01
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install fixed nightly Rust
+        uses: dtolnay/rust-toolchain@nightly-2026-07-01
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: udeps-nightly-2026-07-01
+
+      - name: Install cargo-udeps
+        run: cargo install cargo-udeps --version 0.1.61 --locked
+
+      - name: Check unused dependencies
+        run: cargo udeps --workspace --all-targets --locked

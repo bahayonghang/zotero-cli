@@ -224,11 +224,11 @@ impl PdfiumBackend {
             }
         }
 
-        if matches!(mode, PdfiumLoadMode::AllowDownload)
-            && let Some(target) = current_download_target()
-        {
-            let path = download_pdfium_library(target, &library_name)?;
-            return bind_pdfium_from_path(&path);
+        if matches!(mode, PdfiumLoadMode::AllowDownload) {
+            if let Some(target) = current_download_target() {
+                let path = download_pdfium_library(target, &library_name)?;
+                return bind_pdfium_from_path(&path);
+            }
         }
 
         Err(last_error.unwrap_or_else(pdfium_manual_setup_error))
@@ -789,11 +789,12 @@ fn sha256_reader(mut reader: impl Read) -> std::io::Result<(String, u64)> {
 }
 
 fn pdfium_cache_dir() -> PathBuf {
-    let base_dir = if let Ok(value) = env::var(ZOT_PDFIUM_CACHE_DIR) {
-        PathBuf::from(value)
-    } else {
-        dirs::cache_dir().unwrap_or_else(env::temp_dir).join("zot")
-    };
+    pdfium_cache_dir_with_override(env::var_os(ZOT_PDFIUM_CACHE_DIR).map(PathBuf::from))
+}
+
+fn pdfium_cache_dir_with_override(override_dir: Option<PathBuf>) -> PathBuf {
+    let base_dir =
+        override_dir.unwrap_or_else(|| dirs::cache_dir().unwrap_or_else(env::temp_dir).join("zot"));
     base_dir.join(format!("pdfium-{PDFIUM_VERSION}"))
 }
 
@@ -1462,7 +1463,6 @@ mod tests {
 
     #[test]
     fn cache_dir_uses_override_and_version_suffix() {
-        let _env_guard = PDFIUM_ENV_LOCK.lock().expect("env lock");
         /*
          * ========================================================================
          * 步骤2：校验缓存目录规则
@@ -1473,21 +1473,13 @@ mod tests {
          */
         eprintln!("开始校验 Pdfium 缓存目录规则...");
 
-        // 2.1 设置自定义缓存根目录
+        // 2.1 传入自定义缓存根目录
         let tempdir = tempfile::tempdir().expect("tempdir");
-        unsafe {
-            env::set_var(ZOT_PDFIUM_CACHE_DIR, tempdir.path());
-        }
 
         // 2.2 读取缓存目录并断言版本后缀
-        let cache_dir = pdfium_cache_dir();
+        let cache_dir = pdfium_cache_dir_with_override(Some(tempdir.path().to_path_buf()));
         assert!(cache_dir.starts_with(tempdir.path()));
         assert!(cache_dir.ends_with(format!("pdfium-{PDFIUM_VERSION}")));
-
-        // 2.3 清理环境变量
-        unsafe {
-            env::remove_var(ZOT_PDFIUM_CACHE_DIR);
-        }
 
         eprintln!("Pdfium 缓存目录规则校验完成");
     }

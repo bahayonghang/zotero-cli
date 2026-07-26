@@ -358,10 +358,10 @@ fn group_confidence(items: &[Item]) -> (DedupeConfidence, Option<String>) {
         .iter()
         .filter_map(|item| extract_year(item.date.as_deref()?))
         .collect::<Vec<_>>();
-    if let (Some(min), Some(max)) = (years.iter().min(), years.iter().max())
-        && max - min > 1
-    {
-        notes.push(format!("year spread {min}\u{2194}{max} (>1)"));
+    if let (Some(min), Some(max)) = (years.iter().min(), years.iter().max()) {
+        if max - min > 1 {
+            notes.push(format!("year spread {min}\u{2194}{max} (>1)"));
+        }
     }
     let dois = items
         .iter()

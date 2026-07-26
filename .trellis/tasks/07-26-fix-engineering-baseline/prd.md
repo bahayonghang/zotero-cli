@@ -76,19 +76,19 @@
 
 ## Acceptance Criteria
 
-- [ ] `just ci` 与 `just ci-check` 在 dirty implementation tree 上只执行检查且不改写文件；
+- [x] `just ci` 与 `just ci-check` 在 dirty implementation tree 上只执行检查且不改写文件；
       人为制造 canonical/mirror drift 时 `just skills-check` 失败。
-- [ ] workflow 明确包含三平台 stable matrix、Rust 1.85 MSRV、`--locked`、audit、deny、
+- [x] workflow 明确包含三平台 stable matrix、Rust 1.85 MSRV、`--locked`、audit、deny、
       machete、udeps 和检查后的 `git diff --exit-code`。
-- [ ] `cargo +1.85.0 check --workspace --locked` 通过，且 Pdfium 相关聚焦测试保持通过。
-- [ ] `cargo audit` 无 vulnerability/unsound finding；`cargo deny check` 通过，安全策略无
+- [x] `cargo +1.85.0 check --workspace --locked` 通过，且 Pdfium 相关聚焦测试保持通过。
+- [x] `cargo audit` 无 vulnerability/unsound finding；`cargo deny check` 通过，安全策略无
       无依据 advisory ignore；`cargo machete` 与 `cargo udeps` 通过或由等价 CI 命令验证。
-- [ ] 五个 crate 均继承 workspace lint，workspace/all-targets locked clippy 在
+- [x] 五个 crate 均继承 workspace lint，workspace/all-targets locked clippy 在
       `-D warnings` 下通过，guard test 对缺失 lint inheritance 会失败。
-- [ ] workspace version guard 断言 1.0.0 CHANGELOG heading；AGENTS 的 crate/CI 说明与
+- [x] workspace version guard 断言 1.0.0 CHANGELOG heading；AGENTS 的 crate/CI 说明与
       `Cargo.toml`、`justfile`、workflow 一致。
-- [ ] `CHANGELOG.md` 的 1.0.0 条目包含安全整改和附件上传 API key 轮换提示。
-- [ ] `task.py validate`、`git diff --check`、聚焦测试与最终真实门禁 `just ci` 全部通过；
+- [x] `CHANGELOG.md` 的 1.0.0 条目包含安全整改和附件上传 API key 轮换提示。
+- [x] `task.py validate`、`git diff --check`、聚焦测试与最终真实门禁 `just ci` 全部通过；
       可复用工程契约同步到 `.trellis/spec/`。
 
 ## Out Of Scope

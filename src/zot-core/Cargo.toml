@@ -8,6 +8,9 @@ repository.workspace = true
 rust-version.workspace = true
 description = "Shared config, models, errors, and JSON envelope support for zot."
 
+[lints]
+workspace = true
+
 [dependencies]
 dirs.workspace = true
 regex.workspace = true

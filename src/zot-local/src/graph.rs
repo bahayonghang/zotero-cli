@@ -97,15 +97,16 @@ pub(crate) fn assemble_graph(
         for (source, target) in explicit_relations {
             if let (Some(&i), Some(&j)) =
                 (index_of.get(source.as_str()), index_of.get(target.as_str()))
-                && i != j
             {
-                admit_pair(
-                    order_pair(i, j),
-                    opts.edge_budget,
-                    &mut pairs,
-                    &mut build,
-                    |acc| acc.related = true,
-                );
+                if i != j {
+                    admit_pair(
+                        order_pair(i, j),
+                        opts.edge_budget,
+                        &mut pairs,
+                        &mut build,
+                        |acc| acc.related = true,
+                    );
+                }
             }
         }
     }

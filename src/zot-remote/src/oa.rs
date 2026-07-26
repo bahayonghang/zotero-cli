@@ -162,13 +162,13 @@ impl OaClient {
                 url,
             }));
         }
-        if let Some(crossref) = crossref
-            && let Some(url) = try_arxiv_from_crossref(crossref)
-        {
-            return Ok(Some(ResolvedPdfUrl {
-                source: "arXiv (via CrossRef)".to_string(),
-                url,
-            }));
+        if let Some(crossref) = crossref {
+            if let Some(url) = try_arxiv_from_crossref(crossref) {
+                return Ok(Some(ResolvedPdfUrl {
+                    source: "arXiv (via CrossRef)".to_string(),
+                    url,
+                }));
+            }
         }
         if let Some(url) = self.try_semantic_scholar(doi).await? {
             return Ok(Some(ResolvedPdfUrl {
@@ -357,18 +357,19 @@ fn parse_arxiv_atom(arxiv_id: &str, body: &str) -> ZotResult<ArxivWork> {
             Ok(Event::End(end)) => {
                 let local = end.local_name();
                 let depth = stack.len();
-                if capture
+                let capture_complete = capture
                     .as_ref()
-                    .is_some_and(|(_, capture_depth, _)| *capture_depth == depth)
-                    && let Some((field, _, value)) = capture.take()
-                {
-                    let value = normalize_xml_text(&value);
-                    if !value.is_empty() {
-                        match field {
-                            AtomField::Title => title = Some(value),
-                            AtomField::Summary => abstract_note = Some(value),
-                            AtomField::Published => published = Some(value),
-                            AtomField::Author => creators.push(split_creator_name(&value)),
+                    .is_some_and(|(_, capture_depth, _)| *capture_depth == depth);
+                if capture_complete {
+                    if let Some((field, _, value)) = capture.take() {
+                        let value = normalize_xml_text(&value);
+                        if !value.is_empty() {
+                            match field {
+                                AtomField::Title => title = Some(value),
+                                AtomField::Summary => abstract_note = Some(value),
+                                AtomField::Published => published = Some(value),
+                                AtomField::Author => creators.push(split_creator_name(&value)),
+                            }
                         }
                     }
                 }
@@ -463,12 +464,12 @@ fn try_arxiv_from_crossref(crossref: &CrossRefWork) -> Option<String> {
             if id_type.eq_ignore_ascii_case("arxiv") {
                 return Some(format!("https://arxiv.org/pdf/{id}.pdf"));
             }
-            if id_type.eq_ignore_ascii_case("doi")
-                && id.contains("arXiv.")
-                && let Some(captures) = ARXIV_DOI_RE.captures(id)
-                && let Some(matched) = captures.get(1)
-            {
-                return Some(format!("https://arxiv.org/pdf/{}.pdf", matched.as_str()));
+            if id_type.eq_ignore_ascii_case("doi") && id.contains("arXiv.") {
+                if let Some(captures) = ARXIV_DOI_RE.captures(id) {
+                    if let Some(matched) = captures.get(1) {
+                        return Some(format!("https://arxiv.org/pdf/{}.pdf", matched.as_str()));
+                    }
+                }
             }
         }
     }
@@ -478,10 +479,10 @@ fn try_arxiv_from_crossref(crossref: &CrossRefWork) -> Option<String> {
         }
     }
     for link in &crossref.links {
-        if let Some(captures) = ARXIV_URL_RE.captures(link)
-            && let Some(matched) = captures.get(1)
-        {
-            return Some(format!("https://arxiv.org/pdf/{}.pdf", matched.as_str()));
+        if let Some(captures) = ARXIV_URL_RE.captures(link) {
+            if let Some(matched) = captures.get(1) {
+                return Some(format!("https://arxiv.org/pdf/{}.pdf", matched.as_str()));
+            }
         }
     }
     None
