@@ -36,7 +36,7 @@ pdfium-render = { version = "0.9.0", default-features = false, features = [
 quick-xml = "0.41.0"
 rand = "0.10.1"
 regex = "1.12.2"
-reqwest = { version = "0.13.2", default-features = false, features = [
+reqwest = { version = "0.13.3", default-features = false, features = [
     "json",
     "multipart",
     "rustls",
