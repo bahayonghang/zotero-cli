@@ -240,7 +240,15 @@ Cargo 的 `workspace.package.version` 保持数字形式 `X.Y.Z`。
 just ci
 ```
 
-会执行 `cargo fmt --all --check`、`cargo check --workspace`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`，以及覆盖全部已发布 `skills/*/SKILL.md` 的 canonical skill 镜像检查。
+`just ci` 会执行 `cargo fmt --all --check`、`cargo check --workspace`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`，以及覆盖全部已发布 `skills/*/SKILL.md` 的 canonical skill 镜像检查。
+
+`just ci` 不运行 VitePress。
+
+Pull request 的 CI 工作流 [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) 另有独立 docs job。该 job 在 Node 20 下于 `docs/` 执行 `npm ci`，再执行 `npm run build`，构建中英文 VitePress 站点。该 job 不部署 GitHub Pages。
+
+新 SHA 上的 hosted docs job 结果，在获得单独授权的 pull request 或 push CI 运行之前保持 **UNVERIFIED**。本地文档构建成功不能记为 hosted PASS。
+
+Claude Code、Codex、Grok Build、Kimi Code、Oh My Pi（OMP）共用该验证边界。见 [docs/agents/harnesses.md](./docs/agents/harnesses.md)。
 
 ---
 

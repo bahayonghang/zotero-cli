@@ -1,8 +1,8 @@
 # Agent harnesses
 
 Claude Code, Codex, Grok Build, Kimi Code, and Oh My Pi (OMP) share the repo
-contract in [`AGENTS.md`](../../AGENTS.md). Claude Code also loads tracked root
-[`CLAUDE.md`](../../CLAUDE.md), which imports `AGENTS.md` with `@AGENTS.md`.
+contract in repo-root `AGENTS.md`. Claude Code also loads tracked root
+`CLAUDE.md`, which imports `AGENTS.md` with `@AGENTS.md`.
 
 This page records the five-tool matrix. Do not copy five full rule sets.
 
@@ -36,6 +36,21 @@ Do not mark hosted or fresh-start PASS from documentation work.
   manual inline steps below.
 - Planning is not approved implementation. Implementation waits for artifact
   review and `task.py start`.
+
+## Shared verification boundary
+
+Claude Code, Codex, Grok Build, Kimi Code, and Oh My Pi (OMP) share this gate.
+
+- Local `just ci` is the Rust + skill-mirror gate. `just ci` does not run
+  VitePress.
+- Pull-request CI in `.github/workflows/ci.yml` includes a separate docs job.
+  The docs job runs `npm ci` then `npm run build` under `docs/` on Node 20 and
+  builds the bilingual VitePress site. The docs job does not deploy GitHub Pages.
+- A hosted docs-job result on a new SHA stays **UNVERIFIED** until a separately
+  authorized pull-request or push CI run exists for that SHA. Local VitePress
+  success does not mark hosted PASS.
+- GitHub Pages publish stays in `.github/workflows/deploy-docs.yml` on published
+  `v*` releases or manual dispatch.
 
 ## Five-tool matrix
 
@@ -90,7 +105,7 @@ MCP. Do not publish.
 
 ## Related files
 
-- [`AGENTS.md`](../../AGENTS.md) — short project facts
-- [`CLAUDE.md`](../../CLAUDE.md) — Claude Code import of `AGENTS.md`
+- Repo-root `AGENTS.md` — short project facts
+- Repo-root `CLAUDE.md` — Claude Code import of `AGENTS.md`
 - [`docs/agents/issue-tracker.md`](./issue-tracker.md) — local Trellis PRD versus GitHub Issues
 - [`docs/agents/release.md`](./release.md) — shared release tag contract

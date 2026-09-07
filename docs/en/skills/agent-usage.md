@@ -3,9 +3,9 @@
 This page covers one thing only: **how to ask in plain language**.
 
 Claude Code, Codex, Grok Build, Kimi Code, and Oh My Pi (OMP) share this
-phrasing. Project rules live in [`AGENTS.md`](../../../AGENTS.md). Claude Code
-also reads [`CLAUDE.md`](../../../CLAUDE.md). Tool loading, permissions, and
-evidence levels are in [Agent harnesses](../../agents/harnesses.md).
+phrasing. Project rules live in repo-root `AGENTS.md`. Claude Code also reads
+repo-root `CLAUDE.md`. Tool loading, permissions, and evidence levels are in
+[Agent harnesses](../../agents/harnesses.md).
 
 If the `zot` skill is installed, do not start from commands. Start from the task.
 

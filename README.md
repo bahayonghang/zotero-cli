@@ -230,7 +230,13 @@ If you need to override Pdfium resolution manually:
 just ci
 ```
 
-This runs `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and a canonical skill mirror check that covers every published `skills/*/SKILL.md`.
+`just ci` runs `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and a canonical skill mirror check that covers every published `skills/*/SKILL.md`. `just ci` does not run VitePress.
+
+Pull-request CI in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) has a separate docs job. The docs job runs `npm ci` then `npm run build` under `docs/` on Node 20 and builds the bilingual VitePress site. The docs job does not deploy GitHub Pages.
+
+A hosted docs-job result on a new SHA stays **UNVERIFIED** until a separately authorized pull-request or push CI run exists for that SHA. Do not mark hosted PASS from a local docs build.
+
+Claude Code, Codex, Grok Build, Kimi Code, and Oh My Pi (OMP) share this verification boundary. See [docs/agents/harnesses.md](./docs/agents/harnesses.md).
 
 ---
 
