@@ -1,0 +1,571 @@
+cargo fmt --all --check
+cargo test -p zot-cli --test workspace_version_guard --locked
+   Compiling zot-desktop v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-desktop)
+   Compiling zot-remote v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-remote)
+   Compiling zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.89s
+     Running tests\workspace_version_guard.rs (target\debug\deps\workspace_version_guard-e008cc02ef45250e.exe)
+
+running 2 tests
+test workspace_internal_dependencies_are_centralized ... ok
+test workspace_members_inherit_lints_and_changelog_matches_version ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+cargo check --workspace --locked
+    Checking windows-link v0.2.1
+    Checking cfg-if v1.0.4
+    Checking smallvec v1.15.1
+    Checking stable_deref_trait v1.2.1
+    Checking bytes v1.11.1
+    Checking pin-project-lite v0.2.17
+    Checking memchr v2.8.0
+    Checking once_cell v1.21.4
+    Checking futures-core v0.3.32
+    Checking scopeguard v1.2.0
+    Checking futures-sink v0.3.32
+    Checking itoa v1.0.18
+    Checking litemap v0.8.2
+    Checking zeroize v1.8.2
+    Checking writeable v0.6.3
+    Checking serde_core v1.0.228
+    Checking futures-io v0.3.32
+    Checking slab v0.4.12
+    Checking futures-task v0.3.32
+    Checking untrusted v0.9.0
+    Checking zerofrom v0.1.7
+    Checking icu_normalizer_data v2.1.1
+    Checking icu_properties_data v2.1.2
+    Checking windows-sys v0.61.2
+    Checking subtle v2.6.1
+   Compiling getrandom v0.3.4
+    Checking tower-service v0.3.3
+    Checking try-lock v0.2.5
+    Checking lock_api v0.4.14
+    Checking parking_lot_core v0.9.12
+    Checking unicase v2.9.0
+    Checking percent-encoding v2.3.2
+    Checking futures-channel v0.3.32
+    Checking rustls-pki-types v1.14.0
+    Checking windows_x86_64_msvc v0.52.6
+    Checking httparse v1.10.1
+    Checking tracing-core v0.1.36
+    Checking atomic-waker v1.1.2
+    Checking log v0.4.29
+    Checking yoke v0.8.2
+    Checking want v0.3.1
+    Checking bitflags v2.11.1
+    Checking getrandom v0.4.3
+    Checking libc v0.2.185
+   Compiling jobserver v0.1.34
+    Checking windows-targets v0.52.6
+    Checking sync_wrapper v1.0.2
+    Checking winnow v1.0.1
+    Checking base64 v0.22.1
+    Checking ipnet v2.12.0
+    Checking typenum v1.20.1
+    Checking utf8_iter v1.0.4
+    Checking http v1.4.0
+    Checking option-ext v0.2.0
+    Checking parking_lot v0.12.5
+    Checking futures-util v0.3.32
+    Checking aho-corasick v1.1.4
+   Compiling mime_guess v2.0.5
+    Checking tower-layer v0.3.3
+    Checking regex-syntax v0.8.10
+    Checking form_urlencoded v1.2.2
+    Checking num-traits v0.2.19
+    Checking zmij v1.0.21
+    Checking windows-sys v0.59.0
+    Checking zerovec v0.11.6
+    Checking zerotrie v0.2.4
+   Compiling cc v1.2.60
+    Checking iri-string v0.7.12
+    Checking fastrand v2.4.1
+    Checking tracing v0.1.44
+    Checking toml_writer v1.1.1+spec-1.1.0
+    Checking once_cell_polyfill v1.70.2
+    Checking utf8parse v0.2.2
+    Checking mime v0.3.17
+    Checking anstyle v1.0.14
+    Checking toml_parser v1.1.2+spec-1.1.0
+    Checking thiserror v2.0.18
+    Checking colorchoice v1.0.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking strsim v0.11.1
+    Checking foldhash v0.2.0
+    Checking either v1.15.0
+    Checking unicode-width v0.2.2
+    Checking simd-adler32 v0.3.9
+    Checking byteorder v1.5.0
+    Checking piston-float v1.0.1
+    Checking adler2 v2.0.1
+    Checking clap_lex v1.1.0
+    Checking anstyle-parse v1.0.0
+    Checking crc32fast v1.5.0
+    Checking http-body v1.0.1
+    Checking tinystr v0.8.3
+    Checking potential_utf v0.1.5
+    Checking generic-array v0.14.7
+    Checking hashbrown v0.16.1
+    Checking filetime v0.2.27
+    Checking libloading v0.8.9
+    Checking bytemuck v1.25.0
+    Checking itertools v0.14.0
+    Checking miniz_oxide v0.8.9
+    Checking vecmath v1.0.0
+    Checking maybe-owned v0.3.4
+    Checking cpufeatures v0.2.17
+    Checking fallible-streaming-iterator v0.1.9
+    Checking utf16string v0.2.0
+    Checking http-body-util v0.1.3
+    Checking fallible-iterator v0.3.0
+    Checking icu_collections v2.1.1
+    Checking quick-xml v0.41.0
+   Compiling cmake v0.1.58
+    Checking icu_locale_core v2.1.1
+    Checking tar v0.4.45
+    Checking ascii v1.1.0
+    Checking md5 v0.8.0
+    Checking urlencoding v2.1.3
+    Checking chunked_transfer v1.5.0
+    Checking httpdate v1.0.3
+    Checking flate2 v1.1.9
+    Checking anyhow v1.0.104
+    Checking hashlink v0.11.0
+    Checking serde v1.0.228
+    Checking toml_datetime v1.1.1+spec-1.1.0
+    Checking serde_spanned v1.1.1
+    Checking serde_json v1.0.149
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking uuid v1.23.1
+    Checking regex-automata v0.4.14
+    Checking tiny_http v0.12.0
+    Checking toml v1.1.2+spec-1.1.0
+    Checking digest v0.10.7
+    Checking icu_provider v2.1.1
+   Compiling aws-lc-sys v0.39.1
+   Compiling libsqlite3-sys v0.37.0
+    Checking chrono v0.4.44
+    Checking sha2 v0.10.9
+    Checking icu_properties v2.1.1
+    Checking icu_normalizer v2.1.1
+    Checking pdfium-render v0.9.0
+    Checking idna_adapter v1.2.1
+    Checking winreg v0.55.0
+    Checking regex v1.12.3
+    Checking idna v1.1.0
+    Checking url v2.5.8
+    Checking mio v1.2.0
+    Checking socket2 v0.6.3
+    Checking dirs-sys v0.5.0
+    Checking anstyle-wincon v3.0.11
+    Checking tempfile v3.27.0
+    Checking anstyle-query v1.1.5
+    Checking fs4 v1.1.0
+    Checking normpath v1.5.0
+    Checking anstream v1.0.0
+    Checking dirs v6.0.0
+    Checking opener v0.8.4
+    Checking tokio v1.52.1
+    Checking zot-core v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-core)
+    Checking clap_builder v4.6.0
+    Checking rusqlite v0.39.0
+    Checking clap v4.6.1
+    Checking clap_complete v4.6.2
+    Checking hyper v1.9.0
+    Checking tower v0.5.3
+    Checking tokio-util v0.7.18
+    Checking tower-http v0.6.8
+    Checking hyper-util v0.1.20
+   Compiling aws-lc-rs v1.16.2
+   Compiling rustls v0.23.38
+    Checking rustls-webpki v0.103.13
+    Checking tokio-rustls v0.26.4
+    Checking rustls-platform-verifier v0.6.2
+    Checking hyper-rustls v0.27.9
+    Checking reqwest v0.13.2
+    Checking zot-remote v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-remote)
+    Checking zot-local v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-local)
+    Checking zot-desktop v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-desktop)
+    Checking zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.21s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+    Checking zot-core v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-core)
+    Checking zot-local v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-local)
+    Checking zot-desktop v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-desktop)
+    Checking zot-remote v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-remote)
+    Checking zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.94s
+cargo test --workspace --locked
+   Compiling zot-core v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-core)
+   Compiling zot-desktop v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-desktop)
+   Compiling zot-local v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-local)
+   Compiling zot-remote v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-remote)
+   Compiling zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.56s
+     Running unittests src\main.rs (target\debug\deps\zot-4f829b3103ec9828.exe)
+
+running 126 tests
+test app_error::tests::classifies_raw_serde_json_error ... ok
+test app_error::tests::classifies_generic_runtime_and_exposes_chain_only_as_diagnostics ... ok
+test app_error::tests::preserves_embedded_zot_error_payload ... ok
+test commands::config::tests::parses_output_limit_for_config_updates ... ok
+test commands::config::tests::applies_same_key_through_root_and_profile_targets ... ok
+test commands::config::tests::every_key_applies_at_root_and_root_only_keys_reject_profiles ... ok
+test commands::doctor::tests::local_sqlite_capability_exposes_snapshot_metadata ... ok
+test commands::config::tests::init_keeps_explicit_and_existing_data_dir_over_detected_default ... ok
+test commands::config::tests::init_reuses_apply_setting_and_rejects_root_only_keys_before_mutation ... ok
+test commands::doctor::tests::connector_capability_reports_scope_and_availability ... ok
+test app_error::tests::normalizes_cli_parse_error_and_keeps_detail_out_of_payload ... ok
+test commands::doctor::tests::local_sqlite_capability_preserves_typed_snapshot_error ... ok
+test commands::config::tests::updates_profile_specific_settings ... ok
+test commands::doctor::tests::pdf_backend_label_reports_auto_download_support ... ok
+test commands::doctor::tests::web_capability_is_credentials_only ... ok
+test commands::doctor::tests::write_credentials_payload_marks_local_reads_as_optional ... ok
+test commands::graph::server::tests::embedded_graph_script_uses_dom_and_http_url_policy ... ok
+test commands::graph::tests::zero_edge_budget_fails_before_local_database_open ... ok
+test commands::item::import::tests::read_import_text_prefers_file_and_rejects_neither ... ok
+test commands::item::import::tests::resolve_format_falls_back_to_extension_case_insensitively ... ok
+test commands::item::import::tests::resolve_format_prefers_explicit_over_extension_and_content ... ok
+test commands::graph::server::tests::every_graph_route_has_browser_security_headers ... ok
+test commands::collection::tests::item_count_payload_keeps_its_shape ... ok
+test commands::collection::tests::items_envelope_carries_collection_items ... ok
+test commands::collection::tests::human_mode_produces_no_json ... ok
+test commands::collection::tests::get_missing_collection_maps_to_stable_error ... ok
+test commands::collection::tests::list_envelope_carries_collections ... ok
+test commands::collection::tests::tags_envelope_carries_tag_counts ... ok
+test commands::item::merge::tests::merge_plan_requires_uri_for_every_source ... ok
+test commands::item::merge::tests::merge_plan_rejects_attachment_as_merge_candidate ... ok
+test commands::item::merge::tests::merge_plan_dc_replaces_dedupes_and_reports_only_new_uris ... ok
+test commands::item::merge::tests::merge_plan_fills_empty_metadata_and_sets_apply_result ... ok
+test commands::item::merge::tests::merge_plan_skips_source_fields_missing_on_keeper_type ... ok
+test commands::item::merge::tests::merge_plan_unions_relations_and_adds_dc_replaces ... ok
+test commands::item::merge::tests::merge_plan_skips_duplicate_attachments ... ok
+test commands::item::note::tests::library_errors_pass_through_unchanged ... ok
+test commands::item::note::tests::list_envelope_carries_note_key_and_content ... ok
+test commands::item::note::tests::search_passes_limit_through_to_the_library ... ok
+test commands::item::read::tests::explicit_output_file_ignores_untrusted_metadata_filename ... ok
+test commands::item::merge::tests::writer_contract_validates_sources_and_separates_preview_from_apply ... ok
+test commands::item::read::tests::keeps_explicit_download_filename ... ok
+test commands::item::read::tests::rejects_untrusted_attachment_filenames_cross_platform ... ok
+test cli::tests::rejects_zero_explicit_output_limit ... ok
+test commands::item::scite::tests::collect_retraction_results_keeps_only_items_with_notices ... ok
+test commands::item::scite::tests::collect_dois_drops_items_without_doi ... ok
+test commands::item::scite::tests::collect_retraction_results_with_empty_reports_yields_nothing ... ok
+test commands::item::scite::tests::pair_scite_reports_attaches_match_or_null ... ok
+test commands::item::tag::tests::empty_confirm_is_applied_without_constructing_writer ... ok
+test commands::item::tag::tests::apply_continues_all_operations_and_preserves_nested_error_codes ... ok
+test commands::item::tag::tests::validation_rejects_unsafe_inputs_with_stable_codes ... ok
+test commands::item::tag::tests::report_distinguishes_applied_and_failed_states ... ok
+test commands::item::tag::tests::over_ceiling_confirm_fails_before_constructing_writer ... ok
+test commands::item::write::tests::arxiv_pdf_attachment_builds_target_and_sanitizes_filename ... ok
+test commands::item::write::tests::arxiv_payload_uses_preprint_type_and_extra ... ok
+test commands::item::write::tests::arxiv_pdf_attachment_skips_when_mode_is_none ... ok
+test commands::item::tag::tests::preview_reports_total_selection_and_sample_without_constructing_writer ... ok
+test commands::item::write::tests::crossref_payload_maps_fields ... ok
+test commands::item::write::tests::crossref_payload_title_falls_back_to_doi ... ok
+test commands::item::read::tests::resolves_download_path_inside_directory ... ok
+test commands::item::write::tests::crossref_type_maps_known_and_falls_back_for_unknown ... ok
+test commands::item::write::tests::temporary_pdf_suffix_rejects_path_characters ... ok
+test cli::tests::resolves_configured_limit_only_for_read_output_commands ... ok
+test commands::item::write::tests::webpage_payload_uses_url_for_title_and_url ... ok
+test commands::library::tests::semantic_index_limit_defaults_to_ten_thousand ... ok
+test commands::library::tests::saved_search_delete_output_is_enveloped ... ok
+test commands::library::tests::delete_saved_searches_requires_at_least_one_key ... ok
+test commands::library::tests::truncated_duplicate_scan_fails_before_dedupe_can_build_a_writer ... ok
+test commands::library::tests::rejects_empty_saved_search_conditions_before_remote_calls ... ok
+test commands::library::tests::truncate_semantic_index_items_applies_collection_limit ... ok
+test commands::library::tests::semantic_status_output_envelope_carries_fields ... ok
+test commands::library::tests::zero_candidate_budget_fails_before_local_database_open ... ok
+test commands::library_dedupe::tests::apply_continues_after_single_group_failure ... ok
+test commands::item::import::tests::resolve_format_errors_when_undetectable ... ok
+test commands::library_dedupe::tests::apply_skips_low_confidence_before_calling_writer_by_default ... ok
+test commands::item::import::tests::count_entries_counts_bibtex_and_ris_records ... ok
+test commands::item::import::tests::resolve_format_sniffs_content_when_no_format_or_known_extension ... ok
+test commands::library_dedupe::tests::bridging_group_folds_two_existing_components_into_one ... ok
+test commands::library_dedupe::tests::dedupe_plan_envelope_carries_plan_fields ... ok
+test commands::library_dedupe::tests::differing_dois_mark_low_confidence ... ok
+test commands::library_dedupe::tests::dedupe_plan_serializes_design_contract_shape ... ok
+test commands::library_dedupe::tests::keeper_tie_breaks_on_earlier_date_added ... ok
+test cli::tests::parses_trash_and_candidate_budget_contracts ... ok
+test commands::library_dedupe::tests::include_low_confidence_calls_writer_for_every_group ... ok
+test commands::library_dedupe::tests::keeper_prefers_published_type_over_preprint ... ok
+test commands::library_dedupe::tests::keeper_tie_breaks_on_attachment_count ... ok
+test commands::library_dedupe::tests::keeper_tie_breaks_on_metadata_field_count ... ok
+test commands::library_dedupe::tests::partially_overlapping_groups_merge_into_one_component ... ok
+test commands::library_dedupe::tests::fully_overlapping_groups_collapse_to_combined_match_type ... ok
+test commands::library_dedupe::tests::keeper_falls_back_to_key_order_for_determinism ... ok
+test commands::library_dedupe::tests::same_doi_and_year_stay_normal_confidence ... ok
+test commands::library_dedupe::tests::year_spread_over_one_marks_low_confidence ... ok
+test commands::sync::tests::not_published_yields_empty_fields ... ok
+test commands::sync::tests::published_falls_back_to_journal_name_for_publication_title ... ok
+test commands::sync::tests::published_with_all_fields_maps_each ... ok
+test commands::sync::tests::published_without_usable_fields_is_empty ... ok
+test commands::workspace::tests::export_bibtex_json_envelope_exposes_format_and_content ... ok
+test format::tests::serializes_error_envelope_byte_exact ... ok
+test commands::workspace::tests::export_markdown_human_mode_has_no_json_payload ... ok
+test format::tests::envelope_meta_carries_profile_from_context_and_api_version ... ok
+test format::tests::serializes_domain_error_with_versioned_meta_byte_exact ... ok
+test format::tests::serializes_error_envelope_without_hint ... ok
+test format::tests::serializes_generic_error_without_verbose_chain ... ok
+test format::tests::serializes_success_envelope_with_meta ... ok
+test output::tests::json_output_is_byte_exact_with_seed ... ok
+test util::tests::named_error_constructors_keep_stable_payloads ... ok
+test output::tests::json_output_is_byte_exact_without_seed ... ok
+test output::tests::json_output_injects_profile_and_api_version ... ok
+test util::tests::parses_page_ranges_for_single_pages_and_spans ... ok
+test util::tests::rejects_invalid_page_ranges_with_invalid_input ... ok
+test output::tests::human_output_has_no_json ... ok
+test context::tests::context_debug_never_exposes_secret_canary ... ok
+test context::tests::default_profile_controls_context_metadata_and_output_mode ... ok
+test commands::item::read::tests::download_is_no_clobber_unless_force_is_explicit ... ok
+test commands::doctor::tests::legacy_bridge_config_detection_covers_root_and_profiles_without_exposing_values ... ok
+test util::tests::require_valid_doi_normalizes_or_rejects ... ok
+test commands::item::import::tests::readonly_target_is_rejected_before_confirm_ever_sends_import ... ok
+test commands::item::import::tests::dry_run_never_sends_an_import_request ... ok
+test commands::item::import::tests::target_becoming_readonly_aborts_before_import ... ok
+test commands::item::import::tests::changed_target_aborts_before_import ... ok
+test commands::item::read::tests::force_never_truncates_the_source_attachment ... ok
+test commands::item::import::tests::confirmed_writable_target_sends_import_and_reports_session ... ok
+test commands::item::merge::tests::web_writer_preserves_existing_request_sequence_and_payloads ... ok
+test commands::item::write::tests::plan_add_url_classifies_doi_arxiv_and_webpage ... ok
+test util::tests::run_pdf_offloads_blocking_work_to_a_separate_thread ... ok
+test cli::tests::parses_new_library_and_item_command_surfaces ... ok
+test util::tests::run_local_opens_and_queries_on_a_blocking_thread ... ok
+
+test result: ok. 126 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\json_error_contract.rs (target\debug\deps\json_error_contract-a319362891056d9d.exe)
+
+running 4 tests
+test json_parse_failure_is_enveloped_and_uses_exit_code_two ... ok
+test graph_server_rejects_json_before_database_or_listener_output ... ok
+test verbose_parse_detail_stays_on_stderr_and_stdout_is_unchanged ... ok
+test every_top_level_command_group_has_a_single_document_error_contract ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running tests\workspace_version_guard.rs (target\debug\deps\workspace_version_guard-e008cc02ef45250e.exe)
+
+running 2 tests
+test workspace_internal_dependencies_are_centralized ... ok
+test workspace_members_inherit_lints_and_changelog_matches_version ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\debug\deps\zot_core-6a541aa62f6b1587.exe)
+
+running 13 tests
+test config::tests::config_path_fails_closed_without_platform_directory ... ok
+test error::tests::connector_error_payload_drops_status_and_keeps_code_message_hint ... ok
+test config::tests::effective_profile_prefers_explicit_then_default ... ok
+test net::tests::net_defaults_are_pinned ... ok
+test config::tests::manages_default_profile_name ... ok
+test config::tests::redacts_unicode_secrets_on_character_boundaries ... ok
+test envelope::tests::error_payload_with_meta_is_additive_and_versioned ... ok
+test envelope::tests::legacy_error_constructor_omits_meta ... ok
+test config::tests::old_bridge_config_fields_are_ignored ... ok
+test config::tests::normalizes_legacy_empty_output_defaults_before_validation ... ok
+test config::tests::secret_debug_is_redacted_and_toml_round_trips ... ok
+test config::tests::parses_library_scope ... ok
+test config::tests::save_to_replaces_existing_config_without_temp_residue ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\debug\deps\zot_desktop-d96d2efd926ea562.exe)
+
+running 11 tests
+test connector::tests::rejects_non_loopback_base_url ... ok
+test connector::tests::selected_target_reports_readonly_target_as_not_writable ... ok
+test connector::tests::ping_maps_non_success_status_to_connector_http ... ok
+test connector::tests::selected_target_maps_non_success_status_to_connector_http ... ok
+test connector::tests::ping_reports_available_and_zotero_version_on_success ... ok
+test connector::tests::import_preserves_non_json_response_body_verbatim ... ok
+test connector::tests::import_posts_text_plain_body_with_session_query_and_parses_json_response ... ok
+test connector::tests::local_http_probe_decodes_zotero_headers ... ok
+test connector::tests::import_maps_non_success_status_to_connector_http ... ok
+test connector::tests::selected_target_parses_writable_collection ... ok
+test connector::tests::ping_maps_slow_server_to_timeout ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running unittests src\lib.rs (target\debug\deps\zot_local-55908dd1eb234f10.exe)
+
+running 61 tests
+test db::tests::escape_like_quotes_percent_underscore_and_backslash ... ok
+test graph::tests::score_pair_is_the_single_weight_table ... ok
+test pdf::tests::annotation_area_validation_enforces_finite_unit_rectangle ... ok
+test graph::tests::oversize_groups_are_counted_without_pair_expansion ... ok
+test graph::tests::edge_budget_bounds_new_pairs_and_reports_truncation ... ok
+test pdf::tests::cache_dir_uses_override_and_version_suffix ... ok
+test pdf::tests::artifact_size_limit_is_enforced_before_checksum_acceptance ... ok
+test pdf::tests::candidate_library_paths_only_uses_trusted_sources ... ok
+test pdf::tests::env_candidates_prefer_explicit_file_and_directory_inputs ... ok
+test pdf::tests::download_client_builds_with_shared_net_defaults ... ok
+test pdf::tests::archive_shape_and_library_checksum_fail_closed ... ok
+test db::tests::duplicate_title_scan_bounds_ten_thousand_candidates_by_budget ... ok
+test pdf::tests::managed_cache_rejects_legacy_and_tampered_libraries ... ok
+test pdf::tests::existing_verified_library_survives_failed_redownload_attempt ... ok
+test pdf::tests::installs_verified_library_atomically ... ok
+test pdf::tests::resolves_download_targets_for_supported_platforms ... ok
+test pdf::tests::concurrent_installers_download_once ... ok
+test pdf::tests::tampered_truncated_and_wrong_platform_archives_fail_closed ... ok
+test graph::tests::fifty_thousand_node_oversize_group_does_not_expand_a_clique ... ok
+test pdf::tests::pdf_cache_rejects_future_schema_version ... ok
+test workspace::tests::metadata_chunk_includes_authors_and_tags ... ok
+test db::tests::snapshot_reads_committed_wal_and_preserves_metadata ... ok
+test pdf::tests::pdf_cache_content_fingerprint_rejects_same_metadata_replacement ... ok
+test pdf::tests::pdf_cache_reopens_with_wal_timeout_and_schema_version ... ok
+test semantic::tests::reindex_then_search_works_entirely_through_fakes ... ok
+test workspace::tests::save_rejects_unvalidated_workspace_name ... ok
+test workspace::tests::workspace_name_accepts_only_kebab_case ... ok
+test semantic::tests::search_narrows_results_to_the_allowed_collection ... ok
+test workspace::tests::rag_index_open_enables_wal_journal_mode ... ok
+test workspace::tests::workspace_store_save_round_trips_updates ... ok
+test workspace::tests::bm25_average_doc_len_uses_full_corpus ... ok
+test workspace::tests::rag_index_reopen_preserves_prior_chunks_without_clear ... ok
+test workspace::tests::rag_index_bm25_query_returns_matching_chunks ... ok
+test db::tests::snapshot_lock_contention_returns_stable_busy_error ... ok
+test workspace::tests::rag_index_remove_item_chunks_clears_previous_versions ... ok
+test workspace_rag::tests::embedding_count_mismatch_errors ... ok
+test workspace_rag::tests::force_rebuild_clears_and_re_embeds ... ok
+test workspace_rag::tests::incremental_reindex_does_not_reembed_unchanged_items ... ok
+test workspace_rag::tests::metadata_only_workspace_is_queryable ... ok
+test workspace_rag::tests::query_embedding_dimension_mismatch_errors ... ok
+test workspace_rag::tests::query_workspace_filters_before_limit ... ok
+test workspace_rag::tests::reindex_skips_missing_workspace_items ... ok
+test workspace_rag::tests::query_workspace_filters_stale_chunks_by_current_membership ... ok
+test workspace_rag::tests::workspace_paths_follow_store_root ... ok
+test workspace_rag::tests::fulltext_reindex_reuses_pdf_cache ... ok
+test db::tests::concurrent_writer_snapshots_preserve_cross_table_invariant ... ok
+test db::tests::supports_structured_search_and_citation_key_lookup ... ok
+test db::tests::enumerates_tags_libraries_feeds_and_feed_items ... ok
+test db::tests::exposes_children_notes_annotations_and_collection_search ... ok
+test db::tests::builds_knowledge_graph_with_expected_edges_and_determinism ... ok
+test db::tests::find_duplicates_excludes_trashed_items ... ok
+test db::tests::collection_scoped_graph_only_includes_collection_items ... ok
+test db::tests::returns_recent_items_by_count_in_date_added_order ... ok
+test db::tests::searches_titles_and_fulltext ... ok
+test db::tests::finds_duplicates_by_title_doi_and_both ... ok
+test db::tests::search_excludes_trashed_items_by_default_and_allows_explicit_inclusion ... ok
+test db::tests::collection_resolution_prefers_exact_key_and_rejects_ambiguous_names ... ok
+test db::tests::related_and_graph_rank_the_same_pairs_consistently ... ok
+test db::tests::related_items_rank_by_unified_scorer_signals ... ok
+test db::tests::search_with_percent_in_query_does_not_match_arbitrary_chars ... ok
+test db::tests::resolves_group_library ... ok
+
+test result: ok. 61 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.00s
+
+     Running tests\search_regression.rs (target\debug\deps\search_regression-2b3b90aee89d3505.exe)
+
+running 8 tests
+test list_items_matches_search_default_projection ... ok
+test get_stats_returns_well_formed_aggregate ... ok
+test get_item_returns_none_for_unknown_key ... ok
+test recent_items_by_count_is_bounded ... ok
+test empty_query_returns_non_empty_primary_items_only ... ok
+test like_query_propagates_across_field_sub_searches ... ok
+test item_type_filter_uses_chunked_in_query_not_per_row_lookups ... ok
+test sorting_and_sql_pagination_match_the_full_golden_order ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\semantic_index.rs (target\debug\deps\semantic_index-840bfc1f3bc0f57d.exe)
+
+running 8 tests
+test semantic_apply_rejects_mixed_dimensions_in_batch ... ok
+test with_write_tx_wraps_bulk_inserts_in_single_commit ... ok
+test semantic_apply_records_index_dimension ... ok
+test semantic_search_without_recorded_dimension_is_allowed ... ok
+test semantic_search_rejects_query_embedding_dimension_mismatch ... ok
+test blob_embedding_round_trips_across_reopen ... ok
+test bm25_average_doc_len_is_cached_after_first_query ... ok
+test legacy_text_embedding_migrates_to_blob_on_open ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running unittests src\lib.rs (target\debug\deps\zot_remote-d0104f6b464c7853.exe)
+
+running 44 tests
+test embedding::tests::embedding_batch_size_falls_back_for_zero_or_invalid_input ... ok
+test embedding::tests::embedding_batch_size_respects_positive_env_override ... ok
+test embedding::tests::embedding_batch_size_defaults_to_64_when_env_missing ... ok
+test embedding::tests::accepts_matching_embedding_counts ... ok
+test embedding::tests::rejects_mismatched_embedding_counts ... ok
+test http::tests::http_hint_maps_known_statuses ... ok
+test http::tests::http_hint_returns_none_for_unmapped_or_absent_status ... ok
+test download::tests::rejects_non_public_ip_ranges ... ok
+test scite::tests::batch_request_chunks_over_500_dois ... ok
+test download::tests::download_urls_require_https_without_userinfo ... ok
+test embedding::tests::splits_large_input_into_batches ... ok
+test oa::tests::rejects_malformed_or_entryless_arxiv_atom ... ok
+test http::tests::parses_retry_after_seconds_and_http_date ... ok
+test oa::tests::parses_namespaced_nested_and_cdata_arxiv_atom ... ok
+test oa::tests::parses_arxiv_atom_and_discovers_crossref_relations ... ok
+test oa::tests::parses_crossref_abstract_with_jats_wrapper ... ok
+test scite::tests::converts_tally_payload_into_core_shape ... ok
+test scite::tests::merges_scite_report_title_tally_and_notices ... ok
+test zotero::tests::item_uri_uses_user_and_group_scope_prefixes ... ok
+test http::tests::maps_status_less_error_preserving_code ... ok
+test zotero::tests::production_upload_urls_require_https ... ok
+test oa::tests::normalizes_doi_variants ... ok
+test oa::tests::normalizes_arxiv_variants ... ok
+test zotero::tests::oversize_attachment_fails_before_any_request ... ok
+test zotero::tests::not_found_maps_to_remote_404_without_hint ... ok
+test semantic_scholar::tests::extracts_arxiv_and_biorxiv ... ok
+test zotero::tests::error_bodies_are_bounded_and_sanitized ... ok
+test download::tests::enforces_redirect_budget ... ok
+test zotero::tests::update_item_fields_carries_version_precondition_and_succeeds ... ok
+test semantic_scholar::tests::check_publication_reports_published_paper_via_injected_base_url ... ok
+test zotero::tests::precondition_failure_maps_to_remote_412_with_conflict_hint ... ok
+test download::tests::rejects_private_redirect_before_second_request ... ok
+test zotero::tests::create_item_decodes_multi_write_response ... ok
+test zotero::tests::authorization_failure_hard_deletes_orphan_attachment ... ok
+test zotero::tests::external_upload_failure_hard_deletes_orphan_attachment ... ok
+test zotero::tests::registration_failure_hard_deletes_orphan_attachment ... ok
+test zotero::tests::external_attachment_upload_never_receives_zotero_api_key ... ok
+test zotero::tests::server_error_maps_to_remote_500_without_hint ... ok
+test download::tests::rejects_declared_and_actual_oversize_downloads ... ok
+test download::tests::downloads_valid_pdf_through_bounded_temp_path ... ok
+test download::tests::rejects_wrong_content_type_and_magic ... ok
+test zotero::tests::retries_write_token_create_with_the_same_token ... ok
+test zotero::tests::retries_gets_on_429_and_server_errors ... ok
+test zotero::tests::cleanup_failure_keeps_original_error_and_cleanup_evidence ... ok
+
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+   Doc-tests zot_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zot_desktop
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zot_local
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zot_remote
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+python scripts/check_skill_mirrors.py --skip-if-all-missing
+skill mirror matches canonical: .agents\skills\zot
+skill mirror matches canonical: .claude\skills\zot
+python -m unittest discover -s scripts/tests -p "test_*.py"
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.107s
+
+OK
