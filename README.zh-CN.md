@@ -198,6 +198,16 @@ just docs
 
 正式文档通过 [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml) 发布到 GitHub Pages。
 
+未来的 GitHub release 标签必须是 `vX.Y.Z`。
+
+Cargo 的 `workspace.package.version` 保持数字形式 `X.Y.Z`。
+
+当前示例标签是 `v1.0.1`。
+
+`github-pages` 环境目前允许分支 `main` 和标签模式 `v*`。
+
+共用发布契约见 [docs/agents/release.md](./docs/agents/release.md)。
+
 ---
 
 ## 当前边界

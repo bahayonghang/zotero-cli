@@ -196,7 +196,7 @@ Local preview:
 just docs
 ```
 
-Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml).
+Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml). Future GitHub release tags must be `vX.Y.Z`. Cargo `workspace.package.version` stays numeric `X.Y.Z`. The current example tag is `v1.0.1`. The `github-pages` environment allows branch `main` and tag pattern `v*`. See [docs/agents/release.md](./docs/agents/release.md).
 
 ---
 
