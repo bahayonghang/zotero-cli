@@ -1,6 +1,8 @@
-# 在 Claude Code / Codex 里怎么提 Zotero 任务
+# 在 Claude Code / Codex / Grok Build / Kimi Code / OMP 里怎么提 Zotero 任务
 
 这页只讲一件事：**怎么自然开口**。
+
+Claude Code、Codex、Grok Build、Kimi Code、Oh My Pi（OMP）共用这套开口方式。仓库规则见 [`AGENTS.md`](../../AGENTS.md)。Claude Code 另读根目录 [`CLAUDE.md`](../../CLAUDE.md)。工具加载、权限与证据等级见 [Agent 工具矩阵](../agents/harnesses.md)。
 
 如果你已经装了 `zot` skill，就不要先想命令。直接把 Zotero 任务说出来。
 

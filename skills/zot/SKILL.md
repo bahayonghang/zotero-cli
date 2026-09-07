@@ -292,7 +292,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `--library` 只接受 `user` 或 `group:<id>`
 - `--json` 是 global flag，必须放在子命令前（例 `zot --json item get K`），不能写成 `zot item --json get K`
 - workspace 名必须是 kebab-case
-- workspace 文件实际位置：`~/.config/zot/workspaces/<name>.toml`，索引副文件 `<name>.idx.sqlite`，PDF cache 副文件 `.md_cache.sqlite`
+- workspace 文件由 `AppConfig::state_dir().join("workspaces")` 解析，不要把 `~/.config/zot/workspaces` 写成所有平台的路径。Linux/XDG 示例：`~/.config/zot/workspaces/<name>.toml`；macOS：`~/Library/Application Support/zot/workspaces/<name>.toml`；Windows：`%AppData%\zot\workspaces\<name>.toml`。运行时以 `doctor` / `config show`（`doctor.data.config_file`）为准。索引副文件 `<name>.idx.sqlite`，PDF cache 副文件 `.md_cache.sqlite`
 - `zot mcp serve` 当前不可用
 - `item add-file` 不支持 `--attach-mode`
 - `item annotation create` / `create-area` 只适用于 PDF attachment，且 attachment 的 `content_type` 必须是 `application/pdf`，否则报 `attachment-not-pdf`

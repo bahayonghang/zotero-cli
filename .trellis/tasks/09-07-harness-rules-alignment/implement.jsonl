@@ -1,0 +1,4 @@
+{"file":".trellis/spec/zot-cli/backend/quality-guidelines.md","reason":"统一门禁、集成测试与项目边界"}
+{"file":".trellis/tasks/09-07-evergreen-harness-audit/research/local-validation.md","reason":"当前测试与环境缺口、镜像漏检复现"}
+{"file":".trellis/tasks/09-07-evergreen-harness-audit/research/harness-review.md","reason":"五套工具来源、规则入口与能力边界"}
+{"file":".trellis/tasks/09-07-evergreen-harness-audit/research/workflow-review.md","reason":"当前及历史 GitHub 工作流、发布保护根因"}

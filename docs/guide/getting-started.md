@@ -160,8 +160,13 @@ just ci
 
 ## 配置位置
 
-- 配置文件：`~/.config/zot/config.toml`
-- workspace 根目录：`~/.config/zot/workspaces`
+配置与状态目录由 `dirs::config_dir()` 解析（`AppConfig::config_dir` / `config_file` / `state_dir`）。不要把 `~/.config/zot/...` 写成所有平台的路径。运行时以 `zot --json doctor` / `zot --json config show`（`doctor.data.config_file`）为准。
+
+按平台标注的示例：
+
+- Linux/XDG：`~/.config/zot/config.toml`，`~/.config/zot/workspaces`
+- macOS：`~/Library/Application Support/zot/config.toml`，`~/Library/Application Support/zot/workspaces`
+- Windows：`%AppData%\zot\config.toml`，`%AppData%\zot\workspaces`（示例：`C:\Users\<user>\AppData\Roaming\zot\config.toml`）
 
 常用环境变量：
 

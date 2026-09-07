@@ -163,8 +163,16 @@ just ci
 
 ## Configuration
 
-- Config file: `~/.config/zot/config.toml`
-- Workspace root: `~/.config/zot/workspaces`
+Config and state paths come from `dirs::config_dir()` (`AppConfig::config_dir` /
+`config_file` / `state_dir`). Do not present `~/.config/zot/...` as a universal
+path. Runtime truth is `zot --json doctor` / `zot --json config show`
+(`doctor.data.config_file`).
+
+Typical examples (label the platform):
+
+- Linux/XDG: `~/.config/zot/config.toml`, `~/.config/zot/workspaces`
+- macOS: `~/Library/Application Support/zot/config.toml`, `~/Library/Application Support/zot/workspaces`
+- Windows: `%AppData%\zot\config.toml`, `%AppData%\zot\workspaces` (example: `C:\Users\<user>\AppData\Roaming\zot\config.toml`)
 
 Common environment variables:
 

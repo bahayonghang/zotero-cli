@@ -4,7 +4,11 @@
 
 ## 存储约定
 
-- 默认目录：`~/.config/zot/workspaces`
+- 默认目录：`AppConfig::state_dir().join("workspaces")`。不要把 `~/.config/zot/workspaces` 写成所有平台的路径。运行时以 `doctor` / `config show` 为准。
+- 按平台标注的示例：
+  - Linux/XDG：`~/.config/zot/workspaces`
+  - macOS：`~/Library/Application Support/zot/workspaces`
+  - Windows：`%AppData%\zot\workspaces`
 - 工作区文件：`<name>.toml`
 - 索引 sidecar：`<name>.idx.sqlite`
 - PDF 缓存 sidecar：`.md_cache.sqlite`

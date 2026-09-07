@@ -14,9 +14,11 @@ libraries. Keep it accurate as the implementation evolves.
   hardware. Beyond that the scan starts to dominate; consider scoping queries
   to a smaller workspace or filtering by collection before running
   `semantic-index`.
-- The library-wide index lives in `~/.config/zot/indexes/<scope>.idx.sqlite`;
-  per-workspace indexes are sidecars next to the workspace TOML
-  (`<name>.idx.sqlite`).
+- The library-wide index lives under `AppConfig::state_dir().join("indexes")`
+  as `<scope>.idx.sqlite`. Do not present `~/.config/zot/indexes/...` as a
+  universal path. Linux/XDG example: `~/.config/zot/indexes/<scope>.idx.sqlite`.
+  Runtime truth is `doctor` / `state_dir`. Per-workspace indexes are sidecars
+  next to the workspace TOML (`<name>.idx.sqlite`).
 - Approximate-nearest-neighbour search (e.g. HNSW) is **not** implemented and
   is intentionally deferred to a future minor release.
 

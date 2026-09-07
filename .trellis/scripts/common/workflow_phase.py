@@ -150,10 +150,11 @@ def resolve_effective_platform(platform: str, config: dict) -> str:
     namespaced name (e.g. ``[codex-sub-agent, ...]`` or ``[codex-inline, Kilo,
     Antigravity, Devin]``).
 
-    Default is ``inline`` because Codex sub-agents run with ``fork_turns="none"``
-    isolation and can't inherit the parent session's task context — inline
-    keeps the main agent in charge so context isn't lost. Invalid / missing
-    values also fall back to inline.
+    Default is ``inline`` as a project context-reliability choice. Current
+    Codex default is subagents with ``fork_turns="all"``; ``none`` is an
+    explicit isolation option. Do not treat ``fork_turns="none"`` as the
+    reason for the inline default. Invalid / missing values also fall back
+    to inline.
 
     Other platforms are returned unchanged.
     """
