@@ -230,7 +230,7 @@ If you need to override Pdfium resolution manually:
 just ci
 ```
 
-This runs `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and the canonical skill mirror check.
+This runs `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and a canonical skill mirror check that covers every published `skills/*/SKILL.md`.
 
 ---
 

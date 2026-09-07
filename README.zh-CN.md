@@ -240,7 +240,7 @@ Cargo 的 `workspace.package.version` 保持数字形式 `X.Y.Z`。
 just ci
 ```
 
-会执行 `cargo fmt --all --check`、`cargo check --workspace`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` 和 canonical skill 镜像检查。
+会执行 `cargo fmt --all --check`、`cargo check --workspace`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`，以及覆盖全部已发布 `skills/*/SKILL.md` 的 canonical skill 镜像检查。
 
 ---
 
