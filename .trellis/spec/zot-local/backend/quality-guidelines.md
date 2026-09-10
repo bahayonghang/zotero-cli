@@ -24,7 +24,8 @@ regressions. Add narrow tests around the behavior being changed.
 
 - Run `cargo test -p zot-local` for local data-layer changes.
 - Add fixture-backed tests in `src/zot-local/tests/search_regression.rs` for
-  Zotero schema/query behavior.
+  Zotero schema/query behavior. Cover userdata 120 word tables and schema ≥127
+  without those tables; when testing FTS5, assert ATTACH uses the snapshot copy.
 - Add sidecar-index tests in `src/zot-local/tests/semantic_index.rs` or inline
   `workspace.rs` tests for index schema, migration, and query behavior.
 - Add PDF-specific unit tests in `pdf.rs` when changing Pdfium setup, cache

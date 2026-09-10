@@ -50,6 +50,16 @@ libraries. Keep it accurate as the implementation evolves.
   default. Their explicit `--include-trashed` flag restores the legacy broad
   view; JSON envelopes report the applied choice as
   `meta.trash_policy = "excluded" | "included"`.
+- Non-empty `library search` reports `meta.fulltext_index`:
+  `legacy-tables` (main-DB word tables), `fts5-sidecar` (`fulltext.sqlite`
+  FTS5 after a read-only snapshot `ATTACH`), or `unavailable` (no word tables,
+  no usable sidecar, or the query cannot build a MATCH). `library list` and
+  empty queries omit the field. Zotero userdata ≥127 dropped
+  `fulltextItemWords` / `fulltextWords` from `zotero.sqlite`; attachment
+  content then lives in `data_dir/fulltext.sqlite`. Missing those tables must
+  not fail search. FTS5 MATCH uses `"tokens"*` (or CJK 2-grams) and does not
+  re-scan `.zotero-ft-cache`, so multi-token punctuation phrases can differ
+  from Zotero UI.
 - Search computes `total` with SQL and applies deterministic SQL
   `ORDER BY/LIMIT/OFFSET` before hydrating item fields, creators, tags, and
   collections. Memory use therefore follows the requested page size rather

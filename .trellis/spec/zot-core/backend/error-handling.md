@@ -51,7 +51,9 @@ Err {
 ```
 
 Tests must prove the legacy constructor omits metadata and the versioned constructor serializes
-`profile`/`api_version` without changing `ErrorPayload`.
+`profile`/`api_version` without changing `ErrorPayload`. Additive optional fields such as
+`trash_policy` and `fulltext_index` use `skip_serializing_if = "Option::is_none"` and keep
+`api_version` at 1.
 
 ## Patterns
 

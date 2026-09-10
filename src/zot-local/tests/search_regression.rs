@@ -34,6 +34,10 @@ fn empty_query_returns_non_empty_primary_items_only() {
         result.total > 0,
         "fixture should expose at least one primary item"
     );
+    assert!(
+        result.fulltext_index.is_none(),
+        "empty query must omit fulltext_index"
+    );
     for item in &result.items {
         assert!(
             !CHILD_TYPES.contains(&item.item_type.as_str()),
@@ -87,6 +91,14 @@ fn like_query_propagates_across_field_sub_searches() {
     assert!(
         !result.items.is_empty(),
         "searching for `{token}` should hit the seed item"
+    );
+    assert!(
+        matches!(
+            result.fulltext_index.as_deref(),
+            Some("legacy-tables" | "fts5-sidecar" | "unavailable")
+        ),
+        "non-empty search must report a fulltext backend, got {:?}",
+        result.fulltext_index
     );
     for item in &result.items {
         assert!(

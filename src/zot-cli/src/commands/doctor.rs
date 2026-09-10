@@ -54,6 +54,12 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let config_file = AppConfig::config_file()?;
     let migration_hint = legacy_bridge_config_present(&config_file).then_some(LEGACY_BRIDGE_HINT);
     let local_sqlite_available = library.is_ok();
+    let fulltext_probe = library.as_ref().ok().map(|library| {
+        (
+            library.legacy_fulltext_tables(),
+            library.fulltext_sidecar_present(),
+        )
+    });
     let web_write_configured = ctx.config.write_credentials_configured();
     let pdf_available = pdf_status.available;
     let semantic_status = library::semantic_status(ctx).await.ok();
@@ -141,6 +147,9 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         if let Some(version) = schema_version {
             println!("Schema version: {version}");
         }
+        if let Some((legacy_tables, sidecar_present)) = fulltext_probe {
+            println!("Fulltext index: legacy_tables={legacy_tables} sidecar={sidecar_present}");
+        }
         if let Some(snapshot) = snapshot_meta {
             println!("SQLite snapshot: {}", snapshot.snapshot_created_at);
             if let Some(source_modified_at) = snapshot.source_modified_at {
@@ -157,7 +166,11 @@ fn local_sqlite_capability(
     library: &zot_core::ZotResult<zot_local::LocalLibrary>,
 ) -> serde_json::Value {
     match library {
-        Ok(library) => local_sqlite_available_payload(library.snapshot_meta()),
+        Ok(library) => local_sqlite_available_payload(
+            library.snapshot_meta(),
+            library.legacy_fulltext_tables(),
+            library.fulltext_sidecar_present(),
+        ),
         Err(error) => serde_json::json!({
             "configured": true,
             "available": false,
@@ -166,11 +179,19 @@ fn local_sqlite_capability(
     }
 }
 
-fn local_sqlite_available_payload(snapshot: &LibrarySnapshotMeta) -> serde_json::Value {
+fn local_sqlite_available_payload(
+    snapshot: &LibrarySnapshotMeta,
+    legacy_tables: bool,
+    sidecar_present: bool,
+) -> serde_json::Value {
     serde_json::json!({
             "configured": true,
             "available": true,
             "snapshot": snapshot,
+            "fulltext": {
+                "legacy_tables": legacy_tables,
+                "sidecar_present": sidecar_present,
+            },
     })
 }
 
@@ -306,7 +327,7 @@ mod tests {
             snapshot_created_at: "2026-07-26T10:00:01+00:00".to_string(),
             schema_version: Some(42),
         };
-        let payload = local_sqlite_available_payload(&snapshot);
+        let payload = local_sqlite_available_payload(&snapshot, false, true);
 
         assert_eq!(payload["configured"], true);
         assert_eq!(payload["available"], true);
@@ -318,6 +339,8 @@ mod tests {
                 "schema_version": 42,
             })
         );
+        assert_eq!(payload["fulltext"]["legacy_tables"], false);
+        assert_eq!(payload["fulltext"]["sidecar_present"], true);
     }
 
     #[test]

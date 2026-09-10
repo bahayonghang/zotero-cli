@@ -48,6 +48,11 @@ zot --json library search "alignment" --sort date-added --direction desc
 - `--limit`
 - `--offset`
 
+说明：
+
+- 非空 `library search` 的 JSON `meta.fulltext_index` 为 `legacy-tables`、`fts5-sidecar` 或 `unavailable`。`library list` 和空 query 不输出该字段。
+- Zotero userdata ≥127 后，附件全文在 `data_dir/fulltext.sqlite`。缺少主库词表时 search 仍应成功；`unavailable` 只表示本次未使用附件全文。
+
 ## recent
 
 `library recent` 现在有两种模式：

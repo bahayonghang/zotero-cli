@@ -13,6 +13,8 @@ pub struct EnvelopeMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trash_policy: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub fulltext_index: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<u32>,
 }
 
@@ -102,6 +104,7 @@ mod tests {
                 total: None,
                 profile: Some("work".to_string()),
                 trash_policy: Some("excluded".to_string()),
+                fulltext_index: None,
                 api_version: Some(1),
             },
         );
@@ -112,6 +115,33 @@ mod tests {
         assert_eq!(value["meta"]["profile"], "work");
         assert_eq!(value["meta"]["trash_policy"], "excluded");
         assert_eq!(value["meta"]["api_version"], 1);
+        assert!(value["meta"].get("fulltext_index").is_none());
+    }
+
+    #[test]
+    fn fulltext_index_is_omitted_when_none_and_round_trips_when_set() {
+        let omitted = serde_json::to_value(EnvelopeMeta {
+            count: Some(1),
+            total: Some(1),
+            profile: None,
+            trash_policy: None,
+            fulltext_index: None,
+            api_version: Some(1),
+        })
+        .expect("serialize omitted fulltext_index");
+        assert!(omitted.get("fulltext_index").is_none());
+
+        let present = serde_json::to_value(EnvelopeMeta {
+            count: Some(1),
+            total: Some(1),
+            profile: None,
+            trash_policy: None,
+            fulltext_index: Some("fts5-sidecar".to_string()),
+            api_version: Some(1),
+        })
+        .expect("serialize fulltext_index");
+        assert_eq!(present["fulltext_index"], "fts5-sidecar");
+        assert_eq!(present["api_version"], 1);
     }
 
     #[test]

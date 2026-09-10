@@ -34,6 +34,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 优先路由：
 
 - 普通库内检索：`library search`
+  - 非空 search 的 `meta.fulltext_index` 为 `legacy-tables` / `fts5-sidecar` / `unavailable`。`unavailable` 表示本次未查附件全文，标题/作者/标签仍可能命中。不要把 `no such table: fulltextItemWords` 当成 SQLite 不可读。
 - 纯列表 / 翻页：`library list --collection ... --limit ... --offset ...`
 - 整库统计：`library stats`
 - citation key 直达：`library citekey`
@@ -274,6 +275,8 @@ cargo run -q -p zot-cli -- --json doctor
 
 - `db_exists`
 - `capabilities.local_sqlite_read`
+- `capabilities.local_sqlite_read.fulltext.legacy_tables`
+- `capabilities.local_sqlite_read.fulltext.sidecar_present`
 - `capabilities.local_http_read`
 - `capabilities.connector_write`（仅表示本机 BibTeX/RIS import 能力）
 - `capabilities.web_write.configured`（只表示凭据存在）
