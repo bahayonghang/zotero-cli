@@ -883,3 +883,24 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: library search 兼容 Zotero 7.1+ 全文拆分
+
+**Date**: 2026-09-10
+**Task**: library search 兼容 Zotero 7.1+ 全文拆分
+**Branch**: `dev`
+
+### Summary
+
+修复 userdata 127+ 因缺失 fulltextItemWords 导致 library search 硬失败；惰性 Backup fulltext.sqlite 并以 FTS5 MATCH 附件全文；doctor 与 envelope 报告全文后端。just ci 通过。live IEEE 因 Zotero 占用库返回 zotero-db-busy。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `db55128` | (see git log) |
+
+### Status
+
+[OK] **Completed**

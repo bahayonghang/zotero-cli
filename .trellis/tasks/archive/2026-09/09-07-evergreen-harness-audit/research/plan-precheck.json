@@ -1,0 +1,462 @@
+{
+  "repo_root": "D:/Documents/Code/CLI/zotero-cli",
+  "review_scope": {
+    "mode": "task-tree",
+    "root": "09-07-evergreen-harness-audit",
+    "task_count": 5,
+    "members": [
+      {
+        "name": "09-07-evergreen-harness-audit",
+        "path": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-evergreen-harness-audit",
+        "location": "active",
+        "status": "planning"
+      },
+      {
+        "name": "09-07-harness-rules-alignment",
+        "path": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-harness-rules-alignment",
+        "location": "active",
+        "status": "planning"
+      },
+      {
+        "name": "09-07-skill-mirror-coverage",
+        "path": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-skill-mirror-coverage",
+        "location": "active",
+        "status": "planning"
+      },
+      {
+        "name": "09-07-evergreen-ci-validation",
+        "path": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-evergreen-ci-validation",
+        "location": "active",
+        "status": "planning"
+      },
+      {
+        "name": "09-07-pages-release-contract",
+        "path": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-pages-release-contract",
+        "location": "active",
+        "status": "planning"
+      }
+    ],
+    "edges": [
+      {
+        "parent": "09-07-evergreen-harness-audit",
+        "child": "09-07-harness-rules-alignment"
+      },
+      {
+        "parent": "09-07-evergreen-harness-audit",
+        "child": "09-07-skill-mirror-coverage"
+      },
+      {
+        "parent": "09-07-evergreen-harness-audit",
+        "child": "09-07-evergreen-ci-validation"
+      },
+      {
+        "parent": "09-07-evergreen-harness-audit",
+        "child": "09-07-pages-release-contract"
+      }
+    ],
+    "legacy_fallback_tasks": []
+  },
+  "tasks": [
+    {
+      "task_dir": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-evergreen-harness-audit",
+      "task_status": "planning",
+      "artifacts": {
+        "present": {
+          "prd.md": true,
+          "design.md": true,
+          "implement.md": true,
+          "implement.jsonl": true,
+          "check.jsonl": true,
+          "task.json": true
+        },
+        "shape": "complex",
+        "note": ""
+      },
+      "placeholders": [],
+      "citations": {
+        "total": 0,
+        "by_status": {},
+        "entries": []
+      },
+      "identifiers": {
+        "requirements": [
+          "R1",
+          "R2",
+          "R3",
+          "R4",
+          "R5"
+        ],
+        "criteria": [
+          {
+            "id": "AC1",
+            "requirements": [
+              "R1"
+            ],
+            "clause_hint": 2
+          },
+          {
+            "id": "AC2",
+            "requirements": [
+              "R2"
+            ],
+            "clause_hint": 3
+          },
+          {
+            "id": "AC3",
+            "requirements": [
+              "R3"
+            ],
+            "clause_hint": 2
+          },
+          {
+            "id": "AC4",
+            "requirements": [
+              "R4"
+            ],
+            "clause_hint": 2
+          },
+          {
+            "id": "AC5",
+            "requirements": [
+              "R5"
+            ],
+            "clause_hint": 3
+          }
+        ],
+        "criteria_without_requirement": [],
+        "requirements_without_criterion": [],
+        "referenced_but_undefined": []
+      },
+      "blocking": [],
+      "drift_pass_required": false,
+      "task_name": "09-07-evergreen-harness-audit",
+      "location": "active"
+    },
+    {
+      "task_dir": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-harness-rules-alignment",
+      "task_status": "planning",
+      "artifacts": {
+        "present": {
+          "prd.md": true,
+          "design.md": true,
+          "implement.md": true,
+          "implement.jsonl": true,
+          "check.jsonl": true,
+          "task.json": true
+        },
+        "shape": "complex",
+        "note": ""
+      },
+      "placeholders": [],
+      "citations": {
+        "total": 5,
+        "by_status": {
+          "resolved": 5
+        },
+        "entries": [
+          {
+            "artifact": "prd.md",
+            "artifact_line": 9,
+            "citation": "AGENTS.md:40",
+            "status": "resolved",
+            "resolved_path": "AGENTS.md",
+            "file_lines": 111
+          },
+          {
+            "artifact": "prd.md",
+            "artifact_line": 9,
+            "citation": "src/zot-core/src/config.rs:184",
+            "status": "resolved",
+            "resolved_path": "src/zot-core/src/config.rs",
+            "file_lines": 669
+          },
+          {
+            "artifact": "prd.md",
+            "artifact_line": 9,
+            "citation": "src/zot-local/src/workspace.rs:1053",
+            "status": "resolved",
+            "resolved_path": "src/zot-local/src/workspace.rs",
+            "file_lines": 1414
+          },
+          {
+            "artifact": "prd.md",
+            "artifact_line": 9,
+            "citation": "AGENTS.md:69",
+            "status": "resolved",
+            "resolved_path": "AGENTS.md",
+            "file_lines": 111
+          },
+          {
+            "artifact": "prd.md",
+            "artifact_line": 10,
+            "citation": "AGENTS.md:76",
+            "status": "resolved",
+            "resolved_path": "AGENTS.md",
+            "file_lines": 111
+          }
+        ]
+      },
+      "identifiers": {
+        "requirements": [
+          "R1",
+          "R2",
+          "R3",
+          "R4",
+          "R5"
+        ],
+        "criteria": [
+          {
+            "id": "AC1",
+            "requirements": [
+              "R1"
+            ],
+            "clause_hint": 5
+          },
+          {
+            "id": "AC2",
+            "requirements": [
+              "R2"
+            ],
+            "clause_hint": 1
+          },
+          {
+            "id": "AC3",
+            "requirements": [
+              "R3",
+              "R4"
+            ],
+            "clause_hint": 2
+          },
+          {
+            "id": "AC4",
+            "requirements": [
+              "R5"
+            ],
+            "clause_hint": 2
+          }
+        ],
+        "criteria_without_requirement": [],
+        "requirements_without_criterion": [],
+        "referenced_but_undefined": []
+      },
+      "blocking": [],
+      "drift_pass_required": false,
+      "task_name": "09-07-harness-rules-alignment",
+      "location": "active"
+    },
+    {
+      "task_dir": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-skill-mirror-coverage",
+      "task_status": "planning",
+      "artifacts": {
+        "present": {
+          "prd.md": true,
+          "design.md": true,
+          "implement.md": true,
+          "implement.jsonl": true,
+          "check.jsonl": true,
+          "task.json": true
+        },
+        "shape": "complex",
+        "note": ""
+      },
+      "placeholders": [],
+      "citations": {
+        "total": 2,
+        "by_status": {
+          "resolved": 2
+        },
+        "entries": [
+          {
+            "artifact": "prd.md",
+            "artifact_line": 9,
+            "citation": "scripts/check_skill_mirrors.py:51",
+            "status": "resolved",
+            "resolved_path": "scripts/check_skill_mirrors.py",
+            "file_lines": 89
+          },
+          {
+            "artifact": "prd.md",
+            "artifact_line": 9,
+            "citation": "scripts/check_skill_mirrors.py:63",
+            "status": "resolved",
+            "resolved_path": "scripts/check_skill_mirrors.py",
+            "file_lines": 89
+          }
+        ]
+      },
+      "identifiers": {
+        "requirements": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "criteria": [
+          {
+            "id": "AC1",
+            "requirements": [
+              "R1"
+            ],
+            "clause_hint": 3
+          },
+          {
+            "id": "AC2",
+            "requirements": [
+              "R2"
+            ],
+            "clause_hint": 3
+          },
+          {
+            "id": "AC3",
+            "requirements": [
+              "R3"
+            ],
+            "clause_hint": 3
+          }
+        ],
+        "criteria_without_requirement": [],
+        "requirements_without_criterion": [],
+        "referenced_but_undefined": []
+      },
+      "blocking": [],
+      "drift_pass_required": false,
+      "task_name": "09-07-skill-mirror-coverage",
+      "location": "active"
+    },
+    {
+      "task_dir": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-evergreen-ci-validation",
+      "task_status": "planning",
+      "artifacts": {
+        "present": {
+          "prd.md": true,
+          "design.md": true,
+          "implement.md": true,
+          "implement.jsonl": true,
+          "check.jsonl": true,
+          "task.json": true
+        },
+        "shape": "complex",
+        "note": ""
+      },
+      "placeholders": [],
+      "citations": {
+        "total": 1,
+        "by_status": {
+          "resolved": 1
+        },
+        "entries": [
+          {
+            "artifact": "prd.md",
+            "artifact_line": 9,
+            "citation": "deploy-docs.yml:7",
+            "status": "resolved",
+            "resolved_path": ".github/workflows/deploy-docs.yml",
+            "file_lines": 66
+          }
+        ]
+      },
+      "identifiers": {
+        "requirements": [
+          "R1",
+          "R2",
+          "R3",
+          "R4"
+        ],
+        "criteria": [
+          {
+            "id": "AC1",
+            "requirements": [
+              "R1"
+            ],
+            "clause_hint": 3
+          },
+          {
+            "id": "AC2",
+            "requirements": [
+              "R2"
+            ],
+            "clause_hint": 1
+          },
+          {
+            "id": "AC3",
+            "requirements": [
+              "R3",
+              "R4"
+            ],
+            "clause_hint": 5
+          }
+        ],
+        "criteria_without_requirement": [],
+        "requirements_without_criterion": [],
+        "referenced_but_undefined": []
+      },
+      "blocking": [],
+      "drift_pass_required": false,
+      "task_name": "09-07-evergreen-ci-validation",
+      "location": "active"
+    },
+    {
+      "task_dir": "D:/Documents/Code/CLI/zotero-cli/.trellis/tasks/09-07-pages-release-contract",
+      "task_status": "planning",
+      "artifacts": {
+        "present": {
+          "prd.md": true,
+          "design.md": true,
+          "implement.md": true,
+          "implement.jsonl": true,
+          "check.jsonl": true,
+          "task.json": true
+        },
+        "shape": "complex",
+        "note": ""
+      },
+      "placeholders": [],
+      "citations": {
+        "total": 0,
+        "by_status": {},
+        "entries": []
+      },
+      "identifiers": {
+        "requirements": [
+          "R1",
+          "R2",
+          "R3"
+        ],
+        "criteria": [
+          {
+            "id": "AC1",
+            "requirements": [
+              "R1"
+            ],
+            "clause_hint": 2
+          },
+          {
+            "id": "AC2",
+            "requirements": [
+              "R2"
+            ],
+            "clause_hint": 4
+          },
+          {
+            "id": "AC3",
+            "requirements": [
+              "R3"
+            ],
+            "clause_hint": 3
+          }
+        ],
+        "criteria_without_requirement": [],
+        "requirements_without_criterion": [],
+        "referenced_but_undefined": []
+      },
+      "blocking": [],
+      "drift_pass_required": false,
+      "task_name": "09-07-pages-release-contract",
+      "location": "active"
+    }
+  ],
+  "reviews_git": {
+    "path": ".trellis/reviews/09-07-evergreen-harness-audit.md",
+    "state": "untracked"
+  },
+  "blocking": []
+}

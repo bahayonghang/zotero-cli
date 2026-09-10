@@ -1,6 +1,15 @@
 # config command
 
-`config` inspects and updates `~/.config/zot/config.toml`.
+`config` inspects and updates the platform config file from
+`AppConfig::config_file()`. Do not present `~/.config/zot/config.toml` as a
+universal path. Runtime truth is `zot --json doctor` / `zot --json config show`
+(`doctor.data.config_file`).
+
+Typical examples (label the platform):
+
+- Linux/XDG: `~/.config/zot/config.toml`
+- macOS: `~/Library/Application Support/zot/config.toml`
+- Windows: `%AppData%\zot\config.toml`
 
 This is a runtime reference page, not the primary agent entrypoint.
 
@@ -89,7 +98,7 @@ Use it to:
 
 ## Recommended use
 
-If you are just trying to do Zotero work through Claude Code or Codex, start from the skills pages.
+If you are just trying to do Zotero work through Claude Code, Codex, Grok Build, Kimi Code, or OMP, start from the skills pages.
 
 Drop to `config` only when:
 

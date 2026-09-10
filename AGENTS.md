@@ -36,13 +36,19 @@
   - failure: `{"ok": false, "error": {"code": "...", "message": "...", "hint": "..."}}`
 
 ## Read/write boundaries
-- Local reads come from Zotero data files via `zot-local` (`zotero.sqlite` + attachment storage).
-- Library mutations go through the Zotero Web API via `zot-remote`.
-- Never implement writes by touching `zotero.sqlite` directly.
+- Local SQLite (`zot-local`, `zotero.sqlite` plus attachment storage) and Zotero Local HTTP are read-only. Never use either as a write transport.
+- The built-in connector (`zot-desktop`) is import-only. The connector imports new BibTeX/RIS into Zotero's currently selected writable target. The connector does not update, merge, tag, note, or mutate collections.
+- All other library mutations go through the Zotero Web API via `zot-remote`.
+- Never write `zotero.sqlite` directly.
 - `zot mcp serve` is scaffolded but currently returns `mcp-not-implemented`; do not build workflows around MCP yet.
 
 ## Config and scope quirks
-- Config file path is `~/.config/zot/config.toml`.
+- Config and state paths come from `dirs::config_dir()` (`AppConfig::config_dir` / `config_file` / `state_dir` in `src/zot-core/src/config.rs`). Do not present `~/.config/zot/...` as a universal path.
+- Runtime truth is `zot --json doctor` / `zot --json config show` (`doctor.data.config_file`).
+- Typical examples (label the platform):
+  - Linux/XDG: `~/.config/zot/config.toml`
+  - macOS: `~/Library/Application Support/zot/config.toml`
+  - Windows: `%AppData%\zot\config.toml` (example: `C:\Users\<user>\AppData\Roaming\zot\config.toml`)
 - Supported env overrides are:
   - `ZOT_DATA_DIR`
   - `ZOT_LIBRARY_ID`
@@ -55,7 +61,11 @@
 - `--library` only accepts `user` or `group:<id>`.
 
 ## Workspace / RAG storage
-- Default workspace root is `~/.config/zot/workspaces`.
+- Default workspace root is `AppConfig::state_dir().join("workspaces")` in `src/zot-local/src/workspace.rs`.
+- Typical examples (label the platform):
+  - Linux/XDG: `~/.config/zot/workspaces`
+  - macOS: `~/Library/Application Support/zot/workspaces`
+  - Windows: `%AppData%\zot\workspaces`
 - Each workspace is stored as `<name>.toml`.
 - Index sidecar is `<name>.idx.sqlite`.
 - Workspace PDF cache sidecar is `.md_cache.sqlite` in the workspace root.
@@ -66,14 +76,32 @@
 - `.github/workflows/ci.yml` runs the pure gate on Linux, Windows, and macOS, checks Rust 1.85
   MSRV, and includes dependency security and unused-dependency jobs. Local `just ci` remains the
   source of truth for the stable build/test sequence.
-- Tests are inline crate tests, not a large integration suite; `cargo test --workspace` is still the expected gate.
+- Tests are mostly inline crate tests. `src/zot-cli/tests/` also has integration targets
+  (`json_error_contract.rs`, `workspace_version_guard.rs`). `cargo test --workspace` remains
+  the expected gate.
 - Treat `target/`, `.omx/`, `.claude/`, workspace index files, and PDF cache files as generated state, not source.
 
 ## Agent skills
 
+### Agent harnesses
+
+Claude Code, Codex, Grok Build, Kimi Code, and Oh My Pi (OMP) share this file. Claude Code does not auto-read `AGENTS.md`; tracked root `CLAUDE.md` imports this file with `@AGENTS.md`. Five-tool matrix, sources, and evidence levels: `docs/agents/harnesses.md`.
+
+Grok Build and Kimi Code have no Trellis auto platform marker. After `task.py start` and review, implement inline in the main session:
+1. Read `.trellis/workflow.md` Phase 2 generic steps.
+2. Start the prompt with `Active task: <task path from task.py current>`.
+3. Read that task's `prd.md`, `design.md` if present, `implement.md` if present, and relevant specs.
+4. Implement inline in the main session. Do not pretend unmatched `[platform]` markers inject context.
+5. If session identity is missing, set `TRELLIS_CONTEXT_ID` in the current process only. Do not write the user's global environment.
+
+Planning is not approved implementation. Matrix and sources: `docs/agents/harnesses.md`.
+
 ### Issue tracker
 
-Issues and PRDs are tracked in GitHub Issues for `bahayonghang/zotero-cli`. See `docs/agents/issue-tracker.md`.
+Local Trellis `prd.md` / `design.md` / `implement.md` under `.trellis/tasks/` are the implementation-acceptance source for an active task.
+GitHub Issues for `bahayonghang/zotero-cli` are authorized collaboration / remote tracking records.
+Do not create, comment on, or close GitHub issues without explicit authorization.
+See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

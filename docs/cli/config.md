@@ -1,6 +1,12 @@
 # config 命令
 
-`config` 用于查看和修改 `~/.config/zot/config.toml`。
+`config` 用于查看和修改由 `AppConfig::config_file()` 解析的平台配置文件。不要把 `~/.config/zot/config.toml` 写成所有平台的路径。运行时以 `zot --json doctor` / `zot --json config show`（`doctor.data.config_file`）为准。
+
+按平台标注的示例：
+
+- Linux/XDG：`~/.config/zot/config.toml`
+- macOS：`~/Library/Application Support/zot/config.toml`
+- Windows：`%AppData%\zot\config.toml`
 
 它是运行时参考页，不是 agent 使用主入口。
 
@@ -89,7 +95,7 @@ zot --json config profiles use work
 
 ## 推荐用法
 
-如果只是让 Claude Code / Codex 做 Zotero 任务，优先还是走 skills 页。
+如果只是让 Claude Code、Codex、Grok Build、Kimi Code 或 OMP 做 Zotero 任务，优先还是走 skills 页。
 
 只有在这些场景下，才直接看 `config`：
 

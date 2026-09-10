@@ -183,6 +183,9 @@ The bilingual docs are organized around skill-first Zotero workflows, with CLI p
 - Getting started (EN): [docs/en/guide/getting-started.md](./docs/en/guide/getting-started.md)
 - Migrating from ref\zotero-cli (EN): [docs/en/guide/migrating-from-ref-zotero-cli.md](./docs/en/guide/migrating-from-ref-zotero-cli.md)
 - CLI reference (EN): [docs/en/cli/overview.md](./docs/en/cli/overview.md)
+- Agent harnesses: [docs/agents/harnesses.md](./docs/agents/harnesses.md)
+- Repo contract: [AGENTS.md](./AGENTS.md)
+- Claude Code entry: [CLAUDE.md](./CLAUDE.md)
 - Skills 总览（中文）：[docs/skills/overview.md](./docs/skills/overview.md)
 - Agent 用法（中文）：[docs/skills/agent-usage.md](./docs/skills/agent-usage.md)
 - 典型工作流（中文）：[docs/skills/workflows.md](./docs/skills/workflows.md)
@@ -196,7 +199,7 @@ Local preview:
 just docs
 ```
 
-Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml).
+Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml). Future GitHub release tags must be `vX.Y.Z`. Cargo `workspace.package.version` stays numeric `X.Y.Z`. The current example tag is `v1.0.1`. The `github-pages` environment allows branch `main` and tag pattern `v*`. See [docs/agents/release.md](./docs/agents/release.md).
 
 ---
 
@@ -227,7 +230,13 @@ If you need to override Pdfium resolution manually:
 just ci
 ```
 
-This runs `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and the canonical skill mirror check.
+`just ci` runs `cargo fmt --all --check`, `cargo check --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, and a canonical skill mirror check that covers every published `skills/*/SKILL.md`. `just ci` does not run VitePress.
+
+Pull-request CI in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) has a separate docs job. The docs job runs `npm ci` then `npm run build` under `docs/` on Node 20 and builds the bilingual VitePress site. The docs job does not deploy GitHub Pages.
+
+A hosted docs-job result on a new SHA stays **UNVERIFIED** until a separately authorized pull-request or push CI run exists for that SHA. Do not mark hosted PASS from a local docs build.
+
+Claude Code, Codex, Grok Build, Kimi Code, and Oh My Pi (OMP) share this verification boundary. See [docs/agents/harnesses.md](./docs/agents/harnesses.md).
 
 ---
 

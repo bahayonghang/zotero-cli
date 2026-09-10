@@ -183,6 +183,9 @@ zot completions powershell
 - 快速开始（中文）：[docs/guide/getting-started.md](./docs/guide/getting-started.md)
 - 从 ref\zotero-cli 迁移（中文）：[docs/guide/migrating-from-ref-zotero-cli.md](./docs/guide/migrating-from-ref-zotero-cli.md)
 - CLI 参考（中文）：[docs/cli/overview.md](./docs/cli/overview.md)
+- Agent 工具矩阵：[docs/agents/harnesses.md](./docs/agents/harnesses.md)
+- 仓库契约：[AGENTS.md](./AGENTS.md)
+- Claude Code 入口：[CLAUDE.md](./CLAUDE.md)
 - Skills overview (EN): [docs/en/skills/overview.md](./docs/en/skills/overview.md)
 - Agent Usage (EN): [docs/en/skills/agent-usage.md](./docs/en/skills/agent-usage.md)
 - Skill workflows (EN): [docs/en/skills/workflows.md](./docs/en/skills/workflows.md)
@@ -197,6 +200,16 @@ just docs
 ```
 
 正式文档通过 [`.github/workflows/deploy-docs.yml`](./.github/workflows/deploy-docs.yml) 发布到 GitHub Pages。
+
+未来的 GitHub release 标签必须是 `vX.Y.Z`。
+
+Cargo 的 `workspace.package.version` 保持数字形式 `X.Y.Z`。
+
+当前示例标签是 `v1.0.1`。
+
+`github-pages` 环境目前允许分支 `main` 和标签模式 `v*`。
+
+共用发布契约见 [docs/agents/release.md](./docs/agents/release.md)。
 
 ---
 
@@ -227,7 +240,15 @@ just docs
 just ci
 ```
 
-会执行 `cargo fmt --all --check`、`cargo check --workspace`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` 和 canonical skill 镜像检查。
+`just ci` 会执行 `cargo fmt --all --check`、`cargo check --workspace`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace`，以及覆盖全部已发布 `skills/*/SKILL.md` 的 canonical skill 镜像检查。
+
+`just ci` 不运行 VitePress。
+
+Pull request 的 CI 工作流 [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) 另有独立 docs job。该 job 在 Node 20 下于 `docs/` 执行 `npm ci`，再执行 `npm run build`，构建中英文 VitePress 站点。该 job 不部署 GitHub Pages。
+
+新 SHA 上的 hosted docs job 结果，在获得单独授权的 pull request 或 push CI 运行之前保持 **UNVERIFIED**。本地文档构建成功不能记为 hosted PASS。
+
+Claude Code、Codex、Grok Build、Kimi Code、Oh My Pi（OMP）共用该验证边界。见 [docs/agents/harnesses.md](./docs/agents/harnesses.md)。
 
 ---
 

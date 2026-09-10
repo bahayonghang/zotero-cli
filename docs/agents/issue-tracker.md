@@ -1,8 +1,21 @@
-# Issue tracker: GitHub
+# Issue tracker
 
-Issues and PRDs for this repo live as GitHub issues in `bahayonghang/zotero-cli`. Use the `gh` CLI for all operations.
+## Local Trellis versus GitHub Issues
 
-## Conventions
+Local Trellis `prd.md`, `design.md`, and `implement.md` under `.trellis/tasks/`
+are the implementation-acceptance source for an active task.
+
+GitHub Issues for `bahayonghang/zotero-cli` are authorized collaboration and
+remote tracking records. GitHub Issues are not the implementation-acceptance
+source for an active Trellis task.
+
+Do not create, comment on, or close GitHub issues without explicit
+authorization.
+
+## When GitHub operations are authorized
+
+Use the `gh` CLI for authorized remote operations. Infer the repo from
+`git remote -v` — `gh` does this automatically when run inside a clone.
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
 - **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
@@ -11,11 +24,9 @@ Issues and PRDs for this repo live as GitHub issues in `bahayonghang/zotero-cli`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
-Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
-
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue.
+Create a GitHub issue only after explicit authorization.
 
 ## When a skill says "fetch the relevant ticket"
 

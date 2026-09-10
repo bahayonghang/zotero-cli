@@ -31,6 +31,11 @@ const SNAPSHOT_STEP_PAUSE: Duration = Duration::from_millis(5);
 const SNAPSHOT_PAGES_PER_STEP: i32 = 256;
 const DUPLICATE_TITLE_THRESHOLD: f64 = 0.92;
 const DUPLICATE_TITLE_PREFIX_CHARS: usize = 12;
+const FULLTEXT_INDEX_LEGACY_TABLES: &str = "legacy-tables";
+const FULLTEXT_INDEX_FTS5_SIDECAR: &str = "fts5-sidecar";
+const FULLTEXT_INDEX_UNAVAILABLE: &str = "unavailable";
+const FULLTEXT_SIDECAR_FILENAME: &str = "fulltext.sqlite";
+const FULLTEXT_ATTACH_SCHEMA: &str = "ftindex";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LibrarySnapshotMeta {
@@ -72,6 +77,56 @@ fn escape_like(value: &str) -> String {
         }
     }
     out
+}
+
+struct Fts5Clause {
+    table: &'static str,
+    match_sql: String,
+}
+
+fn is_cjk(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{3400}'..='\u{4DBF}'
+            | '\u{4E00}'..='\u{9FFF}'
+            | '\u{F900}'..='\u{FAFF}'
+            | '\u{3040}'..='\u{30FF}'
+            | '\u{AC00}'..='\u{D7AF}'
+            | '\u{20000}'..='\u{2A6DF}'
+    )
+}
+
+fn fts5_match_clause(query: &str) -> Option<Fts5Clause> {
+    let has_cjk = query.chars().any(is_cjk);
+    let has_non_cjk = query.chars().any(|ch| ch.is_alphanumeric() && !is_cjk(ch));
+    if has_cjk && has_non_cjk {
+        return None;
+    }
+    if has_cjk {
+        let chars: Vec<char> = query.chars().filter(|ch| is_cjk(*ch)).collect();
+        if chars.len() < 2 {
+            return None;
+        }
+        let grams: Vec<String> = chars.windows(2).map(|pair| pair.iter().collect()).collect();
+        let phrase = grams.join(" ").replace('"', "\"\"");
+        return Some(Fts5Clause {
+            table: "fulltextContentCJK",
+            match_sql: format!("\"{phrase}\""),
+        });
+    }
+    let tokens: Vec<String> = query
+        .split(|ch: char| !ch.is_alphanumeric())
+        .filter(|token| !token.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    if tokens.is_empty() || !tokens.iter().any(|token| token.chars().count() >= 3) {
+        return None;
+    }
+    let phrase = tokens.join(" ").replace('"', "\"\"");
+    Some(Fts5Clause {
+        table: "fulltextContent",
+        match_sql: format!("\"{phrase}\"*"),
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,6 +194,7 @@ pub struct LocalLibrary {
     _temp_dir: TempDir,
     snapshot_meta: LibrarySnapshotMeta,
     collections_cache: std::cell::OnceCell<Vec<Collection>>,
+    fulltext_attach: std::cell::OnceCell<bool>,
 }
 
 impl LocalLibrary {
@@ -163,6 +219,7 @@ impl LocalLibrary {
             _temp_dir: temp_dir,
             snapshot_meta,
             collections_cache: std::cell::OnceCell::new(),
+            fulltext_attach: std::cell::OnceCell::new(),
         };
         instance.library_id = instance.resolve_library_id()?;
         Ok(instance)
@@ -178,6 +235,20 @@ impl LocalLibrary {
 
     pub fn snapshot_meta(&self) -> &LibrarySnapshotMeta {
         &self.snapshot_meta
+    }
+
+    pub fn legacy_fulltext_tables(&self) -> bool {
+        matches!(
+            (
+                self.table_exists("fulltextItemWords"),
+                self.table_exists("fulltextWords")
+            ),
+            (Ok(true), Ok(true))
+        )
+    }
+
+    pub fn fulltext_sidecar_present(&self) -> bool {
+        self.data_dir.join(FULLTEXT_SIDECAR_FILENAME).is_file()
     }
 
     pub fn resolve_group_library_id(&self, group_id: i64) -> ZotResult<Option<i64>> {
@@ -223,16 +294,43 @@ impl LocalLibrary {
                 "NOT EXISTS (SELECT 1 FROM deletedItems d WHERE d.itemID = i.itemID)".to_string(),
             );
         }
+        let mut fulltext_index = None;
         if !options.query.is_empty() {
             let like = format!("%{}%", escape_like(&options.query));
-            predicates.push(
-                "(EXISTS (SELECT 1 FROM itemData id JOIN itemDataValues iv ON id.valueID = iv.valueID WHERE id.itemID = i.itemID AND iv.value LIKE ? ESCAPE '\\')
-                  OR EXISTS (SELECT 1 FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE ic.itemID = i.itemID AND (c.firstName LIKE ? ESCAPE '\\' OR c.lastName LIKE ? ESCAPE '\\'))
-                  OR EXISTS (SELECT 1 FROM itemTags itq JOIN tags tq ON itq.tagID = tq.tagID WHERE itq.itemID = i.itemID AND tq.name LIKE ? ESCAPE '\\')
-                  OR EXISTS (SELECT 1 FROM itemAttachments ia JOIN fulltextItemWords fw ON ia.itemID = fw.itemID JOIN fulltextWords w ON fw.wordID = w.wordID WHERE ia.parentItemID = i.itemID AND w.word LIKE ? ESCAPE '\\'))"
-                    .to_string(),
-            );
-            values.extend(std::iter::repeat_n(rusqlite::types::Value::from(like), 5));
+            let mut query_or = vec![
+                "EXISTS (SELECT 1 FROM itemData id JOIN itemDataValues iv ON id.valueID = iv.valueID WHERE id.itemID = i.itemID AND iv.value LIKE ? ESCAPE '\\')".to_string(),
+                "EXISTS (SELECT 1 FROM itemCreators ic JOIN creators c ON ic.creatorID = c.creatorID WHERE ic.itemID = i.itemID AND (c.firstName LIKE ? ESCAPE '\\' OR c.lastName LIKE ? ESCAPE '\\'))".to_string(),
+                "EXISTS (SELECT 1 FROM itemTags itq JOIN tags tq ON itq.tagID = tq.tagID WHERE itq.itemID = i.itemID AND tq.name LIKE ? ESCAPE '\\')".to_string(),
+            ];
+            values.extend(std::iter::repeat_n(
+                rusqlite::types::Value::from(like.clone()),
+                4,
+            ));
+            if self.legacy_fulltext_tables() {
+                query_or.push(
+                    "EXISTS (SELECT 1 FROM itemAttachments ia JOIN fulltextItemWords fw ON ia.itemID = fw.itemID JOIN fulltextWords w ON fw.wordID = w.wordID WHERE ia.parentItemID = i.itemID AND w.word LIKE ? ESCAPE '\\')"
+                        .to_string(),
+                );
+                values.push(rusqlite::types::Value::from(like));
+                fulltext_index = Some(FULLTEXT_INDEX_LEGACY_TABLES.to_string());
+            } else if let Some(clause) = fts5_match_clause(&options.query) {
+                if self.ensure_fts5_attached()
+                    && self.attached_table_exists(clause.table).unwrap_or(false)
+                {
+                    query_or.push(format!(
+                        "EXISTS (SELECT 1 FROM itemAttachments ia JOIN {schema}.{table} fc ON fc.rowid = ia.itemID WHERE ia.parentItemID = i.itemID AND fc.{table} MATCH ?)",
+                        schema = FULLTEXT_ATTACH_SCHEMA,
+                        table = clause.table,
+                    ));
+                    values.push(rusqlite::types::Value::from(clause.match_sql));
+                    fulltext_index = Some(FULLTEXT_INDEX_FTS5_SIDECAR.to_string());
+                } else {
+                    fulltext_index = Some(FULLTEXT_INDEX_UNAVAILABLE.to_string());
+                }
+            } else {
+                fulltext_index = Some(FULLTEXT_INDEX_UNAVAILABLE.to_string());
+            }
+            predicates.push(format!("({})", query_or.join(" OR ")));
         }
         if let Some(collection) = options.collection.as_deref() {
             let collection_id = self.resolve_collection_id(collection)?;
@@ -334,6 +432,7 @@ impl LocalLibrary {
             items,
             total,
             query: options.query,
+            fulltext_index,
         })
     }
 
@@ -2199,6 +2298,68 @@ impl LocalLibrary {
             .map_err(sql_err("table-exists"))
     }
 
+    fn attached_table_exists(&self, table: &str) -> ZotResult<bool> {
+        self.conn
+            .query_row(
+                "SELECT 1 FROM ftindex.sqlite_master WHERE type = 'table' AND name = ?1",
+                params![table],
+                |_| Ok(()),
+            )
+            .optional()
+            .map(|value| value.is_some())
+            .map_err(sql_err("table-exists"))
+    }
+
+    fn ensure_fts5_attached(&self) -> bool {
+        *self
+            .fulltext_attach
+            .get_or_init(|| self.attach_fulltext_sidecar())
+    }
+
+    fn attach_fulltext_sidecar(&self) -> bool {
+        let source = self.data_dir.join(FULLTEXT_SIDECAR_FILENAME);
+        if !source.is_file() {
+            return false;
+        }
+        let dest = self._temp_dir.path().join(FULLTEXT_SIDECAR_FILENAME);
+        let Ok(src_conn) = Connection::open_with_flags(&source, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        else {
+            return false;
+        };
+        let policy = SnapshotPolicy::default();
+        if src_conn.busy_timeout(policy.busy_timeout).is_err() {
+            return false;
+        }
+        let Ok(mut dest_conn) = Connection::open(&dest) else {
+            return false;
+        };
+        if run_snapshot_backup(&src_conn, &mut dest_conn, policy).is_err() {
+            return false;
+        }
+        drop(dest_conn);
+        drop(src_conn);
+        let Ok(check_conn) = Connection::open_with_flags(&dest, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        else {
+            return false;
+        };
+        if validate_snapshot(&check_conn).is_err() {
+            return false;
+        }
+        drop(check_conn);
+        let Some(dest_str) = dest.to_str() else {
+            return false;
+        };
+        if self
+            .conn
+            .execute("ATTACH DATABASE ?1 AS ftindex", params![dest_str])
+            .is_err()
+        {
+            return false;
+        }
+        self.attached_table_exists("fulltextContent")
+            .unwrap_or(false)
+    }
+
     fn field_id(&self, field_name: &str) -> ZotResult<Option<i64>> {
         self.conn
             .query_row(
@@ -2642,6 +2803,7 @@ fn zotero_db_busy_error(message: &str) -> ZotError {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::{Path, PathBuf};
     use std::sync::{
         Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -2655,8 +2817,10 @@ mod tests {
     use zot_core::LibraryScope;
 
     use super::{
-        DuplicateMatchMethod, DuplicateTitleCandidate, LocalLibrary, SearchOptions, SnapshotPolicy,
-        escape_like, title_duplicate_components,
+        DuplicateMatchMethod, DuplicateTitleCandidate, FULLTEXT_ATTACH_SCHEMA,
+        FULLTEXT_INDEX_FTS5_SIDECAR, FULLTEXT_INDEX_LEGACY_TABLES, FULLTEXT_INDEX_UNAVAILABLE,
+        FULLTEXT_SIDECAR_FILENAME, LocalLibrary, SearchOptions, SnapshotPolicy, escape_like,
+        fts5_match_clause, title_duplicate_components,
     };
     use zot_core::ChildItem;
 
@@ -2891,6 +3055,10 @@ mod tests {
     /// Build the rich fixture, then apply `extra_sql` on top (e.g. moving a
     /// seeded item into `deletedItems`) before the read-only open.
     fn rich_fixture_library_with_extra_sql(extra_sql: &str) -> TestFixture {
+        rich_fixture_library_configured(extra_sql, |_| {})
+    }
+
+    fn rich_fixture_library_configured(extra_sql: &str, setup: impl FnOnce(&Path)) -> TestFixture {
         let dir = match tempfile::tempdir() {
             Ok(dir) => dir,
             Err(err) => panic!("tempdir failed: {err}"),
@@ -3178,11 +3346,59 @@ Original Date: 2017');
             }
         }
         drop(conn);
+        setup(dir.path());
         let lib = match LocalLibrary::open(dir.path(), LibraryScope::User) {
             Ok(lib) => lib,
             Err(err) => panic!("open rich fixture failed: {err}"),
         };
         TestFixture { lib, _dir: dir }
+    }
+
+    const SCHEMA129_DROP_WORD_TABLES: &str = "
+        DROP TABLE IF EXISTS fulltextItemWords;
+        DROP TABLE IF EXISTS fulltextWords;
+        UPDATE version SET version = 129 WHERE schema = 'userdata';
+    ";
+
+    fn write_min_fulltext_sidecar(dir: &Path) {
+        let path = dir.join(FULLTEXT_SIDECAR_FILENAME);
+        let conn = match Connection::open(&path) {
+            Ok(conn) => conn,
+            Err(err) => panic!("open sidecar failed: {err}"),
+        };
+        if let Err(err) = conn.execute_batch(
+            "
+            CREATE VIRTUAL TABLE fulltextContent USING fts5(
+                text, tokenize='unicode61', content='', contentless_delete=1
+            );
+            CREATE VIRTUAL TABLE fulltextContentCJK USING fts5(
+                text, tokenize='ascii', content='', contentless_delete=1
+            );
+            INSERT INTO fulltextContent(rowid, text) VALUES (5, 'uniqueftstoken mechanism');
+            INSERT INTO fulltextContentCJK(rowid, text) VALUES (5, '全文检索');
+            ",
+        ) {
+            panic!("seed sidecar failed: {err}");
+        }
+    }
+
+    fn attached_ftindex_file(lib: &LocalLibrary) -> Option<String> {
+        let mut stmt = match lib.conn.prepare("PRAGMA database_list") {
+            Ok(stmt) => stmt,
+            Err(_) => return None,
+        };
+        let rows = match stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?))
+        }) {
+            Ok(rows) => rows,
+            Err(_) => return None,
+        };
+        for row in rows.flatten() {
+            if row.0 == FULLTEXT_ATTACH_SCHEMA {
+                return row.1;
+            }
+        }
+        None
     }
 
     #[test]
@@ -3196,6 +3412,101 @@ Original Date: 2017');
             Err(err) => panic!("search failed: {err}"),
         };
         assert!(result.items.iter().any(|item| item.key == "ATTN001"));
+        assert_eq!(
+            result.fulltext_index.as_deref(),
+            Some(FULLTEXT_INDEX_LEGACY_TABLES)
+        );
+    }
+
+    #[test]
+    fn fts5_match_clause_covers_prefix_cjk_and_mixed_script() {
+        let ascii = fts5_match_clause("IEEE").expect("ieee clause");
+        assert_eq!(ascii.table, "fulltextContent");
+        assert_eq!(ascii.match_sql, "\"ieee\"*");
+        assert!(fts5_match_clause("ab").is_none());
+        let phrase = fts5_match_clause("transformer attention").expect("phrase");
+        assert_eq!(phrase.match_sql, "\"transformer attention\"*");
+        let cjk = fts5_match_clause("全文").expect("cjk");
+        assert_eq!(cjk.table, "fulltextContentCJK");
+        assert_eq!(cjk.match_sql, "\"全文\"");
+        assert!(fts5_match_clause("IEEE全文").is_none());
+    }
+
+    #[test]
+    fn search_without_word_tables_matches_metadata_and_does_not_error() {
+        let fixture = rich_fixture_library_with_extra_sql(SCHEMA129_DROP_WORD_TABLES);
+        let ieee = match fixture.lib.search(SearchOptions {
+            query: "IEEE".to_string(),
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("schema 129 metadata search failed: {err}"),
+        };
+        assert_eq!(ieee.total, 0);
+        assert_eq!(
+            ieee.fulltext_index.as_deref(),
+            Some(FULLTEXT_INDEX_UNAVAILABLE)
+        );
+
+        let attention = match fixture.lib.search(SearchOptions {
+            query: "attention".to_string(),
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("title search failed: {err}"),
+        };
+        assert!(attention.items.iter().any(|item| item.key == "ATTN001"));
+        assert_eq!(
+            attention.fulltext_index.as_deref(),
+            Some(FULLTEXT_INDEX_UNAVAILABLE)
+        );
+
+        let mechanism = match fixture.lib.search(SearchOptions {
+            query: "mechanism".to_string(),
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("dropped-word-table search failed: {err}"),
+        };
+        assert_eq!(mechanism.total, 0);
+        assert!(fixture.lib.list_items(None, 10, 0).is_ok());
+        assert!(!fixture.lib.legacy_fulltext_tables());
+        assert!(!fixture.lib.fulltext_sidecar_present());
+    }
+
+    #[test]
+    fn search_uses_fts5_sidecar_and_does_not_attach_live_file() {
+        let fixture = rich_fixture_library_configured(SCHEMA129_DROP_WORD_TABLES, |dir| {
+            write_min_fulltext_sidecar(dir);
+        });
+        let live = fixture
+            ._dir
+            .path()
+            .join(FULLTEXT_SIDECAR_FILENAME)
+            .canonicalize()
+            .expect("canonicalize live sidecar");
+        let result = match fixture.lib.search(SearchOptions {
+            query: "uniqueftstoken".to_string(),
+            ..SearchOptions::default()
+        }) {
+            Ok(result) => result,
+            Err(err) => panic!("fts5 sidecar search failed: {err}"),
+        };
+        assert_eq!(result.total, 1);
+        assert_eq!(result.items[0].key, "ATTN001");
+        assert_eq!(
+            result.fulltext_index.as_deref(),
+            Some(FULLTEXT_INDEX_FTS5_SIDECAR)
+        );
+        let attached = attached_ftindex_file(&fixture.lib).expect("ftindex attached");
+        let attached_path = PathBuf::from(&attached);
+        let attached_canon = attached_path.canonicalize().unwrap_or(attached_path);
+        assert_ne!(
+            attached_canon, live,
+            "search must attach the snapshot copy, not the live sidecar"
+        );
+        assert!(fixture.lib.fulltext_sidecar_present());
+        assert!(!fixture.lib.legacy_fulltext_tables());
     }
 
     #[test]

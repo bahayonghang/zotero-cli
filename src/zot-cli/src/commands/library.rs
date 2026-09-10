@@ -78,6 +78,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 count: Some(result.items.len()),
                 total: Some(result.total),
                 trash_policy: Some(trash_policy(include_trashed)),
+                fulltext_index: result.fulltext_index,
             });
             CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
         }
@@ -98,6 +99,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 count: Some(result.items.len()),
                 total: Some(result.total),
                 trash_policy: Some(trash_policy(include_trashed)),
+                fulltext_index: None,
             });
             CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
         }
@@ -126,6 +128,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 count: None,
                 total: Some(stats.total_items),
                 trash_policy: Some(trash_policy(include_trashed)),
+                fulltext_index: None,
             });
             CommandOutput::new(ctx, stats, seed, print_stats)
         }
@@ -333,6 +336,7 @@ async fn handle_saved_search(
                 count: Some(searches.len()),
                 total: Some(searches.len()),
                 trash_policy: None,
+                fulltext_index: None,
             });
             CommandOutput::new(ctx, searches, seed, |searches| {
                 if searches.is_empty() {

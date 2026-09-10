@@ -4,7 +4,11 @@
 
 ## Storage conventions
 
-- Default root: `~/.config/zot/workspaces`
+- Default root: `AppConfig::state_dir().join("workspaces")`. Do not present `~/.config/zot/workspaces` as a universal path. Runtime truth is `doctor` / `config show`.
+- Typical examples (label the platform):
+  - Linux/XDG: `~/.config/zot/workspaces`
+  - macOS: `~/Library/Application Support/zot/workspaces`
+  - Windows: `%AppData%\zot\workspaces`
 - Workspace file: `<name>.toml`
 - Index sidecar: `<name>.idx.sqlite`
 - PDF cache sidecar: `.md_cache.sqlite`

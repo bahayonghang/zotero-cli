@@ -39,6 +39,7 @@ async fn build_and_print(
         count: Some(count),
         total: Some(count),
         trash_policy: None,
+        fulltext_index: None,
     });
     CommandOutput::new(ctx, graph, seed, print_graph_summary)
 }

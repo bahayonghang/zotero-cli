@@ -34,6 +34,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 优先路由：
 
 - 普通库内检索：`library search`
+  - 非空 search 的 `meta.fulltext_index` 为 `legacy-tables` / `fts5-sidecar` / `unavailable`。`unavailable` 表示本次未查附件全文，标题/作者/标签仍可能命中。不要把 `no such table: fulltextItemWords` 当成 SQLite 不可读。
 - 纯列表 / 翻页：`library list --collection ... --limit ... --offset ...`
 - 整库统计：`library stats`
 - citation key 直达：`library citekey`
@@ -274,6 +275,8 @@ cargo run -q -p zot-cli -- --json doctor
 
 - `db_exists`
 - `capabilities.local_sqlite_read`
+- `capabilities.local_sqlite_read.fulltext.legacy_tables`
+- `capabilities.local_sqlite_read.fulltext.sidecar_present`
 - `capabilities.local_http_read`
 - `capabilities.connector_write`（仅表示本机 BibTeX/RIS import 能力）
 - `capabilities.web_write.configured`（只表示凭据存在）
@@ -292,7 +295,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `--library` 只接受 `user` 或 `group:<id>`
 - `--json` 是 global flag，必须放在子命令前（例 `zot --json item get K`），不能写成 `zot item --json get K`
 - workspace 名必须是 kebab-case
-- workspace 文件实际位置：`~/.config/zot/workspaces/<name>.toml`，索引副文件 `<name>.idx.sqlite`，PDF cache 副文件 `.md_cache.sqlite`
+- workspace 文件由 `AppConfig::state_dir().join("workspaces")` 解析，不要把 `~/.config/zot/workspaces` 写成所有平台的路径。Linux/XDG 示例：`~/.config/zot/workspaces/<name>.toml`；macOS：`~/Library/Application Support/zot/workspaces/<name>.toml`；Windows：`%AppData%\zot\workspaces\<name>.toml`。运行时以 `doctor` / `config show`（`doctor.data.config_file`）为准。索引副文件 `<name>.idx.sqlite`，PDF cache 副文件 `.md_cache.sqlite`
 - `zot mcp serve` 当前不可用
 - `item add-file` 不支持 `--attach-mode`
 - `item annotation create` / `create-area` 只适用于 PDF attachment，且 attachment 的 `content_type` 必须是 `application/pdf`，否则报 `attachment-not-pdf`

@@ -14,9 +14,11 @@ libraries. Keep it accurate as the implementation evolves.
   hardware. Beyond that the scan starts to dominate; consider scoping queries
   to a smaller workspace or filtering by collection before running
   `semantic-index`.
-- The library-wide index lives in `~/.config/zot/indexes/<scope>.idx.sqlite`;
-  per-workspace indexes are sidecars next to the workspace TOML
-  (`<name>.idx.sqlite`).
+- The library-wide index lives under `AppConfig::state_dir().join("indexes")`
+  as `<scope>.idx.sqlite`. Do not present `~/.config/zot/indexes/...` as a
+  universal path. Linux/XDG example: `~/.config/zot/indexes/<scope>.idx.sqlite`.
+  Runtime truth is `doctor` / `state_dir`. Per-workspace indexes are sidecars
+  next to the workspace TOML (`<name>.idx.sqlite`).
 - Approximate-nearest-neighbour search (e.g. HNSW) is **not** implemented and
   is intentionally deferred to a future minor release.
 
@@ -48,6 +50,16 @@ libraries. Keep it accurate as the implementation evolves.
   default. Their explicit `--include-trashed` flag restores the legacy broad
   view; JSON envelopes report the applied choice as
   `meta.trash_policy = "excluded" | "included"`.
+- Non-empty `library search` reports `meta.fulltext_index`:
+  `legacy-tables` (main-DB word tables), `fts5-sidecar` (`fulltext.sqlite`
+  FTS5 after a read-only snapshot `ATTACH`), or `unavailable` (no word tables,
+  no usable sidecar, or the query cannot build a MATCH). `library list` and
+  empty queries omit the field. Zotero userdata ≥127 dropped
+  `fulltextItemWords` / `fulltextWords` from `zotero.sqlite`; attachment
+  content then lives in `data_dir/fulltext.sqlite`. Missing those tables must
+  not fail search. FTS5 MATCH uses `"tokens"*` (or CJK 2-grams) and does not
+  re-scan `.zotero-ft-cache`, so multi-token punctuation phrases can differ
+  from Zotero UI.
 - Search computes `total` with SQL and applies deterministic SQL
   `ORDER BY/LIMIT/OFFSET` before hydrating item fields, creators, tags, and
   collections. Memory use therefore follows the requested page size rather

@@ -138,7 +138,8 @@ defaults are owned by the CLI and passed explicitly.
   page IDs with deterministic `ORDER BY ... , i.key`, then hydrates only those
   IDs through `get_items_batch`.
 - Query field/creator/tag/fulltext branches are OR; collection/type/tag/creator/
-  year filters are AND. User `LIKE` values remain escaped and bound.
+  year filters are AND. User `LIKE` values remain escaped and bound. Fulltext
+  backend selection is the separate scenario below.
 - Collection lookup checks exact key first. A name resolves only when exactly
   one key matches; multiple names fail with sorted candidate keys.
 - `get_notes` collects IDs first and calls `load_item_tags_batch`; never restore
@@ -160,6 +161,8 @@ defaults are owned by the CLI and passed explicitly.
 | collection name matches multiple keys | `collection-ambiguous`, sorted keys in hint |
 | duplicate pair budget exhausted | partial groups plus `truncated=true` |
 | graph pair budget exhausted | bounded graph plus `build.truncated=true` |
+| `fulltextItemWords` / `fulltextWords` missing | omit those JOINs; metadata search `Ok` |
+| `fulltext.sqlite` missing, busy, or integrity-failed | `fulltext_index=unavailable`; metadata search `Ok` |
 
 ### 5. Good / Base / Bad Cases
 
@@ -178,6 +181,9 @@ defaults are owned by the CLI and passed explicitly.
   saturation, fail-visible truncation, and a 10k synthetic bound.
 - Graph tests assert admitted-pair updates, edge budget, oversize counts,
   unchanged small-fixture metrics, and a 50k synthetic no-clique bound.
+- Dual-schema search tests cover userdata 120 word tables, schema ≥127 without
+  word tables, and a mini `fulltext.sqlite` sidecar MATCH. Assert
+  `SearchResult.fulltext_index` and that ATTACH uses the snapshot copy.
 - Run `cargo test -p zot-local` and `just ci`.
 
 ### 7. Wrong vs Correct
@@ -192,6 +198,91 @@ let page = all.into_iter().skip(offset).take(limit).collect();
 let total = count_matching(&predicates, &params)?;
 let page_ids = select_page(&predicates, &params, sort, limit, offset)?;
 let page = get_items_batch(&page_ids)?;
+```
+
+## Scenario: Zotero 7.1+ attachment fulltext backends
+
+### 1. Scope / Trigger
+
+Apply this contract when changing `LocalLibrary::search` query SQL, snapshot
+ATTACH, doctor local-SQLite capability JSON, or `EnvelopeMeta.fulltext_index`.
+Zotero userdata 127 drops `fulltextItemWords` / `fulltextWords` from
+`zotero.sqlite` and keeps attachment content in `data_dir/fulltext.sqlite`.
+
+### 2. Signatures
+
+```rust
+LocalLibrary::search(SearchOptions) -> ZotResult<SearchResult>
+LocalLibrary::legacy_fulltext_tables() -> bool
+LocalLibrary::fulltext_sidecar_present() -> bool
+SearchResult.fulltext_index: Option<String>
+EnvelopeMeta.fulltext_index: Option<String>
+```
+
+Doctor JSON: `capabilities.local_sqlite_read.fulltext.{legacy_tables, sidecar_present}`.
+
+### 3. Contracts
+
+- Word tables and FTS5 are exclusive. Both word tables present → attachment
+  `LIKE` on `fulltextItemWords` / `fulltextWords`, `fulltext_index=legacy-tables`.
+- Otherwise omit those table names from SQL. If a MATCH clause can be built,
+  Backup `data_dir/fulltext.sqlite` into the existing snapshot `TempDir`, ATTACH
+  that copy as `ftindex`, and EXISTS through `itemAttachments.parentItemID`
+  with FTS `rowid` = attachment `itemID`.
+- MATCH is a bound parameter. Non-CJK: `"token1 token2"*` with at least one
+  token of length ≥ 3. Pure CJK: 2-grams against `fulltextContentCJK`. Mixed
+  CJK+Latin or no usable tokens: omit FTS, `unavailable`.
+- Never ATTACH the live sidecar path. Sidecar Backup is lazy: `open`, doctor,
+  and empty-query list do not copy it.
+- Sidecar missing/busy/integrity failure does not fail `open` or search.
+  `local_sqlite_read.available` still means only the main `zotero.sqlite`
+  snapshot succeeded.
+- `fulltext_index` is set only for non-empty `library search`. Values:
+  `legacy-tables` | `fts5-sidecar` | `unavailable`. `api_version` stays 1.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+| --- | --- |
+| word tables missing | omit JOIN; no `search-count` / `no such table` |
+| sidecar missing or Backup busy | `unavailable`; metadata OR still runs |
+| MATCH not constructible | omit FTS; `unavailable` |
+| main `zotero.sqlite` Backup busy | unchanged `zotero-db-busy` |
+
+### 5. Good / Base / Bad Cases
+
+- Good: schema 129 plus sidecar, query `uniqueftstoken` hits the parent item
+  via FTS `rowid`, ATTACH file is the TempDir copy.
+- Base: schema 120 fixture keeps title and word-table LIKE hits.
+- Bad: prepare SQL that names `fulltextItemWords` on schema 129; ATTACH
+  `data_dir/fulltext.sqlite`; fail `open` because the sidecar is busy.
+
+### 6. Tests Required
+
+- `fts5_match_clause` covers prefix, CJK bigram, mixed-script omit, and short
+  tokens.
+- Schema 129 without sidecar: non-empty search `Ok`, `unavailable`, title still
+  matches.
+- Schema 129 with mini sidecar: FTS-only token hits parent item,
+  `fts5-sidecar`, attached path ≠ live sidecar.
+- Doctor payload includes `fulltext` while `available` stays true when the
+  main snapshot succeeds.
+- `cargo test -p zot-local`, focused doctor/envelope tests, `just ci`.
+
+### 7. Wrong vs Correct
+
+```rust
+// Wrong: fourth OR always JOINs dropped word tables.
+predicates.push("... JOIN fulltextItemWords ... JOIN fulltextWords ...");
+
+// Correct: detect tables, else snapshot+ATTACH ftindex, else omit FTS.
+if legacy_word_tables {
+    predicates.push(word_table_like);
+} else if let Some(clause) = fts5_match_clause(query) {
+    if ensure_fts5_attached() {
+        predicates.push(fts5_exists(clause));
+    }
+}
 ```
 
 ## Sidecar Databases

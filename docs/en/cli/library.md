@@ -48,6 +48,16 @@ Available options:
 - `--limit`
 - `--offset`
 
+Notes:
+
+- A non-empty `library search` JSON envelope sets `meta.fulltext_index` to
+  `legacy-tables`, `fts5-sidecar`, or `unavailable`. `library list` and empty
+  queries omit the field.
+- From Zotero userdata ≥127, attachment full text lives in
+  `data_dir/fulltext.sqlite`. Search must still succeed when the main-DB word
+  tables are gone; `unavailable` means this query did not search attachment
+  content.
+
 ## recent
 
 `library recent` now supports two modes:

@@ -1,0 +1,31 @@
+{
+  "id": "evergreen-harness-audit",
+  "name": "evergreen-harness-audit",
+  "title": "常青项目审查与五套 harness 对齐",
+  "description": "基于当前代码、测试、CI 和五套 harness 能力的审查与可批准改造计划；本轮仅规划",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "lyh",
+  "assignee": "lyh",
+  "createdAt": "2026-09-07",
+  "completedAt": "2026-09-08",
+  "branch": null,
+  "base_branch": "dev",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "09-07-harness-rules-alignment",
+    "09-07-skill-mirror-coverage",
+    "09-07-evergreen-ci-validation",
+    "09-07-pages-release-contract"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

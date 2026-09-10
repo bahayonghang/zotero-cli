@@ -55,6 +55,7 @@ impl CommandOutput {
                 total: seed.total,
                 profile: ctx.profile.clone(),
                 trash_policy: seed.trash_policy,
+                fulltext_index: seed.fulltext_index,
                 api_version: Some(ENVELOPE_API_VERSION),
             };
             Ok(Self(Payload::Json(to_pretty_json(
@@ -117,6 +118,7 @@ mod tests {
             count: Some(3),
             total: Some(10),
             trash_policy: None,
+            fulltext_index: None,
         });
         let out = CommandOutput::new(&c, data, seed, |_| unreachable!()).expect("build");
         assert_eq!(

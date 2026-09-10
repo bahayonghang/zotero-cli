@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify generated zot skill mirrors match the canonical source tree."""
+"""Verify generated skill mirrors match every published canonical skill tree."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from pathlib import Path
 
 
 IGNORED_NAMES = frozenset({".DS_Store", "__pycache__"})
+SKILLS_ROOT = Path("skills")
+MANAGED_MIRROR_ROOTS = (Path(".agents/skills"), Path(".claude/skills"))
 
 
 def collect_tree(root: Path) -> dict[str, bytes]:
@@ -46,10 +48,35 @@ def compare_trees(canonical: Path, mirror: Path) -> list[str]:
     return issues
 
 
+def discover_published_skills(skills_root: Path) -> list[Path]:
+    if not skills_root.is_dir():
+        raise FileNotFoundError(f"skill tree does not exist: {skills_root}")
+
+    published: list[Path] = []
+    for child in sorted(skills_root.iterdir()):
+        if child.is_dir() and (child / "SKILL.md").is_file():
+            published.append(child)
+    return published
+
+
+def managed_mirrors(skill_name: str) -> list[Path]:
+    return [root / skill_name for root in MANAGED_MIRROR_ROOTS]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--canonical", type=Path, default=Path("skills/zot"))
-    parser.add_argument("--mirror", type=Path, action="append")
+    parser.add_argument(
+        "--canonical",
+        type=Path,
+        default=None,
+        help="canonical skill tree (default: every skills/*/SKILL.md)",
+    )
+    parser.add_argument(
+        "--mirror",
+        type=Path,
+        action="append",
+        help="generated mirror tree (default: .agents/skills/<name> and .claude/skills/<name>)",
+    )
     parser.add_argument(
         "--skip-if-all-missing",
         action="store_true",
@@ -58,26 +85,48 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def check_jobs(args: argparse.Namespace) -> list[tuple[Path, list[Path]]]:
+    if args.canonical is not None or args.mirror:
+        canonical = args.canonical or Path("skills/zot")
+        mirrors = args.mirror or managed_mirrors(canonical.name)
+        return [(canonical, mirrors)]
+
+    return [
+        (skill, managed_mirrors(skill.name))
+        for skill in discover_published_skills(SKILLS_ROOT)
+    ]
+
+
+def report_mirrors(canonical: Path, mirrors: list[Path]) -> bool:
+    failed = False
+    for mirror in mirrors:
+        issues = compare_trees(canonical, mirror)
+        if not issues:
+            print(f"skill mirror matches canonical: {mirror}")
+            continue
+        failed = True
+        print(f"skill mirror drift: {mirror}")
+        for issue in issues:
+            print(f"  - {issue}")
+    return failed
+
+
 def main() -> int:
     args = parse_args()
-    mirrors = args.mirror or [Path(".agents/skills/zot"), Path(".claude/skills/zot")]
     failed = False
 
     try:
-        if args.skip_if_all_missing and all(not mirror.exists() for mirror in mirrors):
-            collect_tree(args.canonical)
+        jobs = check_jobs(args)
+        all_mirrors = [mirror for _canonical, mirrors in jobs for mirror in mirrors]
+        if args.skip_if_all_missing and all(not mirror.exists() for mirror in all_mirrors):
+            for canonical, _mirrors in jobs:
+                collect_tree(canonical)
             print("skill mirrors are not installed; skipping local mirror comparison")
             return 0
 
-        for mirror in mirrors:
-            issues = compare_trees(args.canonical, mirror)
-            if not issues:
-                print(f"skill mirror matches canonical: {mirror}")
-                continue
-            failed = True
-            print(f"skill mirror drift: {mirror}")
-            for issue in issues:
-                print(f"  - {issue}")
+        for canonical, mirrors in jobs:
+            if report_mirrors(canonical, mirrors):
+                failed = True
     except FileNotFoundError as error:
         print(error)
         return 1

@@ -82,6 +82,8 @@ pub struct SearchResult {
     pub items: Vec<Item>,
     pub total: usize,
     pub query: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fulltext_index: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

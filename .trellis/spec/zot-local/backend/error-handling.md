@@ -28,7 +28,10 @@
 - Preserve the path when mapping filesystem errors.
 - Treat missing optional Zotero tables as empty results when that matches
   Zotero version compatibility. For example, annotation reads return an empty
-  list if `itemAnnotations` is absent.
+  list if `itemAnnotations` is absent. `fulltextItemWords` / `fulltextWords`
+  are optional after userdata schema 127: omit those JOINs instead of failing
+  `search-count`. A missing or busy `fulltext.sqlite` sidecar must not fail
+  `LocalLibrary::open` or non-empty search; report `fulltext_index=unavailable`.
 - Keep user-fixable setup failures actionable. `PdfiumBackend::status` and
   Pdfium errors mention `ZOT_PDFIUM_LIB_PATH` / `PDFIUM_LIB_PATH` when manual
   setup is needed.
