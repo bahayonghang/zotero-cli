@@ -1,0 +1,9 @@
+{"file": ".trellis/tasks/09-10-library-search-fulltext-split/research/2026-09-10-fulltext-schema-split.md", "reason": "本机 schema 129 复现、Zotero 127 删表与 fulltext.sqlite 位置"}
+{"file": ".trellis/spec/zot-local/backend/database-guidelines.md", "reason": "只读快照合同与 bounded search OR/AND、LIKE、页内 hydration"}
+{"file": ".trellis/spec/zot-local/backend/error-handling.md", "reason": "缺失可选 Zotero 表按空结果处理；禁止暴露 rusqlite"}
+{"file": ".trellis/spec/zot-local/backend/quality-guidelines.md", "reason": "search_regression 夹具与主条目过滤"}
+{"file": ".trellis/spec/zot-core/backend/error-handling.md", "reason": "envelope meta 加法字段与 api_version=1"}
+{"file": "docs/agents/limits.md", "reason": "library search LIKE 与 trash_policy 文档合同"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "envelope meta 加法字段与 CommandOutput 单一装配点"}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "JSON envelope 稳定性与 skills-sync 镜像"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "SearchResult 到 EnvelopeMeta.fulltext_index 的跨层字段"}
