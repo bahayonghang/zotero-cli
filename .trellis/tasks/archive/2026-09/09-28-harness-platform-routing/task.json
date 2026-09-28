@@ -3,7 +3,7 @@
   "name": "harness-platform-routing",
   "title": "修复五套 harness 的 Trellis 平台上下文路由",
   "description": "P1：修复claude/kimi/omp别名匹配和静默空正文，增加正式回归。",
-  "status": "review",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "lyh",
   "assignee": "lyh",
   "createdAt": "2026-09-28",
-  "completedAt": null,
+  "completedAt": "2026-09-28",
   "branch": "dev",
   "base_branch": "main",
   "worktree_path": null,
@@ -24,7 +24,7 @@
     ".trellis/scripts/common/workflow_phase.py",
     "scripts/tests/test_harness_platform_routing.py"
   ],
-  "notes": "Local implementation and validation passed. Work commit recorded; user authorized local archival on 2026-09-28. Remote delivery remains unverified.",
+  "notes": "Local work committed and archived on 2026-09-28 at the user's request. Local acceptance passed. No remote push or hosted validation was performed.",
   "meta": {
     "approval_status": "approved",
     "audit_baseline": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
@@ -38,10 +38,12 @@
     "approval_date": "2026-09-28",
     "local_acceptance": "passed",
     "local_verified_at_utc": "2026-09-28T06:54:38.931913+00:00",
-    "execution_report": ".trellis/tasks/09-28-evergreen-harness-review/execution-report.md",
+    "execution_report": ".trellis/tasks/archive/2026-09/09-28-evergreen-harness-review/execution-report.md",
     "commit_status": "committed",
-    "archive_status": "authorized_pending",
+    "archive_status": "archived",
     "hosted_validation": "UNVERIFIED",
-    "delivery_authorized_date": "2026-09-28"
+    "delivery_authorized_date": "2026-09-28",
+    "archive_path": ".trellis/tasks/archive/2026-09/09-28-harness-platform-routing",
+    "audit_commit": "456c6a0af5508c7e83ebc3cec3779625cd26e61f"
   }
 }

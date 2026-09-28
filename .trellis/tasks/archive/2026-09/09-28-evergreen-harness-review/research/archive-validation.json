@@ -1,0 +1,50 @@
+{
+  "checked_utc": "2026-09-28T07:07:17.940184+00:00",
+  "work_record_commit": "456c6a0af5508c7e83ebc3cec3779625cd26e61f",
+  "tasks": [
+    {
+      "task": "09-28-evergreen-harness-review",
+      "path": ".trellis/tasks/archive/2026-09/09-28-evergreen-harness-review",
+      "status": "completed",
+      "commit": "2b93e1b0eeffcd9078f83432cd2c9e2269205e2f",
+      "validation_exit": 0,
+      "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\r\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\archive\\2026-09\\09-28-evergreen-harness-review\r\n\r\n  \u001b[0;32mimplement.jsonl: \u2713 (3 entries)\u001b[0m\r\n  \u001b[0;32mcheck.jsonl: \u2713 (3 entries)\u001b[0m\r\n\r\n\u001b[0;32m\u2713 All validations passed\u001b[0m\r\n"
+    },
+    {
+      "task": "09-28-security-lock-refresh",
+      "path": ".trellis/tasks/archive/2026-09/09-28-security-lock-refresh",
+      "status": "completed",
+      "commit": "a2120b3af11dca51c0399b02192d6ed7de43a946",
+      "validation_exit": 0,
+      "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\r\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\archive\\2026-09\\09-28-security-lock-refresh\r\n\r\n  \u001b[0;32mimplement.jsonl: \u2713 (3 entries)\u001b[0m\r\n  \u001b[0;32mcheck.jsonl: \u2713 (3 entries)\u001b[0m\r\n\r\n\u001b[0;32m\u2713 All validations passed\u001b[0m\r\n"
+    },
+    {
+      "task": "09-28-harness-platform-routing",
+      "path": ".trellis/tasks/archive/2026-09/09-28-harness-platform-routing",
+      "status": "completed",
+      "commit": "d2ab47c61e7a1e6db98d09dd60ebc23323e57620",
+      "validation_exit": 0,
+      "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\r\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\archive\\2026-09\\09-28-harness-platform-routing\r\n\r\n  \u001b[1;33mimplement.jsonl:2: Warning: .trellis/scripts/common/workflow_phase.py looks like a code file \u2014 implement/check.jsonl should reference spec/research docs; agents read code themselves\u001b[0m\r\n  \u001b[0;32mimplement.jsonl: \u2713 (3 entries)\u001b[0m\r\n  \u001b[1;33mcheck.jsonl:2: Warning: .trellis/scripts/common/workflow_phase.py looks like a code file \u2014 implement/check.jsonl should reference spec/research docs; agents read code themselves\u001b[0m\r\n  \u001b[0;32mcheck.jsonl: \u2713 (3 entries)\u001b[0m\r\n\r\n\u001b[0;32m\u2713 All validations passed\u001b[0m\r\n"
+    },
+    {
+      "task": "09-28-harness-contract-refresh",
+      "path": ".trellis/tasks/archive/2026-09/09-28-harness-contract-refresh",
+      "status": "completed",
+      "commit": "2b93e1b0eeffcd9078f83432cd2c9e2269205e2f",
+      "validation_exit": 0,
+      "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\r\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\archive\\2026-09\\09-28-harness-contract-refresh\r\n\r\n  \u001b[0;32mimplement.jsonl: \u2713 (3 entries)\u001b[0m\r\n  \u001b[0;32mcheck.jsonl: \u2713 (3 entries)\u001b[0m\r\n\r\n\u001b[0;32m\u2713 All validations passed\u001b[0m\r\n"
+    },
+    {
+      "task": "09-28-evergreen-security-cadence",
+      "path": ".trellis/tasks/archive/2026-09/09-28-evergreen-security-cadence",
+      "status": "completed",
+      "commit": "2b93e1b0eeffcd9078f83432cd2c9e2269205e2f",
+      "validation_exit": 0,
+      "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\r\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\archive\\2026-09\\09-28-evergreen-security-cadence\r\n\r\n  \u001b[0;32mimplement.jsonl: \u2713 (3 entries)\u001b[0m\r\n  \u001b[0;32mcheck.jsonl: \u2713 (3 entries)\u001b[0m\r\n\r\n\u001b[0;32m\u2713 All validations passed\u001b[0m\r\n"
+    }
+  ],
+  "parent_child_links": "PASS",
+  "active_task": null,
+  "old_active_paths_absent": true,
+  "historical_logs": "preserved"
+}
