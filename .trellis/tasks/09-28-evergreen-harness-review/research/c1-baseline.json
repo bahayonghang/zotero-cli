@@ -1,0 +1,9 @@
+{
+  "timestamp_utc": "2026-09-28T06:34:42.5566190Z",
+  "base_commit": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+  "cargo_lock_sha256": "C1D8BBF1A145A259F15D166EA7EE0F635A97F4608F225D11C6CADC34E224D48C",
+  "cargo_version": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+  "rustc_version": "rustc 1.98.0 (88d9e12ae 2026-08-18)",
+  "audit_version": "cargo-audit-audit 0.22.2",
+  "deny_version": "cargo-deny 0.20.2"
+}

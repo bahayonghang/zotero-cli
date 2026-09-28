@@ -1,0 +1,8 @@
+#### 2.1 Implement `[required · repeatable]`
+
+
+1. Load the `trellis-before-dev` skill to read project guidelines
+2. Read `{TASK_DIR}/prd.md`, then `design.md` if present, then `implement.md` if present
+3. Consult materials under `{TASK_DIR}/research/`
+4. Implement the code per reviewed artifacts
+5. Run project lint and type-check

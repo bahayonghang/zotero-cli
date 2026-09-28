@@ -1,0 +1,47 @@
+{
+  "id": "security-lock-refresh",
+  "name": "security-lock-refresh",
+  "title": "修复已确认的 rustls 安全依赖失败",
+  "description": "P1：最小rustls补丁修复当前audit/deny失败，保持MSRV与locked门。",
+  "status": "review",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "lyh",
+  "assignee": "lyh",
+  "createdAt": "2026-09-28",
+  "completedAt": null,
+  "branch": "dev",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "a2120b3af11dca51c0399b02192d6ed7de43a946",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "09-28-evergreen-harness-review",
+  "relatedFiles": [
+    "Cargo.lock",
+    "Cargo.toml"
+  ],
+  "notes": "Local implementation and validation passed. Work commit recorded; user authorized local archival on 2026-09-28. Remote delivery remains unverified.",
+  "meta": {
+    "approval_status": "approved",
+    "audit_baseline": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+    "applicable_harnesses": [
+      "Claude Code",
+      "Codex",
+      "Grok Build",
+      "Kimi Code",
+      "OMP"
+    ],
+    "approval_date": "2026-09-28",
+    "local_acceptance": "passed",
+    "local_verified_at_utc": "2026-09-28T06:54:38.931913+00:00",
+    "execution_report": ".trellis/tasks/09-28-evergreen-harness-review/execution-report.md",
+    "commit_status": "committed",
+    "archive_status": "authorized_pending",
+    "hosted_validation": "UNVERIFIED",
+    "delivery_authorized_date": "2026-09-28"
+  }
+}

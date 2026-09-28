@@ -1,0 +1,9 @@
+[0;34m=== Validating Context Files ===[0m
+Target dir: D:\Documents\Code\CLI\zotero-cli\.trellis\tasks\09-28-harness-platform-routing
+
+  [1;33mimplement.jsonl:2: Warning: .trellis/scripts/common/workflow_phase.py looks like a code file — implement/check.jsonl should reference spec/research docs; agents read code themselves[0m
+  [0;32mimplement.jsonl: ✓ (3 entries)[0m
+  [1;33mcheck.jsonl:2: Warning: .trellis/scripts/common/workflow_phase.py looks like a code file — implement/check.jsonl should reference spec/research docs; agents read code themselves[0m
+  [0;32mcheck.jsonl: ✓ (3 entries)[0m
+
+[0;32m✓ All validations passed[0m

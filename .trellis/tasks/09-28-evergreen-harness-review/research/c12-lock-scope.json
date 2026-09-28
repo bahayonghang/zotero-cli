@@ -1,0 +1,64 @@
+{
+  "lock_sha256": "857974bce8e060ed25212b68463e2bd1e0c42be3dce908517d001428d93e706f",
+  "count_before": 305,
+  "count_after": 305,
+  "changes": [
+    {
+      "name": "aws-lc-rs",
+      "before": "1.16.2",
+      "after": "1.18.1"
+    },
+    {
+      "name": "aws-lc-sys",
+      "before": "0.39.1",
+      "after": "0.45.0"
+    },
+    {
+      "name": "rustls",
+      "before": "0.23.38",
+      "after": "0.23.45"
+    },
+    {
+      "name": "rustls-webpki",
+      "before": "0.103.13",
+      "after": "0.103.15"
+    }
+  ],
+  "added": [],
+  "removed": [],
+  "independent_registry_check": [
+    {
+      "name": "aws-lc-rs",
+      "version": "1.18.1",
+      "checksum_matches": true,
+      "metadata_matches": true,
+      "rust_version": "1.71.0",
+      "yanked": false
+    },
+    {
+      "name": "aws-lc-sys",
+      "version": "0.45.0",
+      "checksum_matches": true,
+      "metadata_matches": true,
+      "rust_version": "1.71.0",
+      "yanked": false
+    },
+    {
+      "name": "rustls",
+      "version": "0.23.45",
+      "checksum_matches": true,
+      "metadata_matches": true,
+      "rust_version": "1.71",
+      "yanked": false
+    },
+    {
+      "name": "rustls-webpki",
+      "version": "0.103.15",
+      "checksum_matches": true,
+      "metadata_matches": true,
+      "rust_version": "1.71",
+      "yanked": false
+    }
+  ],
+  "manifest_diff": ""
+}

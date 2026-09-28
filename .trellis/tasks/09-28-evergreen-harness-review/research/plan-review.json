@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "task_count": 5,
+  "planning_artifacts": 15,
+  "context_manifests": 10,
+  "source_anchors": 9,
+  "local_links_checked": 12,
+  "all_tasks_planning": true,
+  "tracked_diff_unchanged": true,
+  "issues": [],
+  "review_scope": "Structural and source-anchor review by the main agent; not an independent reviewer or implementation validation."
+}

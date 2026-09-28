@@ -1,0 +1,17 @@
+[
+  {
+    "command": "python -m unittest discover -s scripts/tests -p test_harness_platform_routing.py",
+    "exit_code": 0,
+    "phase": "after-alias-fix"
+  },
+  {
+    "command": "python -m unittest discover -s scripts/tests -p test_*.py",
+    "exit_code": 0,
+    "phase": "after-alias-fix"
+  },
+  {
+    "command": "git diff --check -- .trellis/scripts/common/workflow_phase.py scripts/tests/test_harness_platform_routing.py",
+    "exit_code": 0,
+    "phase": "after-alias-fix"
+  }
+]

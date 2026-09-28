@@ -1,0 +1,7 @@
+info: syncing channel updates for nightly-2026-07-01-x86_64-pc-windows-msvc
+info: latest update on 2026-07-01 for version 1.98.0-nightly (f46ec5218 2026-06-30)
+info: downloading 3 components
+
+  nightly-2026-07-01-x86_64-pc-windows-msvc installed - rustc 1.98.0-nightly (f46ec5218 2026-06-30)
+
+info: checking for self-update (current version: 1.29.1)

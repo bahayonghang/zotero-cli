@@ -1,0 +1,121 @@
+{
+  "version": "1.0.42",
+  "projectTrusted": true,
+  "projectInstructions": [
+    {
+      "path": "C:\\Users\\lyh\\.grok\\rules\\RTK.md",
+      "source": null,
+      "name": null
+    },
+    {
+      "path": "C:\\Users\\lyh\\.grok\\rules\\basic-memory.md",
+      "source": null,
+      "name": null
+    },
+    {
+      "path": "C:\\Users\\lyh\\.claude\\Claude.md",
+      "source": null,
+      "name": null
+    },
+    {
+      "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\Agents.md",
+      "source": null,
+      "name": null
+    },
+    {
+      "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\Claude.md",
+      "source": null,
+      "name": null
+    }
+  ],
+  "skills": [
+    {
+      "name": "trellis-check",
+      "path": null,
+      "source": {
+        "type": "project",
+        "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.grok\\skills\\trellis-check\\SKILL.md"
+      }
+    },
+    {
+      "name": "trellis-start",
+      "path": null,
+      "source": {
+        "type": "project",
+        "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.grok\\commands\\trellis-start.md"
+      }
+    },
+    {
+      "name": "zot",
+      "path": null,
+      "source": {
+        "type": "project",
+        "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.agents\\skills\\zot\\SKILL.md"
+      }
+    },
+    {
+      "name": "zot-brainstorm",
+      "path": null,
+      "source": {
+        "type": "project",
+        "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.agents\\skills\\zot-brainstorm\\SKILL.md"
+      }
+    }
+  ],
+  "agents": [
+    {
+      "name": "general-purpose",
+      "path": null,
+      "source": {
+        "type": "builtin"
+      }
+    },
+    {
+      "name": "explore",
+      "path": null,
+      "source": {
+        "type": "builtin"
+      }
+    },
+    {
+      "name": "plan",
+      "path": null,
+      "source": {
+        "type": "builtin"
+      }
+    },
+    {
+      "name": "trellis-check",
+      "path": null,
+      "source": {
+        "type": "project",
+        "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.grok/agents\\trellis-check.md"
+      }
+    },
+    {
+      "name": "trellis-implement",
+      "path": null,
+      "source": {
+        "type": "project",
+        "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.grok/agents\\trellis-implement.md"
+      }
+    },
+    {
+      "name": "trellis-research",
+      "path": null,
+      "source": {
+        "type": "project",
+        "path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.grok/agents\\trellis-research.md"
+      }
+    },
+    {
+      "name": "codex:codex-rescue",
+      "path": null,
+      "source": {
+        "type": "plugin",
+        "plugin_name": "codex",
+        "path": "C:\\Users\\lyh\\.claude\\plugins\\marketplaces\\openai-codex\\plugins\\codex\\agents\\codex-rescue.md"
+      }
+    }
+  ]
+}

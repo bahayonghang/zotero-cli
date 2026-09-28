@@ -1,0 +1,61 @@
+{
+  "checked_utc": "2026-09-28T06:54:38.931913+00:00",
+  "parent_child_links": "PASS",
+  "tasks": [
+    {
+      "task": "09-28-evergreen-harness-review",
+      "command": [
+        "C:\\Program Files\\Python314\\python.exe",
+        ".trellis/scripts/task.py",
+        "validate",
+        ".trellis/tasks/09-28-evergreen-harness-review"
+      ],
+      "exit_code": 0,
+      "log": "final-validate-09-28-evergreen-harness-review.log"
+    },
+    {
+      "task": "09-28-security-lock-refresh",
+      "command": [
+        "C:\\Program Files\\Python314\\python.exe",
+        ".trellis/scripts/task.py",
+        "validate",
+        ".trellis/tasks/09-28-security-lock-refresh"
+      ],
+      "exit_code": 0,
+      "log": "final-validate-09-28-security-lock-refresh.log"
+    },
+    {
+      "task": "09-28-harness-platform-routing",
+      "command": [
+        "C:\\Program Files\\Python314\\python.exe",
+        ".trellis/scripts/task.py",
+        "validate",
+        ".trellis/tasks/09-28-harness-platform-routing"
+      ],
+      "exit_code": 0,
+      "log": "final-validate-09-28-harness-platform-routing.log"
+    },
+    {
+      "task": "09-28-harness-contract-refresh",
+      "command": [
+        "C:\\Program Files\\Python314\\python.exe",
+        ".trellis/scripts/task.py",
+        "validate",
+        ".trellis/tasks/09-28-harness-contract-refresh"
+      ],
+      "exit_code": 0,
+      "log": "final-validate-09-28-harness-contract-refresh.log"
+    },
+    {
+      "task": "09-28-evergreen-security-cadence",
+      "command": [
+        "C:\\Program Files\\Python314\\python.exe",
+        ".trellis/scripts/task.py",
+        "validate",
+        ".trellis/tasks/09-28-evergreen-security-cadence"
+      ],
+      "exit_code": 0,
+      "log": "final-validate-09-28-evergreen-security-cadence.log"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "claude",
+    "version": "2.1.283 (Claude Code)",
+    "exit_code": 0
+  },
+  {
+    "name": "codex",
+    "version": "codex-cli 0.157.1",
+    "exit_code": 0
+  },
+  {
+    "name": "grok",
+    "version": "grok 1.0.42 (4651fbdf9f13)",
+    "exit_code": 0
+  },
+  {
+    "name": "kimi",
+    "version": "2.0.0",
+    "exit_code": 0
+  },
+  {
+    "name": "omp",
+    "version": "omp/18.3.5",
+    "exit_code": 0
+  }
+]

@@ -1,0 +1,7 @@
+[0;34m=== Validating Context Files ===[0m
+Target dir: D:\Documents\Code\CLI\zotero-cli\.trellis\tasks\09-28-harness-contract-refresh
+
+  [0;32mimplement.jsonl: ✓ (3 entries)[0m
+  [0;32mcheck.jsonl: ✓ (3 entries)[0m
+
+[0;32m✓ All validations passed[0m

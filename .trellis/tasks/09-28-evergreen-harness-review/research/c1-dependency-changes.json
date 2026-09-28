@@ -1,0 +1,831 @@
+{
+  "changes": [
+    {
+      "name": "aws-lc-rs",
+      "before": {
+        "name": "aws-lc-rs",
+        "version": "1.16.2",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "a054912289d18629dc78375ba2c3726a3afe3ff71b4edba9dedfca0e3446d1fc",
+        "dependencies": [
+          "aws-lc-sys",
+          "zeroize"
+        ]
+      },
+      "after": {
+        "name": "aws-lc-rs",
+        "version": "1.18.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "b281d307588d634de920874890732659e2e7672f72b5e10e81badc1a8a83621e",
+        "dependencies": [
+          "aws-lc-sys",
+          "zeroize"
+        ]
+      },
+      "registry": [
+        {
+          "index_path": "C:\\Users\\lyh\\.cargo\\registry\\index\\index.crates.io-1949cf8c6b5b557f\\.cache\\aw\\s-\\aws-lc-rs",
+          "metadata": {
+            "name": "aws-lc-rs",
+            "vers": "1.18.1",
+            "deps": [
+              {
+                "name": "aws-lc-fips-sys",
+                "req": "^0.14.2",
+                "features": [],
+                "optional": true,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "aws-lc-sys",
+                "req": "^0.45.0",
+                "features": [],
+                "optional": true,
+                "default_features": false,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "clap",
+                "req": "^4.4",
+                "features": [
+                  "derive"
+                ],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "hex",
+                "req": "^0.4.3",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "lazy_static",
+                "req": "^1.5.0",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "paste",
+                "req": "^1.0.15",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "regex",
+                "req": "^1.11.1",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "untrusted",
+                "req": "^0.7.1",
+                "features": [],
+                "optional": true,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "zeroize",
+                "req": "^1.8.1",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              }
+            ],
+            "cksum": "b281d307588d634de920874890732659e2e7672f72b5e10e81badc1a8a83621e",
+            "features": {
+              "alloc": [],
+              "dev-tests-only": [],
+              "non-fips": [
+                "aws-lc-sys"
+              ],
+              "test_logging": [],
+              "unstable": []
+            },
+            "features2": {
+              "asan": [
+                "aws-lc-sys?/asan",
+                "aws-lc-fips-sys?/asan"
+              ],
+              "bindgen": [
+                "aws-lc-sys?/bindgen",
+                "aws-lc-fips-sys?/bindgen"
+              ],
+              "default": [
+                "aws-lc-sys",
+                "alloc",
+                "ring-io",
+                "ring-sig-verify"
+              ],
+              "fips": [
+                "dep:aws-lc-fips-sys"
+              ],
+              "legacy-des": [
+                "aws-lc-sys?/all-bindings"
+              ],
+              "prebuilt-nasm": [
+                "aws-lc-sys?/prebuilt-nasm"
+              ],
+              "ring-io": [
+                "dep:untrusted"
+              ],
+              "ring-sig-verify": [
+                "dep:untrusted"
+              ]
+            },
+            "yanked": false,
+            "links": "aws_lc_rs_1_18_1_sys",
+            "rust_version": "1.71.0",
+            "pubtime": "2026-09-01T20:08:57Z",
+            "v": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "aws-lc-sys",
+      "before": {
+        "name": "aws-lc-sys",
+        "version": "0.39.1",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "83a25cf98105baa966497416dbd42565ce3a8cf8dbfd59803ec9ad46f3126399",
+        "dependencies": [
+          "cc",
+          "cmake",
+          "dunce",
+          "fs_extra"
+        ]
+      },
+      "after": {
+        "name": "aws-lc-sys",
+        "version": "0.45.0",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "9bff6c3b54fad79a2e60b8102caf565819711497c1f5f092f49508e2f5c31b27",
+        "dependencies": [
+          "cc",
+          "cmake",
+          "dunce",
+          "fs_extra",
+          "pkg-config"
+        ]
+      },
+      "registry": [
+        {
+          "index_path": "C:\\Users\\lyh\\.cargo\\registry\\index\\index.crates.io-1949cf8c6b5b557f\\.cache\\aw\\s-\\aws-lc-sys",
+          "metadata": {
+            "name": "aws-lc-sys",
+            "vers": "0.45.0",
+            "deps": [
+              {
+                "name": "bindgen",
+                "req": "^0.72.0",
+                "features": [],
+                "optional": true,
+                "default_features": true,
+                "target": null,
+                "kind": "build"
+              },
+              {
+                "name": "cc",
+                "req": "^1.2.26",
+                "features": [
+                  "parallel"
+                ],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "build"
+              },
+              {
+                "name": "cmake",
+                "req": "^0.1.54",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "build"
+              },
+              {
+                "name": "dunce",
+                "req": "^1.0.5",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "build"
+              },
+              {
+                "name": "fs_extra",
+                "req": "^1.3.0",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "build"
+              },
+              {
+                "name": "pkg-config",
+                "req": "^0.3.31",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": "cfg(unix)",
+                "kind": "build"
+              }
+            ],
+            "cksum": "9bff6c3b54fad79a2e60b8102caf565819711497c1f5f092f49508e2f5c31b27",
+            "features": {
+              "all-bindings": [],
+              "asan": [],
+              "default": [
+                "all-bindings"
+              ],
+              "disable-prebuilt-nasm": [],
+              "prebuilt-nasm": []
+            },
+            "features2": {
+              "bindgen": [
+                "dep:bindgen"
+              ],
+              "fips": [
+                "dep:bindgen"
+              ],
+              "ssl": [
+                "bindgen",
+                "all-bindings"
+              ]
+            },
+            "yanked": false,
+            "links": "aws_lc_0_45_0",
+            "rust_version": "1.71.0",
+            "pubtime": "2026-09-01T13:00:11Z",
+            "v": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "rustls",
+      "before": {
+        "name": "rustls",
+        "version": "0.23.38",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "69f9466fb2c14ea04357e91413efb882e2a6d4a406e625449bc0a5d360d53a21",
+        "dependencies": [
+          "aws-lc-rs",
+          "once_cell",
+          "rustls-pki-types",
+          "rustls-webpki",
+          "subtle",
+          "zeroize"
+        ]
+      },
+      "after": {
+        "name": "rustls",
+        "version": "0.23.45",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634",
+        "dependencies": [
+          "aws-lc-rs",
+          "once_cell",
+          "rustls-pki-types",
+          "rustls-webpki",
+          "subtle",
+          "zeroize"
+        ]
+      },
+      "registry": [
+        {
+          "index_path": "C:\\Users\\lyh\\.cargo\\registry\\index\\index.crates.io-1949cf8c6b5b557f\\.cache\\ru\\st\\rustls",
+          "metadata": {
+            "name": "rustls",
+            "vers": "0.23.45",
+            "deps": [
+              {
+                "name": "aws-lc-rs",
+                "req": "^1.18",
+                "features": [],
+                "optional": true,
+                "default_features": false,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "base64",
+                "req": "^0.22",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "bencher",
+                "req": "^0.1.5",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "brotli",
+                "req": "^8",
+                "features": [
+                  "std"
+                ],
+                "optional": true,
+                "default_features": false,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "brotli-decompressor",
+                "req": "^5.0.0",
+                "features": [],
+                "optional": true,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "env_logger",
+                "req": "^0.11",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "hashbrown",
+                "req": "^0.15",
+                "features": [
+                  "default-hasher",
+                  "inline-more"
+                ],
+                "optional": true,
+                "default_features": false,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "hex",
+                "req": "^0.4",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "log",
+                "req": "^0.4.8",
+                "features": [],
+                "optional": true,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "log",
+                "req": "^0.4.8",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "macro_rules_attribute",
+                "req": "^0.2",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "num-bigint",
+                "req": "^0.4.4",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "once_cell",
+                "req": "^1.16",
+                "features": [
+                  "alloc",
+                  "race"
+                ],
+                "optional": false,
+                "default_features": false,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "pki-types",
+                "req": "^1.12",
+                "features": [
+                  "alloc"
+                ],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "normal",
+                "package": "rustls-pki-types"
+              },
+              {
+                "name": "rcgen",
+                "req": "^0.14",
+                "features": [
+                  "pem",
+                  "aws_lc_rs"
+                ],
+                "optional": false,
+                "default_features": false,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "ring",
+                "req": "^0.17",
+                "features": [],
+                "optional": true,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "rustversion",
+                "req": "^1.0.6",
+                "features": [],
+                "optional": true,
+                "default_features": true,
+                "target": null,
+                "kind": "build"
+              },
+              {
+                "name": "serde",
+                "req": "^1",
+                "features": [
+                  "derive"
+                ],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "serde_json",
+                "req": "^1",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "subtle",
+                "req": "^2.5.0",
+                "features": [],
+                "optional": false,
+                "default_features": false,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "time",
+                "req": "^0.3.6",
+                "features": [],
+                "optional": false,
+                "default_features": false,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "webpki",
+                "req": "^0.103.14",
+                "features": [
+                  "alloc"
+                ],
+                "optional": false,
+                "default_features": false,
+                "target": null,
+                "kind": "normal",
+                "package": "rustls-webpki"
+              },
+              {
+                "name": "webpki-roots",
+                "req": "^1",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "x509-parser",
+                "req": "^0.17",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "zeroize",
+                "req": "^1.8",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "zlib-rs",
+                "req": "^0.6",
+                "features": [],
+                "optional": true,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              }
+            ],
+            "cksum": "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634",
+            "features": {
+              "custom-provider": [],
+              "logging": [
+                "log"
+              ],
+              "read_buf": [
+                "rustversion",
+                "std"
+              ],
+              "std": [
+                "webpki/std",
+                "pki-types/std",
+                "once_cell/std"
+              ],
+              "tls12": []
+            },
+            "features2": {
+              "aws-lc-rs": [
+                "aws_lc_rs"
+              ],
+              "aws_lc_rs": [
+                "dep:aws-lc-rs",
+                "webpki/aws-lc-rs",
+                "aws-lc-rs/aws-lc-sys",
+                "aws-lc-rs/prebuilt-nasm"
+              ],
+              "brotli": [
+                "dep:brotli",
+                "dep:brotli-decompressor",
+                "std"
+              ],
+              "default": [
+                "aws_lc_rs",
+                "logging",
+                "prefer-post-quantum",
+                "std",
+                "tls12"
+              ],
+              "fips": [
+                "aws_lc_rs",
+                "aws-lc-rs?/fips",
+                "webpki/aws-lc-rs-fips"
+              ],
+              "prefer-post-quantum": [
+                "aws_lc_rs"
+              ],
+              "ring": [
+                "dep:ring",
+                "webpki/ring"
+              ],
+              "zlib": [
+                "dep:zlib-rs"
+              ]
+            },
+            "yanked": false,
+            "rust_version": "1.71",
+            "pubtime": "2026-09-14T15:11:17Z",
+            "v": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "rustls-webpki",
+      "before": {
+        "name": "rustls-webpki",
+        "version": "0.103.13",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e",
+        "dependencies": [
+          "aws-lc-rs",
+          "ring",
+          "rustls-pki-types",
+          "untrusted"
+        ]
+      },
+      "after": {
+        "name": "rustls-webpki",
+        "version": "0.103.15",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2",
+        "dependencies": [
+          "aws-lc-rs",
+          "ring",
+          "rustls-pki-types",
+          "untrusted"
+        ]
+      },
+      "registry": [
+        {
+          "index_path": "C:\\Users\\lyh\\.cargo\\registry\\index\\index.crates.io-1949cf8c6b5b557f\\.cache\\ru\\st\\rustls-webpki",
+          "metadata": {
+            "name": "rustls-webpki",
+            "vers": "0.103.15",
+            "deps": [
+              {
+                "name": "aws-lc-rs",
+                "req": "^1.18",
+                "features": [],
+                "optional": true,
+                "default_features": false,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "base64",
+                "req": "^0.23",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "bencher",
+                "req": "^0.1.5",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "bzip2",
+                "req": "^0.6",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "once_cell",
+                "req": "^1.17.2",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "pki-types",
+                "req": "^1.12",
+                "features": [],
+                "optional": false,
+                "default_features": false,
+                "target": null,
+                "kind": "normal",
+                "package": "rustls-pki-types"
+              },
+              {
+                "name": "rcgen",
+                "req": "^0.14.2",
+                "features": [
+                  "aws_lc_rs"
+                ],
+                "optional": false,
+                "default_features": false,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "ring",
+                "req": "^0.17",
+                "features": [],
+                "optional": true,
+                "default_features": false,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "serde",
+                "req": "^1.0",
+                "features": [
+                  "derive"
+                ],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "serde_json",
+                "req": "^1.0",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              },
+              {
+                "name": "untrusted",
+                "req": "^0.9",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "normal"
+              },
+              {
+                "name": "x509-parser",
+                "req": "^0.18.1",
+                "features": [],
+                "optional": false,
+                "default_features": true,
+                "target": null,
+                "kind": "dev"
+              }
+            ],
+            "cksum": "f3c3cf1d8b1e7d4927e2d154c3fcb02979afb9939629c62cd9048d4f07b60ac2",
+            "features": {},
+            "features2": {
+              "alloc": [
+                "ring?/alloc",
+                "pki-types/alloc"
+              ],
+              "aws-lc-rs": [
+                "dep:aws-lc-rs",
+                "aws-lc-rs/aws-lc-sys",
+                "aws-lc-rs/prebuilt-nasm"
+              ],
+              "aws-lc-rs-fips": [
+                "dep:aws-lc-rs",
+                "aws-lc-rs/fips"
+              ],
+              "aws-lc-rs-unstable": [
+                "aws-lc-rs"
+              ],
+              "default": [
+                "std"
+              ],
+              "ring": [
+                "dep:ring"
+              ],
+              "std": [
+                "alloc",
+                "pki-types/std"
+              ]
+            },
+            "yanked": false,
+            "rust_version": "1.71",
+            "pubtime": "2026-08-21T16:40:00Z",
+            "v": 2
+          }
+        }
+      ]
+    }
+  ],
+  "removed_names": [],
+  "package_count_before": 305,
+  "package_count_after": 305
+}
