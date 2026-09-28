@@ -87,14 +87,13 @@
 
 Claude Code, Codex, Grok Build, Kimi Code, and Oh My Pi (OMP) share this file. Claude Code does not auto-read `AGENTS.md`; tracked root `CLAUDE.md` imports this file with `@AGENTS.md`. Five-tool matrix, sources, and evidence levels: `docs/agents/harnesses.md`.
 
-Grok Build and Kimi Code have no Trellis auto platform marker. After `task.py start` and review, implement inline in the main session:
-1. Read `.trellis/workflow.md` Phase 2 generic steps.
-2. Start the prompt with `Active task: <task path from task.py current>`.
-3. Read that task's `prd.md`, `design.md` if present, `implement.md` if present, and relevant specs.
-4. Implement inline in the main session. Do not pretend unmatched `[platform]` markers inject context.
-5. If session identity is missing, set `TRELLIS_CONTEXT_ID` in the current process only. Do not write the user's global environment.
+Trellis supports the platform IDs `claude`, `codex`, `grok`, `kimi`, and `omp`. The local renderer maps `claude` / `kimi` / `omp` to `Claude Code` / `Kimi Code` / `Oh My Pi`. Rendered workflow text proves routing only; client rule discovery, hooks, and context injection require separate runtime evidence.
 
-Planning is not approved implementation. Matrix and sources: `docs/agents/harnesses.md`.
+Codex uses the explicit project setting `codex.dispatch_mode: inline` in `.trellis/config.yaml`. This Codex-only setting overrides the generated Trellis default `auto`; implementation and checks load task context in the main session. Other platforms follow their matching workflow sections and available native tools.
+
+Grok Build and Kimi Code have matching workflow sections with pull-based context loading. After user approval, artifact review, and `task.py start`, use the installed native entrypoint and the rendered Phase 2 instructions. A dispatched prompt starts with `Active task: <task path>`; the agent reads the task artifacts, context manifest, and referenced specs before work. Native dispatch must be available and authorized. If dispatch is unavailable, report the limitation and load the same context before an authorized inline fallback. Details: `docs/agents/harnesses.md`.
+
+Planning does not authorize implementation. Harness capability does not authorize delegation, external actions, or a model change. Use strong models for planning and final review; use a verified lower-cost model only for approved work with fixed files and checks. If session identity is missing, set `TRELLIS_CONTEXT_ID` in the current process only. Do not write the user's global environment.
 
 ### Issue tracker
 

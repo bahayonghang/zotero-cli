@@ -97,6 +97,21 @@ workspace = true
   the fixed nightly shown above and does not change the workspace toolchain contract.
 - Audit, deny, machete, and udeps tool installs pin versions and use their published lockfiles.
   Do not ignore advisories or machete findings merely to make CI green.
+- Claude Code, Codex, Grok Build, Kimi Code, and OMP share the dependency gates.
+  `just ci` does not run audit/deny, unused-dependency analysis, or the docs build.
+- CI schedules only the existing security job for Monday 08:17 UTC
+  (`17 8 * * 1`). Stable, MSRV, machete, udeps, and docs skip only the schedule
+  event. Pushes to main, pull requests targeting main, and manual runs retain
+  all existing jobs. Security has only `contents: read` permission.
+- Security evidence records the checked commit, UTC time, lockfile hash,
+  tool versions, advisory database revision, command, and exit code. For an
+  uncommitted patch, record the baseline commit and changed-file hashes
+  separately. A prior PASS does not cover advisories published after that scan,
+  even when the source commit is unchanged. Never suppress a nonzero security
+  result with `continue-on-error` or an advisory ignore to pass the gate.
+- A local event-matrix check and actionlint do not prove hosted execution.
+  Keep the new scheduled run UNVERIFIED until the workflow reaches the default
+  branch and a run for the checked revision provides evidence.
 - After removing dependencies, regenerate `Cargo.lock` once, then prove both MSRV check and
   udeps pass with `--locked`.
 
@@ -113,6 +128,9 @@ workspace = true
 | vulnerable, disallowed, or unknown-source dependency | audit/deny job fails |
 | unused direct or target-specific dependency | machete/udeps job fails |
 | a check rewrites tracked files in CI | post-check `git diff --exit-code` fails |
+| push to main, PR targeting main, or manual CI | stable on three OSes plus MSRV, security, machete, udeps, and docs |
+| weekly schedule | security only; audit/deny failure fails the job |
+| historical security PASS predates a new advisory | rerun security checks; the prior PASS does not establish current safety |
 
 ### 5. Good / Base / Bad Cases
 
@@ -130,6 +148,9 @@ workspace = true
 - Exercise a temporary skill mirror drift and assert `just skills-check` fails, then remove it.
 - Assert all-absent mirrors can be skipped while a partial mirror install still fails.
 - Run `cargo +1.85.0 check --workspace --locked`, audit, deny, machete, and fixed-nightly udeps.
+- After CI event edits, run actionlint and review push/PR/manual/schedule job
+  sets, job dependencies, permissions, and failure propagation. Preserve all
+  existing checks for non-scheduled events.
 - Run `just ci`, compare tracked hashes before/after when changing check recipes, and finish with
   `git diff --check`.
 

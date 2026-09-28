@@ -12,7 +12,7 @@
 
 **An agent-first Zotero skill runtime for querying, reading, and safely updating library content.**
 
-Turn an existing Zotero library into a dependable content surface for AI workflows: find items, read PDF evidence, extract annotations and notes, build topic workspaces, merge duplicates through Zotero Desktop, and perform gated Zotero Web API writes.
+Use an existing Zotero library in AI workflows: find items, read PDF evidence, extract annotations and notes, and build topic workspaces. Merge duplicates and perform other library mutations through the Zotero Web API with explicit confirmation and write-scoped credentials. The Zotero Desktop connector only imports new BibTeX/RIS records.
 
 <img src="./docs/public/images/zot-icon.png" alt="zot icon" width="180" />
 

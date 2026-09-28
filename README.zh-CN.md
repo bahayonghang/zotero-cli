@@ -12,7 +12,7 @@
 
 **面向 Agent 的 Zotero skill 运行时，用来查询、阅读并安全更新库里的内容。**
 
-把已有的 Zotero 文献库变成稳定的 AI 工作面：找条目、读 PDF 证据、提取批注和笔记、建立主题 workspace、通过 Zotero Desktop 合并重复项，并在安全门下执行 Zotero Web API 写操作。
+在 AI 工作流中使用已有的 Zotero 文献库：查找条目、读取 PDF 证据、提取批注和笔记、建立主题 workspace。合并重复项及其他库修改通过 Zotero Web API 执行，需要明确确认和具备写权限的凭据。Zotero Desktop connector 仅用于新增导入 BibTeX/RIS 条目。
 
 <img src="./docs/public/images/zot-icon.png" alt="zot 图标" width="180" />
 

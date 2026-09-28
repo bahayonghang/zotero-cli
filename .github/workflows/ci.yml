@@ -6,6 +6,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * 1'
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,6 +15,7 @@ env:
 jobs:
   stable:
     name: stable / ${{ matrix.os }}
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -45,6 +48,7 @@ jobs:
 
   msrv:
     name: Rust 1.85.0 / locked workspace
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -64,6 +68,8 @@ jobs:
   security:
     name: dependency security and policy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -90,6 +96,7 @@ jobs:
 
   machete:
     name: unused direct dependencies / stable
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -106,6 +113,7 @@ jobs:
 
   udeps:
     name: unused dependencies / nightly-2026-07-01
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -130,6 +138,7 @@ jobs:
   # Independent VitePress compile gate. Does not deploy Pages.
   docs:
     name: docs / VitePress build
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
