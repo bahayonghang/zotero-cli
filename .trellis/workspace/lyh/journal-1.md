@@ -904,3 +904,41 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Status
 
 [OK] **Completed**
+
+
+## Session 28: 常青项目审查实施与五工具契约对齐
+
+**Date**: 2026-09-28
+**Task**: 常青项目审查实施与五工具契约对齐
+**Branch**: `dev`
+
+### Summary
+
+完成 C1-C4 本地实施、验收、工作提交与主子任务归档。远端交付仍未执行。
+
+### Main Changes
+
+- 修补 rustls 安全依赖，修复三组平台别名，显式 Codex inline，对齐五工具规则与每周安全 CI。
+- 主任务及四个子任务归档至 .trellis/tasks/archive/2026-09，保持父子关系并更新上下文清单。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a2120b3` | (see git log) |
+| `d2ab47c` | (see git log) |
+| `2b93e1b` | (see git log) |
+| `456c6a0` | (see git log) |
+
+### Testing
+
+- [OK] 此前 just ci 通过：281 个不同 Rust 测试与 23 项 Python 测试；audit/deny/MSRV/machete/udeps/actionlint/文档构建通过。
+- [OK] 本次提交复核 10 个产品文件与已验收哈希一致；归档后五项 task.py validate、任务关系和会话指针检查通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 未推送；跨平台 hosted CI、五客户端新会话及实际 scheduled run 保持 UNVERIFIED。
