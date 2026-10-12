@@ -1,0 +1,3 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/tasks/10-12-dependabot-pr-review/research/pr-triage.md", "reason": "checkout 与 setup-node 大版本结论"}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "ci.yml 与 MSRV 门禁不能被 action 升级改变"}

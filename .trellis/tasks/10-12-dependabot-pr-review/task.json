@@ -1,0 +1,31 @@
+{
+  "id": "dependabot-pr-review",
+  "name": "dependabot-pr-review",
+  "title": "审查并处置 8 个 Dependabot PR",
+  "description": "审查 GitHub PR #17-#24，确认哪些可接受，并在落地方式确定后处置。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "lyh",
+  "assignee": "lyh",
+  "createdAt": "2026-10-12",
+  "completedAt": null,
+  "branch": "dev",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-12-reject-rust-toolchain-msrv",
+    "10-12-review-actions-majors",
+    "10-12-review-dirs-major",
+    "10-12-review-crate-bumps"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
