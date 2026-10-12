@@ -95,6 +95,8 @@ workspace = true
 - Stable CI runs `just ci-check` on Linux, Windows, and macOS, then requires a clean diff.
 - MSRV CI uses Rust 1.85.0 with the committed lockfile; unused-dependency analysis uses only
   the fixed nightly shown above and does not change the workspace toolchain contract.
+- `dtolnay/rust-toolchain` refs (`1.85.0`, `stable`, and the fixed nightly) select compilers.
+  They are not action versions. Dependabot ignores that action name so it does not bump the MSRV ref.
 - Audit, deny, machete, and udeps tool installs pin versions and use their published lockfiles.
   Do not ignore advisories or machete findings merely to make CI green.
 - Claude Code, Codex, Grok Build, Kimi Code, and OMP share the dependency gates.

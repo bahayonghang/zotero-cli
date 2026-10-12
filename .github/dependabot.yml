@@ -22,6 +22,9 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+    # Toolchain refs select a compiler. They are not action versions.
+    ignore:
+      - dependency-name: "dtolnay/rust-toolchain"
     labels:
       - dependencies
       - ci
