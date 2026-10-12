@@ -942,3 +942,43 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - 未推送；跨平台 hosted CI、五客户端新会话及实际 scheduled run 保持 UNVERIFIED。
+
+
+## Session 29: 处置 Dependabot PR #17-#24
+
+**Date**: 2026-10-12
+**Task**: 处置 Dependabot PR #17-#24
+**Branch**: `dev`
+
+### Summary
+
+在本地 dev 吸收 #17-#23，拒绝 #24 的 MSRV 误升级，关闭八个 PR 且不合并 main。
+
+### Main Changes
+
+- 锁文件升到 clap 4.6.6、thiserror 2.0.20、tar 0.4.46、http 1.5.0，rustls 保持 0.23.45
+- dirs 升到 7.0.0；dirs-sys 仍是 0.5.0
+- actions/checkout 与 actions/setup-node 升到 v7，Node 仍是 20
+- Dependabot 忽略 dtolnay/rust-toolchain，MSRV 保持 1.85.0
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `974334dda8280691b6a1665f244132d76132660f` | (see git log) |
+| `e1221155bc522497c9b99939d042c0ad1f1e8cca` | (see git log) |
+| `588e2bf65051177a6a35eb031bd715f09ee9e747` | (see git log) |
+| `815cd97215d456146a1b44cb615ab21498315d39` | (see git log) |
+| `99c87c3f37197e683ec06434b1557e7340a4fe87` | (see git log) |
+
+### Testing
+
+- [OK] just ci 在提交前通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 推送本地 dev 后再让这些升级进入 main
