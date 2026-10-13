@@ -54,22 +54,23 @@ Use one invocation path consistently during an agent session.
 
 Doctor reports `local_sqlite_read`, `local_http_read`, `connector_write`, and
 `web_write` independently. Web credentials do not represent connector import
-capability, and Local HTTP remains read-only.
+capability. `local_api_write` reports Zotero 10+ support and cached credentials, without authorization or test writes.
 
 ## Write Boundaries
 
-Command handlers can orchestrate two distinct write paths:
+Command handlers orchestrate separate write paths. See [Local API contract](./local-api.md) for explicit local field/creator and collection membership mutations; they use `ctx.local_api()` and never open SQLite.
 
 - `item import` is the only connector write. Dry-run validates the selected
   target; confirm rechecks writability immediately before import.
-- `item merge`, `library duplicates-merge`, `library dedupe`, and all other
-  current mutations use the Web API. Remote mutation logic belongs in
+- `item merge`, `library duplicates-merge`, `library dedupe`, and mutations
+  outside the explicit local operations use the Web API. Remote mutation logic belongs in
   `zot-remote`.
 
 Examples:
 
 - `item note add/update/delete` calls `ctx.remote()?`.
-- `collection create/rename/delete/add-item/remove-item` calls `ctx.remote()?`.
+- `collection create/rename/delete` calls `ctx.remote()?`; add/remove default
+  to Web, with an explicit local backend. Move is local only.
 - `sync update-status --apply` calls `ctx.remote()?` only when apply is set.
 - Merge commands return a preview unless `--confirm` is set.
 - `library dedupe --confirm` skips low-confidence groups before writer calls
@@ -171,7 +172,7 @@ let result = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
 ## Avoid
 
 - Do not touch `zotero.sqlite` for writes.
-- Do not describe Zotero Local HTTP as a write transport.
+- Only the explicit Zotero 10+ authenticated Local API path is writable; legacy Local HTTP reads and connector imports retain their boundaries.
 - Do not add automatic connector/Web fallback around import errors.
 - Do not make `--json` subcommand-local. It is a global flag and must be
   parsed before the subcommand.

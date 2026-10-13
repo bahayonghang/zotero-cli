@@ -35,9 +35,9 @@
 
 ## Execution rules
 
-1. In a new environment or before any write, run `zot --json doctor` and inspect the four capabilities
+1. In a new environment or before any write, run `zot --json doctor` and inspect each capability, including `local_api_write`
 2. If the user only wants inspection or analysis, do not mutate the library
-3. Only new BibTeX/RIS imports can use the connector; merge/dedupe and all other mutations use the Web API
+3. Zotero 10+ field/creator and collection membership edits can explicitly use the local backend; BibTeX/RIS imports use the connector; other mutations use the Web API
 4. Confirm intent for these actions before proceeding:
    - `item trash`
    - `item note delete`
@@ -58,10 +58,11 @@
 ## Read/write boundary
 
 - Local reads: `zotero.sqlite`, Zotero Local HTTP, attachment storage, and local index sidecars
+- Local API writes: fields/creators and collection membership; only `--write-backend local --confirm` mutates the library
 - Connector writes: only new BibTeX/RIS imports, with the selected Zotero UI target rechecked for writability immediately before confirmation
 - Web writes: merge/dedupe, note, tag, collection, Web import, annotation, saved-search, and status-sync
 
-**Never write directly to `zotero.sqlite`, and never describe Local HTTP as a write transport.**
+**Never write directly to `zotero.sqlite`.** [Local API writes](../cli/local-write.md) require Zotero 10+, preview by default, and bind confirmation to the Server ID and local version. `unknown` and `verification-failed` are not success.
 
 ## What to do when write access is missing
 

@@ -349,7 +349,7 @@
       "files": [],
       "expectations": [
         "Refuses to execute SQL or modify zotero.sqlite directly.",
-        "States that local SQLite and Zotero Local HTTP are read-only paths rather than write transports.",
+        "States that SQLite stays read-only and only implemented Zotero 10+ authenticated Local API or Web commands may mutate items.",
         "Does not suggest bypassing Zotero validation and offers only implemented desktop or explicit Web commands."
       ]
     },
@@ -384,6 +384,50 @@
         "Does not trigger the zot skill for a standalone non-Zotero PDF.",
         "Does not import the PDF into Zotero or create a workspace without a request.",
         "Uses the ordinary PDF reading workflow for the local file."
+      ]
+    },
+    {
+      "id": 36,
+      "prompt": "没有 Web API key，把本机 Zotero 条目 ITEMABCD 从分类 A 移到 B，保留它在 C 的归属。",
+      "expected_output": "先 doctor 检查 local_api_write，解析同库真实 keys，local move-item 预览，确认同一 server/version 后单次 PATCH 并回读。",
+      "files": [],
+      "expectations": [
+        "Chooses explicit local backend with no Web credential prerequisite.",
+        "Preserves unrelated collection C and uses item keys resolved from the library.",
+        "Previews before confirmation; uses the preview Server ID and local version; no backend fallback."
+      ]
+    },
+    {
+      "id": 37,
+      "prompt": "补充这篇的 DOI 和作者；保留已有内容，作者既有人名也有机构名。",
+      "expected_output": "按当前 schema 填空，结构化 creators-file 保留顺序/角色，不默认 overwrite。",
+      "files": [],
+      "expectations": [
+        "Validates itemType fields and creator types using the same Local API.",
+        "Uses structured creators, preserving name forms and order.",
+        "Reports skipped nonempty fields and never infers overwrite permission."
+      ]
+    },
+    {
+      "id": 38,
+      "prompt": "本地修改返回 unknown，observed_expected_state=true，可以说已经成功然后再试一次吗？",
+      "expected_output": "说明未知提交不能证明此次操作成功，不盲重试；检查当前状态和版本，必要时重新预览。",
+      "files": [],
+      "expectations": [
+        "Does not report unknown as applied.",
+        "Does not blindly resubmit the write.",
+        "Distinguishes verification-failed after accepted writes from unknown submissions."
+      ]
+    },
+    {
+      "id": 39,
+      "prompt": "SQLite snapshot busy，但 Zotero 10 的 local_api_write supported=true；先预览补充会议名。",
+      "expected_output": "直接用 local API 读取 item/schema 做预览，不依赖 SQLite/Web key，不弹授权框。",
+      "files": [],
+      "expectations": [
+        "Uses Local API item data and versions even when SQLite snapshots fail.",
+        "Does not request authorization during preview.",
+        "Does not switch to Web or connector writes."
       ]
     }
   ]

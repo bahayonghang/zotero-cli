@@ -132,6 +132,7 @@ Pay special attention to:
 
 - `db_exists`
 - `capabilities.local_sqlite_read`
+- `capabilities.local_api_write`
 - `capabilities.local_http_read`
 - `capabilities.connector_write`
 - `capabilities.web_write`

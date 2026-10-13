@@ -173,5 +173,25 @@
     "id": 35,
     "prompt": "总结当前目录里的 report.pdf；它不是 Zotero 附件，也不需要建 workspace 或写回 Zotero。",
     "expected": "这是非 Zotero PDF 处理请求，不应触发 zot skill，应直接使用普通 PDF 工作流。"
+  },
+  {
+    "id": 36,
+    "prompt": "没有 Web API key，把本机 Zotero 条目 ITEMABCD 从分类 A 移到 B，保留它在 C 的归属。",
+    "expected": "先 doctor 检查 local_api_write，解析同库真实 keys，local move-item 预览，确认同一 server/version 后单次 PATCH 并回读。"
+  },
+  {
+    "id": 37,
+    "prompt": "补充这篇的 DOI 和作者；保留已有内容，作者既有人名也有机构名。",
+    "expected": "按当前 schema 填空，结构化 creators-file 保留顺序/角色，不默认 overwrite。"
+  },
+  {
+    "id": 38,
+    "prompt": "本地修改返回 unknown，observed_expected_state=true，可以说已经成功然后再试一次吗？",
+    "expected": "说明未知提交不能证明此次操作成功，不盲重试；检查当前状态和版本，必要时重新预览。"
+  },
+  {
+    "id": 39,
+    "prompt": "SQLite snapshot busy，但 Zotero 10 的 local_api_write supported=true；先预览补充会议名。",
+    "expected": "直接用 local API 读取 item/schema 做预览，不依赖 SQLite/Web key，不弹授权框。"
   }
 ]

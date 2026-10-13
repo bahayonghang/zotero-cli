@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file. Dates use
 `YYYY-MM-DD`. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Zotero 10+ official Local API backend for previewed item field/creator edits
+  and collection membership add, remove, and move. Confirmed writes bind the
+  local server and item version, request desktop authorization, and verify by
+  reading back. Existing Web API commands retain their default backend.
+- `doctor` reports Local API write support separately from credentials and
+  actual write verification.
+
 ## [1.0.1] - 2026-07-26
 
 ### Fixed

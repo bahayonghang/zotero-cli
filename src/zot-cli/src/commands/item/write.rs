@@ -122,6 +122,17 @@ pub(crate) async fn handle_merge(ctx: &AppContext, args: ItemMergeArgs) -> Resul
 }
 
 pub(crate) async fn handle_update(ctx: &AppContext, args: ItemUpdateArgs) -> Result<CommandOutput> {
+    if args.write.write_backend == crate::cli::WriteBackendArg::Local {
+        return crate::commands::local_write::update(ctx, args).await;
+    }
+    crate::commands::local_write::validate_web_options(&args.write)?;
+    if args.overwrite || args.creators_file.is_some() {
+        return Err(crate::commands::local_write::invalid(
+            "local-write-options",
+            "--overwrite and --creators-file require --write-backend local",
+        )
+        .into());
+    }
     let mut fields = BTreeMap::new();
     if let Some(title) = args.title {
         fields.insert("title".to_string(), title);

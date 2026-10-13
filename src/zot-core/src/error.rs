@@ -47,6 +47,14 @@ pub enum ZotError {
         status: Option<u16>,
     },
 
+    #[error("Local API error: {message}")]
+    LocalApi {
+        code: String,
+        message: String,
+        hint: Option<String>,
+        status: Option<u16>,
+    },
+
     #[error("PDF error: {message}")]
     Pdf {
         code: String,
@@ -108,6 +116,12 @@ impl ZotError {
                 hint: hint.clone(),
             },
             ZotError::Connector {
+                code,
+                message,
+                hint,
+                ..
+            }
+            | ZotError::LocalApi {
                 code,
                 message,
                 hint,

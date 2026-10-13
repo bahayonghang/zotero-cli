@@ -24,6 +24,9 @@ doctor diagnostics, and orchestration between `zot-core`, `zot-local`, and
 
 ## Guidelines Index
 
+Read [Local API Content Operations](./local-api.md) before changing the
+authenticated local client, local mutation planning, credentials, or doctor capability.
+
 | Guide                                           | Description                                                                          | Status   |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------ | -------- |
 | [Directory Structure](./directory-structure.md) | Binary entrypoint, clap args, command modules, and utilities                         | Complete |
@@ -31,6 +34,7 @@ doctor diagnostics, and orchestration between `zot-core`, `zot-local`, and
 | [Error Handling](./error-handling.md)           | `anyhow` boundary, `ZotError`, and envelope errors                                   | Complete |
 | [Quality Guidelines](./quality-guidelines.md)   | CLI parse tests, JSON contract tests, and workspace manifest guard                   | Complete |
 | [Connector Import Contract](./connector.md)     | Unauthenticated built-in connector server, `item import`, format/entry rules         | Complete |
+| [Local API Content Operations](./local-api.md) | Zotero 10+ authorization, local versions, previews, fields/creators and memberships | Complete |
 | [Merge & Dedupe Engine](./merge-dedupe.md)      | Cross-type merge safety, dc:replaces citation protection, dedupe planning invariants | Complete |
 | [Logging Guidelines](./logging-guidelines.md)   | Human vs JSON output rules                                                           | Complete |
 

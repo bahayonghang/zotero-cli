@@ -35,9 +35,9 @@
 
 ## 执行规则
 
-1. 新环境或任何写入先跑 `zot --json doctor`，分别读取四类 capability
+1. 新环境或任何写入先跑 `zot --json doctor`，分别读取各类 capability，包括 `local_api_write`
 2. 如果用户只是想“分析”“看看”，不要偷偷写库
-3. 只有 BibTeX/RIS 新增导入可走 connector；merge/dedupe 与其他 mutation 走 Web API
+3. Zotero 10+ 字段/作者和分类成员可显式走 local 后端；BibTeX/RIS 新增导入走 connector；其余 mutation 走 Web API
 4. 这些动作要确认意图已经明确：
    - `item trash`
    - `item note delete`
@@ -58,10 +58,11 @@
 ## 读写边界
 
 - 本地读：`zotero.sqlite`、Zotero Local HTTP、附件 storage、本地索引 sidecar
+- Local API 写：字段/作者补充、分类添加/移除/移动；仅 `--write-backend local --confirm` 会写库
 - connector 写：只新增导入 BibTeX/RIS，且确认前重新检查 Zotero UI 当前目标可写
 - Web 写：merge/dedupe、note、tag、collection、Web import、annotation、saved-search、status-sync
 
-**永远不要直接改 `zotero.sqlite`，也不要把 Local HTTP 描述成写通道。**
+**永远不要直接改 `zotero.sqlite`。** [Local API 写入](../cli/local-write.md)需要 Zotero 10+，默认预览，确认时绑定 Server ID 和本地版本；`unknown` / `verification-failed` 不代表成功。
 
 ## 写权限缺失时怎么办
 

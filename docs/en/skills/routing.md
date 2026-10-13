@@ -17,9 +17,9 @@ It is not a command catalog.
 | “Download attachment ATCH005” | local attachment download | which attachment, where it was saved |
 | “Add a note to this item” | controlled mutation | what will change and whether write access exists |
 | “Preview a merge for KEEP001 and DUPE001 first” | manual merge preview | what will be filled or moved, and when the write happens |
-| “I have no API key; clean duplicates through local Zotero” | desktop dedupe | bridge capability, preview, normal-only confirmation |
+| “I have no API key; clean duplicates through local Zotero” | dedupe preview | preview is available; confirmation requires Web credentials |
 | “Use the Zotero Web API for this merge” | explicit Web merge | Web credentials and one backend for preview/confirm |
-| “UPDATE zotero.sqlite directly” | refuse direct database writes | SQLite/Local HTTP read-only boundary and supported writers |
+| “UPDATE zotero.sqlite directly” | refuse direct database writes | SQLite read-only boundary and authenticated Local API / Web writers |
 | “Show me the current config and default profile” | configuration inspection | effective config, default profile, missing pieces |
 
 ## Quick rule of thumb
@@ -31,8 +31,8 @@ It is not a command catalog.
 - “download the attachment”: treat it as an attachment task, not upload
 - “preview this merge first”: treat it as `item merge`, not immediate duplicate merge
 - local read-only requests: do not require a Web key
-- any mutation: run doctor first; only new BibTeX/RIS imports can use the connector, while all other mutations use the Web API
-- the connector cannot update or merge existing items; do not invent local tag, note, or collection writes
+- any mutation: run doctor first; Zotero 10+ fields/creators and collection membership can use the Local API, BibTeX/RIS imports use the connector, and other mutations use the Web API
+- the connector cannot update or merge existing items; local tags, notes, and merge are not implemented
 - skip low-confidence groups by default and never add `--include-low-confidence` on the user's behalf
 - any “why is this broken?” question: start with doctor or config
 
@@ -47,7 +47,7 @@ Run `doctor` first when:
 - the task depends on citation-key lookup
 - the user is troubleshooting configuration or profile state
 
-Inspect `capabilities.local_sqlite_read`, `local_http_read`, `connector_write`, and `web_write`; do not reduce the decision to Web `write_credentials`.
+Inspect `capabilities.local_sqlite_read`, `local_http_read`, `connector_write`, `local_api_write`, and `web_write`; do not reduce the decision to Web `write_credentials`.
 
 ## Division of labor between skills and CLI docs
 

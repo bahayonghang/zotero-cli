@@ -12,7 +12,7 @@
 
 **An agent-first Zotero skill runtime for querying, reading, and safely updating library content.**
 
-Use an existing Zotero library in AI workflows: find items, read PDF evidence, extract annotations and notes, and build topic workspaces. Merge duplicates and perform other library mutations through the Zotero Web API with explicit confirmation and write-scoped credentials. The Zotero Desktop connector only imports new BibTeX/RIS records.
+Use an existing Zotero library in AI workflows: find items, read PDF evidence, extract annotations and notes, and build topic workspaces. Zotero 10+ supports local field/creator edits and collection membership changes with a preview and desktop authorization. Merge duplicates and perform other library mutations through the Zotero Web API. The Desktop connector imports new BibTeX/RIS records.
 
 <img src="./docs/public/images/zot-icon.png" alt="zot icon" width="180" />
 
@@ -206,7 +206,7 @@ Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.
 ## Current boundary
 
 - `zot mcp serve` is scaffolded and currently returns `mcp-not-implemented`. For now, use the skill plus the runtime.
-- Local SQLite and Zotero Local HTTP are read-only. Never use either as a write transport.
+- Local SQLite remains read-only. For Zotero 10+ local field/creator edits and collection membership changes, see [local content operations](docs/en/cli/local-write.md); these use the official authenticated Local API.
 - The built-in connector only imports new BibTeX/RIS records into Zotero's currently selected writable target; it does not update or merge existing items.
 - Merge/dedupe, note, tag, collection, Web import, annotation, saved-search, and status-sync mutations use the Zotero Web API.
 - Legacy `desktop_bridge` and `write_backend` config entries are ignored; `doctor` reports a migration hint so they can be removed safely.

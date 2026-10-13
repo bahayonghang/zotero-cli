@@ -1,6 +1,6 @@
 ---
 name: zot
-description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v1.0.1)
+description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 Zotero 10+ Local API 补充字段/作者和整理分类、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v1.0.1)
 ---
 
 # zot
@@ -12,7 +12,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 - 只要任务的真实目标是操作**已有的本地 Zotero 库**或**已有/将创建的 reading workspace**，就用本 skill，即使用户没说 `zot`。
 - 用户在 Claude Code、Codex 里应该直接说需求，不应该先背命令。skill 负责把需求翻成运行时动作。
 - `zot` 是唯一执行面。`ref/` 里的旧 Python 参考实现和 `zot mcp serve` 都不是当前主路径。
-- 本地 SQLite 和 Zotero Local HTTP 都是只读路径；connector 只负责向 Zotero UI 当前选中的目标新增 BibTeX/RIS 条目；其他 mutation 全部走 Zotero Web API。三个边界不能混用。
+- 本地 SQLite 只读；Zotero 10+ Local API 支持显式 local 后端的字段/作者和分类成员操作；connector 仅新增导入；其他 mutation 走 Web API。各路径不能混用。
 - 每条写路径拥有本次操作的成功和失败；connector 或 Web API 出错时不能自动 fallback 到另一条路径。
 - 回答先给结论、证据、变更或失败原因。不要先把 raw JSON 倒给用户。
 
@@ -162,15 +162,16 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 
 | 路径 | 当前能力 | 凭据 / 运行条件 |
 | --- | --- | --- |
-| local SQLite / Local HTTP | 只读查询、提取和 dedupe planning | 本地 Zotero 数据；不能写 |
+| local SQLite / Local HTTP reads | 查询、提取和 dedupe planning | SQLite 永远不能写 |
+| Zotero 10+ Local API | item update、collection add-item/remove-item/move-item | 显式 local 后端、预览/确认、Zotero 桌面授权；无需 Web key |
 | connector 本机导入 | 仅 `item import` 新增 BibTeX/RIS 条目 | Zotero 正在运行、connector 可达、UI 当前目标可写 |
-| Zotero Web API | 除 connector 导入外的全部 mutation，含 merge/dedupe | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
+| Zotero Web API | 既有 mutation 默认后端，含 merge/dedupe；不含 move-item | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
 
 写入决策顺序：
 
-1. 先跑 `zot --json doctor`，读取 `capabilities.connector_write`、`capabilities.web_write` 和 `write_credentials`。
+1. 先跑 `zot --json doctor`，读取 `capabilities.local_api_write`、`capabilities.connector_write`、`capabilities.web_write` 和 `write_credentials`。
 2. BibTeX/RIS 新增导入只走 connector：先不带 `--confirm` 预览目标、可写性、记录数和格式，复述后取得确认，再执行 `item import ... --confirm`。
-3. 其他 mutation 全部走 Web API。缺少 `ZOT_LIBRARY_ID` 或 `ZOT_API_KEY` 时停止并点名缺失凭据；不要尝试 connector。
+3. 本地字段/作者或分类成员操作优先评估 `local_api_write` 并按下一节显式选择 local；其他 mutation 走 Web API。Web 凭据缺失时停止对应 Web 操作；不要切换到 connector。
 4. 对 merge/dedupe 先跑不带 `--confirm` 的本地 preview，复述 keeper、sources、confidence 和跳过项；执行 `--confirm` 前再检查 Web 凭据。
 
 命令路由：
@@ -179,6 +180,21 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 - Web API 写：`item create/add-doi/add-url/add-file/update/trash/restore/attach`、`item note add/update/delete`、`item tag add/remove/batch`、collection mutation、saved-search mutation、annotation creation、`sync update-status --apply` 和 merge/dedupe。
 - `library dedupe --confirm` 默认只执行 normal-confidence 组；low-confidence 组保留在 `skipped_low_confidence`。普通 confirm 不等于 low-confidence 授权；只有用户看过 preview 后另行、明确接受这部分风险，才可追加 `--include-low-confidence`。
 - 不要宣称 connector 能执行 tag、note、collection、attachment、annotation、saved-search、status-sync 或 merge/dedupe mutation。
+
+### 7a. 本地字段、作者与分类成员（Zotero 10+）
+
+自然语言“把条目从 A 移到 B”“补上这篇的 DOI/作者”可使用官方 Local API，不要求 Web 凭据。
+
+1. 先 doctor：`local_api_write.supported` 仅证明版本/协议支持，`credential_present` 仅表示缓存授权，`verified=false` 不能解读成真实写入通过。Zotero 必须运行并启用本地通信。
+2. 用 item key 与 collection key 确定同一 library 的目标；不要把 citation key 或 UI 当前选中分类当作 API 身份。必要时先检索解析，不能猜 key。
+3. `item update K --write-backend local --field DOI=...` 或 `collection move-item K --from A --to B --write-backend local` 默认只预览。add-item/remove-item 保留 `<collection-key> <item-key>` 参数顺序，同样可选择 local。
+4. 展示 before/after/skipped_fields；默认仅填空，覆盖非空字段需显式 `--overwrite`。`--creators-file` 为有序 JSON 数组，含 creatorType 与个人 firstName/lastName 或机构 name；已有作者列表需显式覆盖。
+5. 用户认可具体修改后，保持原参数并增加 `--confirm --expected-server-id <预览值> --expected-version <预览值>`。Zotero 自身会在需要时显示授权框，不能替用户点击 Always Allow。
+6. applied 且 verified 才表示确认成功；unknown 表示结果未知，verification-failed 表示写被接受但回读未验证，不能称为全部成功或盲重试。冲突须重新预览。
+
+移动仅改变指定分类归属，保留其他分类、item key 和 children。不支持跨库移动、itemType 转换、批量修改、自动联网补全或本地 tags/notes/merge。local 失败不自动换 Web/Connector/SQLite。
+
+本地 key 仅在 Zotero 返回 remember=true 时按 profile + Server ID 缓存；不进入输出。不要主动读取或展示授权文件。
 
 ### 8. 配置排障
 
@@ -277,6 +293,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `capabilities.local_sqlite_read`
 - `capabilities.local_sqlite_read.fulltext.legacy_tables`
 - `capabilities.local_sqlite_read.fulltext.sidecar_present`
+- `capabilities.local_api_write`（版本/可达/凭据存在分别报告，`verified: false` 不表示已验证可写）
 - `capabilities.local_http_read`
 - `capabilities.connector_write`（仅表示本机 BibTeX/RIS import 能力）
 - `capabilities.web_write.configured`（只表示凭据存在）
@@ -304,7 +321,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `library saved-search create --conditions` 必须是 JSON 数组，每项形如 `{"condition": "...", "operator": "...", "value": "..."}`，至少一条；空数组直接报 `saved-search-conditions`
 - Pdfium 路径覆盖：`ZOT_PDFIUM_LIB_PATH` / `PDFIUM_LIB_PATH` 指向 lib，`ZOT_PDFIUM_CACHE_DIR` 覆盖自动下载缓存目录
 - 永远不要直接修改 `zotero.sqlite`
-- Zotero Local HTTP API 只读；本机唯一写路径是 connector 的 `item import`
+- Zotero 10+ 的本地内容操作走授权 Local API；旧版 Local HTTP 只读。Connector 仍仅支持 item import。
 - connector 无鉴权但仅监听 loopback，只支持向 Zotero UI 当前选中目标新增 BibTeX/RIS 条目；不能用于 merge/dedupe 或其他 mutation
 - API key 和 raw merge plan token 不得进入输出、日志、fixture、文档示例或 eval
 
@@ -438,7 +455,7 @@ cargo run -q -p zot-cli -- --json doctor
   先生成 merge preview，再确认 `capabilities.web_write` 和 Web 凭据；用户确认后执行 `--confirm`，Web 失败不 fallback 到 connector
 
 - “帮我直接 UPDATE zotero.sqlite”
-  拒绝直接 SQLite 写；说明 local SQLite / Local HTTP 只读。BibTeX/RIS 新增导入可走 connector，其他 mutation 只能转到已实现的 Web 命令
+  拒绝直接 SQLite 写；字段/作者和分类成员可评估授权 Local API，BibTeX/RIS 新增导入可走 connector，其他操作使用已实现的 Web 命令
 
 - “我库里这些跟 attention 有关的条目，挨个查一下 Scite 报告”  
   走 `item scite search "attention"`

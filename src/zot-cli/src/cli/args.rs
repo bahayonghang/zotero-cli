@@ -126,6 +126,8 @@ pub(crate) enum CollectionCommand {
     Delete(CollectionKeyArgs),
     AddItem(CollectionMembershipArgs),
     RemoveItem(CollectionMembershipArgs),
+    /// Move one item between collections in the same local library.
+    MoveItem(CollectionMoveArgs),
 }
 
 #[derive(Subcommand)]
@@ -516,6 +518,34 @@ pub(crate) struct ItemUpdateArgs {
     pub(crate) date: Option<String>,
     #[arg(long = "field")]
     pub(crate) fields: Vec<String>,
+    #[command(flatten)]
+    pub(crate) write: LocalWriteArgs,
+    /// Replace specified nonempty fields (local backend only).
+    #[arg(long)]
+    pub(crate) overwrite: bool,
+    /// Ordered JSON creators array (local backend only).
+    #[arg(long)]
+    pub(crate) creators_file: Option<PathBuf>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
+pub(crate) enum WriteBackendArg {
+    #[default]
+    Web,
+    Local,
+}
+
+#[derive(Args, Debug, Default)]
+pub(crate) struct LocalWriteArgs {
+    #[arg(long, value_enum, default_value = "web")]
+    pub(crate) write_backend: WriteBackendArg,
+    /// Apply a local preview; requires its Server ID and version.
+    #[arg(long, requires_all = ["expected_server_id", "expected_version"])]
+    pub(crate) confirm: bool,
+    #[arg(long, requires = "confirm")]
+    pub(crate) expected_server_id: Option<String>,
+    #[arg(long, requires = "confirm")]
+    pub(crate) expected_version: Option<u64>,
 }
 
 #[derive(Args)]
@@ -630,6 +660,19 @@ pub(crate) struct CollectionKeyArgs {
 pub(crate) struct CollectionMembershipArgs {
     pub(crate) collection_key: String,
     pub(crate) item_key: String,
+    #[command(flatten)]
+    pub(crate) write: LocalWriteArgs,
+}
+
+#[derive(Args)]
+pub(crate) struct CollectionMoveArgs {
+    pub(crate) item_key: String,
+    #[arg(long)]
+    pub(crate) from: String,
+    #[arg(long)]
+    pub(crate) to: String,
+    #[command(flatten)]
+    pub(crate) write: LocalWriteArgs,
 }
 
 #[derive(Args)]

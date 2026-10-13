@@ -60,6 +60,23 @@ fn every_top_level_command_group_has_a_single_document_error_contract() {
 }
 
 #[test]
+fn local_update_validation_runs_in_real_process_without_network() {
+    // Exercises the nested item dispatcher on Windows' smaller main-thread stack.
+    let output = run(&[
+        "--json",
+        "item",
+        "update",
+        "ITEMABCD",
+        "--write-backend",
+        "local",
+        "--field",
+        "DOI=",
+    ]);
+    assert_error(&output, "local-write-field", 1);
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
 fn json_parse_failure_is_enveloped_and_uses_exit_code_two() {
     let output = run(&["--json", "--not-a-real-option"]);
     let value = assert_error(&output, "cli-parse", 2);

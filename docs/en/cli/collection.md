@@ -21,6 +21,11 @@ zot --json collection remove-item COLL001 ATTN001
 
 ## When to use collection
 
+`add-item` / `remove-item` default to the Web API and accept explicit `--write-backend local`.
+On Zotero 10+, `move-item ITEMKEY --from SOURCEKEY --to TARGETKEY --write-backend local`
+previews a same-library move while preserving other memberships. See
+[local content operations](./local-write.md) for confirmation flags.
+
 - You are organizing the actual Zotero library structure
 - You need to place items into a real collection
 - You want subcollections, item counts, or collection-level tags

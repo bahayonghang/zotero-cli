@@ -31,6 +31,17 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
             CommandOutput::new(ctx, payload, None, |_| println!("Collection deleted."))
         }
         CollectionCommand::AddItem(args) => {
+            if args.write.write_backend == crate::cli::WriteBackendArg::Local {
+                return super::local_write::membership(
+                    ctx,
+                    &args.item_key,
+                    Some(&args.collection_key),
+                    None,
+                    &args.write,
+                )
+                .await;
+            }
+            super::local_write::validate_web_options(&args.write)?;
             ctx.remote()?
                 .add_item_to_collection(&args.item_key, &args.collection_key)
                 .await?;
@@ -43,6 +54,17 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
             })
         }
         CollectionCommand::RemoveItem(args) => {
+            if args.write.write_backend == crate::cli::WriteBackendArg::Local {
+                return super::local_write::membership(
+                    ctx,
+                    &args.item_key,
+                    None,
+                    Some(&args.collection_key),
+                    &args.write,
+                )
+                .await;
+            }
+            super::local_write::validate_web_options(&args.write)?;
             ctx.remote()?
                 .remove_item_from_collection(&args.item_key, &args.collection_key)
                 .await?;
@@ -53,6 +75,23 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
             CommandOutput::new(ctx, payload, None, |_| {
                 println!("Item removed from collection.")
             })
+        }
+        CollectionCommand::MoveItem(args) => {
+            if args.write.write_backend != crate::cli::WriteBackendArg::Local {
+                return Err(super::local_write::invalid(
+                    "local-write-options",
+                    "move-item requires --write-backend local",
+                )
+                .into());
+            }
+            super::local_write::membership(
+                ctx,
+                &args.item_key,
+                Some(&args.to),
+                Some(&args.from),
+                &args.write,
+            )
+            .await
         }
         read => handle_read(ctx, &ctx.local_library()?, read),
     }

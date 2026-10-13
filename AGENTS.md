@@ -36,9 +36,9 @@
   - failure: `{"ok": false, "error": {"code": "...", "message": "...", "hint": "..."}}`
 
 ## Read/write boundaries
-- Local SQLite (`zot-local`, `zotero.sqlite` plus attachment storage) and Zotero Local HTTP are read-only. Never use either as a write transport.
+- Local SQLite (`zot-local`, `zotero.sqlite` plus attachment storage) remains read-only. Zotero 10+ Local API supports authenticated local writes through `zot-desktop` for `item update` and collection membership operations with explicit `--write-backend local`.
 - The built-in connector (`zot-desktop`) is import-only. The connector imports new BibTeX/RIS into Zotero's currently selected writable target. The connector does not update, merge, tag, note, or mutate collections.
-- All other library mutations go through the Zotero Web API via `zot-remote`.
+- Other library mutations go through the Zotero Web API via `zot-remote`. Existing commands default to Web; local writes preview by default and require `--confirm --expected-server-id ... --expected-version ...`. Never automatically switch transports.
 - Never write `zotero.sqlite` directly.
 - `zot mcp serve` is scaffolded but currently returns `mcp-not-implemented`; do not build workflows around MCP yet.
 

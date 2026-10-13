@@ -18,7 +18,7 @@
 
 那就先走 skill，而不是先背命令。
 
-skill 会把本地 SQLite / Local HTTP 只读、connector 新增导入和 Web API mutation 分开路由。connector 不会被描述成已有条目的通用更新或 merge 通道，未实现的本机 tag/note/collection 写入也不会被虚构。
+skill 分别路由本地只读查询、Zotero 10+ 授权 Local API 字段/作者及分类成员操作、connector 新增导入和 Web API mutation。详见[本地内容操作](../cli/local-write.md)；本机 tag/note/merge 尚未接入。
 
 如果你的目标是：
 

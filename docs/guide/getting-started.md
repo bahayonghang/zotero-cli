@@ -129,6 +129,7 @@ zot --json workspace query llm-safety "主要的失败模式有哪些？" --mode
 
 - `db_exists`
 - `capabilities.local_sqlite_read`
+- `capabilities.local_api_write`
 - `capabilities.local_http_read`
 - `capabilities.connector_write`
 - `capabilities.web_write`

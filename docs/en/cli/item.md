@@ -78,8 +78,8 @@ zot --json item attach ATTN001 --file supplement.pdf
 zot --json item download ATCH005 --output downloads/
 ```
 
-`update`, `trash`, `restore`, and `attach` mutate the library through the
-Zotero Web API. Check first that:
+`update`, `trash`, `restore`, and `attach` default to the Zotero Web API.
+`update` also supports explicit `--write-backend local`; see [local content operations](./local-write.md). For Web writes, check first that:
 
 1. `doctor` has been run
 2. `ZOT_API_KEY` is configured

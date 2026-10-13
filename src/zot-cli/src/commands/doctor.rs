@@ -51,6 +51,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let connector = ctx.connector()?;
     let local_http = connector.probe_local_http().await;
     let connector_ping = connector.ping().await;
+    let local_write = local_write_capability(ctx).await;
     let config_file = AppConfig::config_file()?;
     let migration_hint = legacy_bridge_config_present(&config_file).then_some(LEGACY_BRIDGE_HINT);
     let local_sqlite_available = library.is_ok();
@@ -74,6 +75,7 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
             "local_http_read": local_http_capability(&local_http),
             "connector_write": connector_write_capability(&connector_ping),
             "web_write": web_write_capability(&ctx.config),
+            "local_api_write": local_write,
         },
         "embedding": {
             "configured": ctx.config.embedding.is_configured(),
@@ -117,6 +119,14 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         );
         println!("Local HTTP read: {local_http_label}");
         println!("Connector write: {connector_write_label}");
+        println!(
+            "Local API write: {} (authorization and actual writes not verified)",
+            if local_write["supported"].as_bool() == Some(true) {
+                "supported"
+            } else {
+                "unavailable"
+            }
+        );
         println!(
             "Web write: {}",
             if web_write_configured {
@@ -224,6 +234,43 @@ fn connector_write_capability(ping: &zot_core::ZotResult<ConnectorPing>) -> serd
             "scope": "import-only",
             "hint": "Start Zotero to enable local import",
             "error": error.payload(),
+        }),
+    }
+}
+
+async fn local_write_capability(ctx: &AppContext) -> serde_json::Value {
+    let result = match ctx.local_api() {
+        Ok(client) => client.probe().await,
+        Err(error) => Err(error),
+    };
+    match result {
+        Ok(probe) => {
+            let credential = probe
+                .server_id
+                .as_deref()
+                .map(|server| {
+                    super::local_credentials::load(
+                        &ctx.local_api_credentials_path()?,
+                        ctx.profile.as_deref(),
+                        server,
+                    )
+                })
+                .transpose();
+            let (present, credential_error) = match credential {
+                Ok(key) => (key.flatten().is_some(), None),
+                Err(error) => (false, Some(error.payload())),
+            };
+            serde_json::json!({
+                "reachable": true, "supported": probe.supported,
+                "zotero_version": probe.zotero_version, "api_version": probe.api_version,
+                "schema_version": probe.schema_version, "server_id": probe.server_id,
+                "credential_present": present, "credential_error": credential_error,
+                "verified": false, "reason": "read-only probe; authorization and writes not tested",
+            })
+        }
+        Err(error) => serde_json::json!({
+            "reachable": false, "supported": false, "verified": false,
+            "credential_present": false, "error": error.payload(),
         }),
     }
 }

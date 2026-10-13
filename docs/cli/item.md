@@ -78,7 +78,7 @@ zot --json item attach ATTN001 --file supplement.pdf
 zot --json item download ATCH005 --output downloads/
 ```
 
-`update`、`trash`、`restore` 和 `attach` 会改库，当前走 Zotero Web API。执行前应先确认：
+`update`、`trash`、`restore` 和 `attach` 默认走 Zotero Web API。`update` 也支持显式 `--write-backend local`，见[本地内容操作](./local-write.md)。Web 写入前应先确认：
 
 1. `doctor` 已通过
 2. 已配置 `ZOT_API_KEY`

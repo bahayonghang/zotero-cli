@@ -21,6 +21,10 @@ zot --json collection remove-item COLL001 ATTN001
 
 ## 什么时候使用 collection
 
+`add-item` / `remove-item` 默认使用 Web API，也可显式指定 `--write-backend local`。
+Zotero 10+ 的 `move-item ITEMKEY --from SOURCEKEY --to TARGETKEY --write-backend local`
+会预览同库分类移动并保留其他分类。确认参数见[本地内容操作](./local-write.md)。
+
 - 你在整理 Zotero 库本身的分组结构
 - 你需要把条目挂到某个真实 collection 下
 - 你想读某个 collection 的子 collection、条目数量或常见标签
