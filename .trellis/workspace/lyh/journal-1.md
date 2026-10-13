@@ -982,3 +982,25 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - 推送本地 dev 后再让这些升级进入 main
+
+
+## Session 30: Zotero local content operations acceptance
+
+**Date**: 2026-10-13
+**Task**: Zotero local content operations acceptance
+**Branch**: `dev`
+
+### Summary
+
+完成 Zotero 10.0.6 独立测试库真实授权、字段/作者写入、分类移动和增删、UI 并发编辑拒绝、重启授权复用及恢复主库后的实例冲突验收。just ci 通过：303 个 Rust 测试和 23 个 Python 测试。补齐验收脚本、结果与规范，任务已归档，原已跟踪调研报告完整保留。主库恢复且未写入，未推送或全局安装；真实组库权限、提交中断连、Undo/BBT 和其他平台保留为验证限制。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `16ce140` | (see git log) |
+| `c9548ce` | (see git log) |
+
+### Status
+
+[OK] **Completed**

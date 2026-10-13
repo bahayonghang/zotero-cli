@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 29
-- **Last Active**: 2026-10-12
+- **Total Sessions**: 30
+- **Last Active**: 2026-10-13
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~984 | Active |
+| `journal-1.md` | ~1006 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 30 | 2026-10-13 | Zotero local content operations acceptance | `16ce140`, `c9548ce` | `dev` |
 | 29 | 2026-10-12 | 处置 Dependabot PR #17-#24 | `974334dda8280691b6a1665f244132d76132660f`, `e1221155bc522497c9b99939d042c0ad1f1e8cca`, `588e2bf65051177a6a35eb031bd715f09ee9e747`, `815cd97215d456146a1b44cb615ab21498315d39`, `99c87c3f37197e683ec06434b1557e7340a4fe87` | `dev` |
 | 28 | 2026-09-28 | 常青项目审查实施与五工具契约对齐 | `a2120b3`, `d2ab47c`, `2b93e1b`, `456c6a0` | `dev` |
 | 27 | 2026-09-10 | library search 兼容 Zotero 7.1+ 全文拆分 | `db55128` | `dev` |
