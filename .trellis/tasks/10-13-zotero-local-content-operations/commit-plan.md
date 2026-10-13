@@ -1,4 +1,4 @@
-# Approved commit
+# Implementation commit — completed
 
 用户已回复“确认”，授权以下本地提交。
 
@@ -6,7 +6,7 @@
 
 范围：Local API transport/授权状态、字段和作者补充、分类成员操作、诊断、回归测试、双语文档、skill 与 spec、任务调研和验证记录。含 Windows 异步任务栈占用修复及进程级回归。
 
-所有脏文件均为本次任务改动；没有不明来源改动。当前不创建 archive/journal 提交，不推送；真实测试库写验收待完成。
+已于上一聊天完成提交 `16ce140`，未推送。本节是原提交范围的历史记录；后续真实验收已经完成。
 
 - `.trellis/spec/zot-cli/backend/connector.md`
 - `.trellis/spec/zot-cli/backend/database-guidelines.md`
@@ -61,3 +61,26 @@
 - `src/zot-desktop/src/lib.rs`
 - `src/zot-desktop/src/local_api.rs`
 - `src/zot-desktop/src/local_api_tests.rs`
+
+## Acceptance commit — approved
+
+1. `test(desktop): record real Zotero local write acceptance`
+
+范围：Windows Zotero 10.0.6 独立测试库交互式验收脚本、压缩结果、AC 对照与验证限制；补充隔离和凭据持久化规范。没有 Rust 产品代码变更。
+
+- `.trellis/spec/zot-cli/backend/local-api.md`
+- `.trellis/tasks/10-13-zotero-local-content-operations/acceptance/README.md`
+- `.trellis/tasks/10-13-zotero-local-content-operations/acceptance/creators.json`
+- `.trellis/tasks/10-13-zotero-local-content-operations/acceptance/results.json`
+- `.trellis/tasks/10-13-zotero-local-content-operations/acceptance/run.py`
+- `.trellis/tasks/10-13-zotero-local-content-operations/acceptance/setup-fixture.js`
+- `.trellis/tasks/10-13-zotero-local-content-operations/commit-plan.md`
+- `.trellis/tasks/10-13-zotero-local-content-operations/design.md`
+- `.trellis/tasks/10-13-zotero-local-content-operations/implement.md`
+- `.trellis/tasks/10-13-zotero-local-content-operations/prd.md`
+- `.trellis/tasks/10-13-zotero-local-content-operations/task.json`
+- `.trellis/tasks/10-13-zotero-local-content-operations/validation.md`
+
+无不明来源脏文件。测试 profile、数据库、密钥和完整本地快照不进入提交。
+
+用户已明确回复“确认提交并归档”。执行此本地提交，再由 trellis-finish-work 归档本任务并记录 journal（脚本分别自动提交）；不推送。

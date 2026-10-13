@@ -108,6 +108,19 @@ uppercase ASCII letters/digits. Group IDs are public IDs from `LibraryScope`.
   persistence and Unix modes. `json_error_contract.rs`: real process validation.
 - `just ci`; bilingual docs build; canonical skill mirror check. Real Zotero
   preview is separate evidence from authorization/mutation/UI verification.
+- For desktop acceptance, create a separate profile **and** explicit data
+  directory. A new profile alone does not prove library isolation. Bind fixture
+  keys to the verified Server ID, keep synthetic data under ignored `target/`,
+  and use the production CLI endpoint on port 23119. Restore the original
+  instance afterward. Never copy the user's library or authorization file.
+- The user performs Deny/Allow/Always Allow. Check both API snapshots and UI,
+  unchanged child objects, stale previews after UI edits, and cached-key reuse
+  after restart. Windows Zotero 10.0.6 passed this baseline on 2026-10-13;
+  real group permissions and interrupted submissions remain separate evidence.
+- A sandbox denial when saving a remembered key is an environment I/O failure,
+  not a Zotero permission rejection. Credential persistence happens before
+  PATCH; obtain the necessary filesystem permission and re-preview. Do not
+  bypass persistence or claim the item was changed after that failure.
 
 ## 7. Wrong / Correct
 

@@ -1,6 +1,6 @@
 # Design — 官方 Local API 内容操作
 
-状态：用户于 2026-10-13 明确批准实施，代码和自动化验证已完成，真实授权写入验收待完成。依据见 [research/findings.md](research/findings.md)。
+状态：用户于 2026-10-13 明确批准实施；代码、自动化验证及 Windows Zotero 10.0.6 独立测试库真实授权/写入/UI 验收已完成。证据与验证限制见 [validation.md](validation.md)，调研依据见 [research/findings.md](research/findings.md)。
 
 ## 1. 路线与兼容策略
 

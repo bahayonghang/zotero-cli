@@ -1,6 +1,6 @@
 # Implementation Plan — 实施与验证记录
 
-当前 task.status = in_progress。2026-10-13 用户明确“批准实施”，按 Codex inline 模式实施。自动化检查与真实预览通过，独立测试库实际写入和 UI 验收仍待完成。
+2026-10-13 用户明确“批准实施”，按 Codex inline 模式实施。实现提交为 `16ce140`；自动化检查和独立测试库实际授权、写入、UI 验收均通过，进入提交验收材料及归档阶段。
 
 ## 进入实施前
 
@@ -42,8 +42,9 @@
 - [x] `cargo test -p zot-cli --locked`
 - [x] 有意修改 canonical skill 后 `just skills-sync`，再 `just skills-check`；不无故 version-sync。
 - [x] `just ci`；修改 docs 后 `npm --prefix docs run build`。
-- [ ] 获得测试库写授权后验证 Zotero 10.0.6：只读预览→人工 Allow/Deny→条件写→UI/API 回读；字段、作者、分类分别验证。
-- [ ] 测试无 Web key、SQLite snapshot busy、预览后人工编辑、实例变化、只读 group 和断连；不用真实主库条目作破坏性 fixture。
+- [x] 用户授权使用独立测试库；Zotero 10.0.6 只读预览→人工 Deny/Allow/Always Allow→条件写→UI/API 回读；字段、作者、分类分别验证。
+- [x] 真实测试覆盖无 Web key、SQLite snapshot busy、预览后通过 UI 编辑、重启授权复用及切回主库后的实例拒绝。主库未写入。
+- [x] 只读 group、提交超时/断连和回读失败由模拟服务器回归覆盖；未在真实组库或真实应用提交期间注入断连，保留为验证限制。
 - [x] 记录未覆盖平台/版本及 BBT/UI Undo 限制，按 trellis-check 最终审查。
 
 ## 风险文件与回退
@@ -56,4 +57,4 @@
 
 ## 本轮检查范围
 
-见 [validation.md](validation.md)。真实桌面只执行 GET/preview/unchanged，没有请求本地授权或发送 PATCH。尚未安装新版本到全局 zot，开发二进制位于 target/debug/zot.exe。
+见 [validation.md](validation.md) 和 [acceptance/README.md](acceptance/README.md)。真实 PATCH 仅针对独立测试库的虚构条目；主库已经恢复。开发二进制为 `target/debug/zot.exe`，未全局安装、未推送。

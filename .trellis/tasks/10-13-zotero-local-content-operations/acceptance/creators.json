@@ -1,0 +1,5 @@
+[
+  {"creatorType": "author", "firstName": "Ada", "lastName": "Example"},
+  {"creatorType": "author", "name": "CLI Acceptance Laboratory"},
+  {"creatorType": "editor", "firstName": "Grace", "lastName": "Fixture"}
+]

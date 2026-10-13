@@ -2,7 +2,7 @@
   "id": "zotero-local-content-operations",
   "name": "zotero-local-content-operations",
   "title": "Zotero 本地分类与字段作者操作",
-  "description": "2026-10-13 用户批准实施；已接入 Zotero 10+ Local API，支持同库分类添加/移除/移动及字段/作者手动补充。代码和自动化检查已完成，独立测试库真实授权/写入/UI 验收待完成。",
+  "description": "Zotero 10+ Local API 字段/作者补充和同库分类成员操作已实现；自动化检查及 Windows Zotero 10.0.6 独立测试库真实授权、写入、UI 与重启验收通过。",
   "status": "in_progress",
   "dev_type": null,
   "scope": null,
@@ -15,7 +15,7 @@
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "16ce140",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -33,6 +33,6 @@
     "src/zot-cli/src/commands/local_credentials.rs",
     "docs/cli/local-write.md"
   ],
-  "notes": "已运行 task.py start，Codex inline 实施及自动化检查通过；用户已确认提交本次实现。验证记录见 validation.md。未修改真实文献，任务因真实写验收尚未完成保留 in_progress。",
+  "notes": "实现提交 16ce140；用户授权独立测试库并亲自完成 Deny/Allow/Always Allow。验收结果见 validation.md 和 acceptance/results.json。主库已恢复且未写入；用户已确认提交验收材料并归档。真实组库、提交中断连、Undo/BBT 和其他平台验证限制已明确。",
   "meta": {}
 }
