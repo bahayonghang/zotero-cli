@@ -55,6 +55,9 @@ fn validate_candidate_budget(candidate_budget: usize) -> ZotResult<usize> {
 
 pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<CommandOutput> {
     match command {
+        LibraryCommand::Organize { command } => {
+            return Box::pin(super::organize::handle(ctx, command)).await;
+        }
         LibraryCommand::Search(args) => {
             let include_trashed = args.include_trashed;
             let options = SearchOptions {

@@ -106,6 +106,260 @@ async fn group_patch_binds_local_identity_version_and_key() {
 }
 
 #[tokio::test]
+async fn tag_patch_keeps_complete_array_unknown_properties_and_headers() {
+    let tags = json!([
+        {"tag":"自动标签","type":1,"meta":{"source":"bbt"}},
+        {"tag":"手工 标签","type":0}
+    ]);
+    let patch = json!({"tags": tags.clone()})
+        .as_object()
+        .expect("map")
+        .clone();
+    let (client, handle) = server(vec![(204, Value::Null, vec![(SERVER_ID, "server")])]);
+    assert_eq!(
+        client
+            .patch_item(
+                "server",
+                &LibraryScope::User,
+                "ITEMABCD",
+                7,
+                &patch,
+                &"local-secret".into()
+            )
+            .await
+            .expect("patch"),
+        PatchReceipt::Accepted
+    );
+    let captured = handle.join().expect("join");
+    let (method, url, headers, body) = &captured[0];
+    assert_eq!(method, "PATCH");
+    assert_eq!(url, "/api/users/0/items/ITEMABCD");
+    for (key, value) in [
+        ("zotero-server-id", "server"),
+        ("zotero-api-key", "local-secret"),
+        ("if-unmodified-since-version", "7"),
+        ("zotero-api-version", "3"),
+    ] {
+        assert!(
+            headers.contains(&(key.to_string(), value.to_string())),
+            "missing {key}"
+        );
+    }
+    assert!(!headers.iter().any(|(key, _)| key == "zotero-write-token"));
+    assert_eq!(body, &json!({"tags": tags, "version": 7}));
+}
+
+fn collection_object(key: &str, name: &str, parent: Value) -> Value {
+    json!({
+        "key": key,
+        "version": 3,
+        "data": {
+            "key": key,
+            "version": 3,
+            "name": name,
+            "parentCollection": parent
+        }
+    })
+}
+
+#[tokio::test]
+async fn collection_snapshot_requires_library_version_and_closes_pagination() {
+    let (client, handle) = server(vec![(
+        200,
+        json!([]),
+        vec![
+            (SERVER_ID, "server"),
+            ("Last-Modified-Version", "0"),
+            ("Total-Results", "0"),
+        ],
+    )]);
+    let snapshot = client
+        .collection_snapshot("server", &LibraryScope::User)
+        .await
+        .expect("empty");
+    assert_eq!(snapshot.library_version, 0);
+    assert!(snapshot.collections.is_empty());
+    assert_eq!(
+        handle.join().expect("join")[0].1,
+        "/api/users/0/collections"
+    );
+
+    let (client, handle) = server(vec![(
+        200,
+        json!([collection_object("COLLA234", "Root", Value::Bool(false))]),
+        vec![(SERVER_ID, "server"), ("Total-Results", "1")],
+    )]);
+    let error = client
+        .collection_snapshot("server", &LibraryScope::User)
+        .await
+        .expect_err("missing version");
+    assert_eq!(error.payload().code, "local-api-protocol");
+    handle.join().expect("join");
+
+    let (client, handle) = server(vec![
+        (
+            200,
+            json!([collection_object("COLLA234", "Root", Value::Bool(false))]),
+            vec![
+                (SERVER_ID, "server"),
+                ("Last-Modified-Version", "12"),
+                ("Total-Results", "2"),
+                (
+                    "Link",
+                    "<http://example.test/api/users/0/collections?start=1>; rel=\"next\"",
+                ),
+            ],
+        ),
+        (
+            200,
+            json!([collection_object("COLLB234", "Child", json!("COLLA234"))]),
+            vec![
+                (SERVER_ID, "server"),
+                ("Last-Modified-Version", "12"),
+                ("Total-Results", "2"),
+            ],
+        ),
+    ]);
+    let snapshot = client
+        .collection_snapshot("server", &LibraryScope::Group { group_id: 42 })
+        .await
+        .expect("pages");
+    assert_eq!(snapshot.library_version, 12);
+    assert_eq!(snapshot.collections.len(), 2);
+    assert_eq!(snapshot.collections[1].parent.as_deref(), Some("COLLA234"));
+    let urls = handle.join().expect("join");
+    assert_eq!(urls[0].1, "/api/groups/42/collections");
+    assert_eq!(urls[1].1, "/api/groups/42/collections?start=1");
+
+    let (client, handle) = server(vec![
+        (
+            200,
+            json!([collection_object("COLLA234", "Root", Value::Bool(false))]),
+            vec![
+                (SERVER_ID, "server"),
+                ("Last-Modified-Version", "12"),
+                ("Link", "</api/users/0/collections?start=1>; rel=\"next\""),
+            ],
+        ),
+        (
+            200,
+            json!([]),
+            vec![(SERVER_ID, "server"), ("Last-Modified-Version", "13")],
+        ),
+    ]);
+    let error = client
+        .collection_snapshot("server", &LibraryScope::User)
+        .await
+        .expect_err("version changed");
+    assert_eq!(error.payload().code, "local-api-conflict");
+    assert_eq!(handle.join().expect("join").len(), 2);
+
+    let (client, handle) = server(vec![(
+        200,
+        json!([collection_object("COLLA234", "Root", Value::Bool(false))]),
+        vec![
+            (SERVER_ID, "server"),
+            ("Last-Modified-Version", "12"),
+            ("Total-Results", "2"),
+        ],
+    )]);
+    let error = client
+        .collection_snapshot("server", &LibraryScope::User)
+        .await
+        .expect_err("incomplete");
+    assert_eq!(error.payload().code, "local-api-protocol");
+    handle.join().expect("join");
+}
+
+#[tokio::test]
+async fn create_collection_posts_one_object_without_write_token() {
+    let (client, handle) = server(vec![(
+        200,
+        json!({
+            "successful": {"0": {"key": "NEWCOLL1", "data": {"key": "NEWCOLL1"}}},
+            "unchanged": {},
+            "failed": {}
+        }),
+        vec![(SERVER_ID, "server")],
+    )]);
+    let receipt = client
+        .create_collection(
+            "server",
+            &LibraryScope::User,
+            12,
+            "待读",
+            None,
+            &"local-secret".into(),
+        )
+        .await
+        .expect("create");
+    assert_eq!(
+        receipt,
+        CreateReceipt::Accepted {
+            key: "NEWCOLL1".to_string()
+        }
+    );
+    let (method, url, headers, body) = &handle.join().expect("join")[0];
+    assert_eq!(method, "POST");
+    assert_eq!(url, "/api/users/0/collections");
+    assert_eq!(body, &json!([{"name": "待读", "parentCollection": false}]));
+    for (key, value) in [
+        ("zotero-server-id", "server"),
+        ("zotero-api-key", "local-secret"),
+        ("if-unmodified-since-version", "12"),
+    ] {
+        assert!(headers.contains(&(key.to_string(), value.to_string())));
+    }
+    assert!(!headers.iter().any(|(key, _)| key == "zotero-write-token"));
+
+    let (client, handle) = server(vec![(
+        200,
+        json!({
+            "successful": {},
+            "unchanged": {},
+            "failed": {"0": {"code": 400, "message": "bad name"}}
+        }),
+        vec![(SERVER_ID, "server")],
+    )]);
+    let error = client
+        .create_collection(
+            "server",
+            &LibraryScope::User,
+            12,
+            "Child",
+            Some("PARENT12"),
+            &"local-secret".into(),
+        )
+        .await
+        .expect_err("failed object");
+    assert_eq!(error.payload().code, "local-api-http");
+    assert_eq!(handle.join().expect("join").len(), 1);
+
+    for (status, id, expected) in [
+        (500, "server", CreateReceipt::Unknown),
+        (200, "other", CreateReceipt::Unknown),
+        (204, "server", CreateReceipt::Unknown),
+    ] {
+        let (client, handle) = server(vec![(status, Value::Null, vec![(SERVER_ID, id)])]);
+        assert_eq!(
+            client
+                .create_collection(
+                    "server",
+                    &LibraryScope::User,
+                    12,
+                    "待读",
+                    None,
+                    &"secret".into()
+                )
+                .await
+                .expect("receipt"),
+            expected
+        );
+        assert_eq!(handle.join().expect("join").len(), 1);
+    }
+}
+
+#[tokio::test]
 async fn authorization_is_redacted_and_instance_bound() {
     let (client, handle) = server(vec![(
         200,
@@ -119,6 +373,22 @@ async fn authorization_is_redacted_and_instance_bound() {
     assert_eq!(captured[0].1, "/api/local/authorize");
     assert_eq!(captured[0].3, json!({"appName":"zot CLI"}));
     assert!(!captured[0].2.iter().any(|(k, _)| k == "zotero-api-key"));
+}
+
+#[test]
+fn create_receipt_rejects_contradictory_or_malformed_result_buckets() {
+    for body in [
+        json!({"successful":{"0":"NEWCOLL1"},"unchanged":{"0":"NEWCOLL1"},"failed":{}}),
+        json!({"successful":{"0":"NEWCOLL1"},"unchanged":{"1":"OTHER234"},"failed":{}}),
+        json!({"successful":{"0":"NEWCOLL1"},"unchanged":[],"failed":{}}),
+        json!({"successful":{},"unchanged":{},"failed":{"0":null}}),
+        json!({"successful":{},"unchanged":{"0":"NEWCOLL1"},"failed":{"0":{"code":400}}}),
+    ] {
+        assert_eq!(
+            interpret_create_body(&body).expect("unreliable response"),
+            CreateReceipt::Unknown
+        );
+    }
 }
 
 #[tokio::test]

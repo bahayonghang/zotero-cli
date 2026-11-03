@@ -18,7 +18,7 @@ If your goal is to:
 
 start from the skill, not the command list.
 
-The skill separates local reads, authenticated Zotero 10+ Local API field/creator and collection membership edits, connector imports, and Web API mutations. See [local content operations](../cli/local-write.md). Local tags, notes, and merge are not implemented; failures never switch backends.
+The skill separates local reads, authenticated Zotero 10+ Local API field/creator, collection create/membership, and single-item tag edits, connector imports, and Web API mutations. See [local content operations](../cli/local-write.md). Local notes, merge, and `item tag batch` are not implemented; failures never switch backends.
 
 If your goal is to:
 

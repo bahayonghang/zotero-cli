@@ -36,6 +36,16 @@ pub(crate) enum LibraryCommand {
         #[command(subcommand)]
         command: LibrarySavedSearchCommand,
     },
+    Organize {
+        #[command(subcommand)]
+        command: LibraryOrganizeCommand,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum LibraryOrganizeCommand {
+    Plan(LibraryOrganizePlanArgs),
+    Apply(LibraryOrganizeApplyArgs),
 }
 
 #[derive(Subcommand)]
@@ -606,6 +616,8 @@ pub(crate) struct ItemTagUpdateArgs {
     pub(crate) key: String,
     #[arg(long = "tag")]
     pub(crate) tags: Vec<String>,
+    #[command(flatten)]
+    pub(crate) write: LocalWriteArgs,
 }
 
 #[derive(Args)]
@@ -627,6 +639,34 @@ pub(crate) struct ItemTagBatchArgs {
 }
 
 #[derive(Args)]
+pub(crate) struct LibraryOrganizePlanArgs {
+    #[arg(long)]
+    pub(crate) file: PathBuf,
+    #[arg(long)]
+    pub(crate) output: PathBuf,
+    #[arg(long, value_enum)]
+    pub(crate) write_backend: WriteBackendArg,
+    #[arg(long, default_value_t = 50)]
+    pub(crate) max_affected: usize,
+}
+
+#[derive(Args)]
+pub(crate) struct LibraryOrganizeApplyArgs {
+    #[arg(long)]
+    pub(crate) plan: PathBuf,
+    #[arg(long)]
+    pub(crate) confirm: bool,
+    #[arg(long)]
+    pub(crate) expected_plan_sha256: Option<String>,
+    #[arg(long)]
+    pub(crate) report: PathBuf,
+    #[arg(long, value_enum)]
+    pub(crate) write_backend: WriteBackendArg,
+    #[arg(long, default_value_t = 50)]
+    pub(crate) max_affected: usize,
+}
+
+#[derive(Args)]
 pub(crate) struct CollectionItemsArgs {
     pub(crate) key: String,
 }
@@ -638,11 +678,26 @@ pub(crate) struct CollectionSearchArgs {
     pub(crate) limit: Option<usize>,
 }
 
+#[derive(Args, Debug, Default)]
+pub(crate) struct LocalCreateArgs {
+    #[arg(long, value_enum, default_value = "web")]
+    pub(crate) write_backend: WriteBackendArg,
+    /// Apply a local collection preview; requires its Server ID and library version.
+    #[arg(long, requires_all = ["expected_server_id", "expected_library_version"])]
+    pub(crate) confirm: bool,
+    #[arg(long, requires = "confirm")]
+    pub(crate) expected_server_id: Option<String>,
+    #[arg(long, requires = "confirm")]
+    pub(crate) expected_library_version: Option<u64>,
+}
+
 #[derive(Args)]
 pub(crate) struct CollectionCreateArgs {
     pub(crate) name: String,
     #[arg(long)]
     pub(crate) parent: Option<String>,
+    #[command(flatten)]
+    pub(crate) write: LocalCreateArgs,
 }
 
 #[derive(Args)]

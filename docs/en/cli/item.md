@@ -113,7 +113,7 @@ Notes:
 
 ## note / tag / annotation / scite
 
-Note, tag, and annotation mutations still use the Web API. Do not describe Zotero Local HTTP or the built-in connector as write transports for these commands.
+Note and annotation mutations still use the Web API. Single-item `item tag add/remove` can explicitly select the Local API; see [local content operations](./local-write.md). Without `--write-backend local` they still use Web. `item tag batch` remains Web-only. Do not describe the built-in connector or legacy Local HTTP as write transports for these commands.
 
 ### notes
 
@@ -131,6 +131,8 @@ zot --json item note delete NOTE001
 zot --json item tag list ATTN001
 zot --json item tag add ATTN001 --tag important --tag reading-list
 zot --json item tag remove ATTN001 --tag obsolete
+zot --json item tag add ITEMABCD --tag 待读 --write-backend local
+zot --json item tag remove ITEMABCD --tag obsolete --write-backend local
 # Preview first; this command does not write
 zot --json item tag batch --tag test --add-tag verified --limit 50
 # After reviewing matched/affected/sample_keys, confirm with the same arguments

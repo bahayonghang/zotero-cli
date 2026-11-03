@@ -31,8 +31,8 @@
 - 明确说“下载附件”“导出文件”：优先理解成附件面
 - 明确说“先预览再合并”：优先理解成 `item merge`，不是直接 `duplicates-merge`
 - 本地只读请求：不要求 Web key
-- 任何写入：先过 doctor；字段/作者和分类成员可走 Zotero 10+ Local API，BibTeX/RIS 新增导入走 connector，其余 mutation 走 Web API
-- connector 不能更新或 merge 已有条目；本机 tag/note/merge 尚未接入
+- 任何写入：先过 doctor；字段/作者、分类创建/成员和单条标签增删可走 Zotero 10+ Local API，BibTeX/RIS 新增导入走 connector，其余 mutation 走 Web API
+- connector 不能更新或 merge 已有条目；本机 note/merge 和 `item tag batch` 尚未接入
 - low-confidence 默认 skip，不自行追加 `--include-low-confidence`
 - 任何“为什么不工作”：先过 doctor / config
 

@@ -114,6 +114,11 @@ async fn read_target(
             "Expected local item version is missing or changed; preview again",
         ));
     }
+    require_bibliographic_item(&item)?;
+    Ok((server, item))
+}
+
+pub(crate) fn require_bibliographic_item(item: &LocalObject) -> ZotResult<()> {
     let item_type = item
         .data
         .get("itemType")
@@ -123,7 +128,7 @@ async fn read_target(
         || item
             .data
             .get("parentItem")
-            .is_some_and(|v| v.as_str().is_some_and(|s| !s.is_empty()))
+            .is_some_and(|value| value.as_str().is_some_and(|text| !text.is_empty()))
         || deleted(&item.data)
     {
         return Err(invalid(
@@ -131,7 +136,7 @@ async fn read_target(
             "Local content operations require a non-trashed top-level bibliographic item",
         ));
     }
-    Ok((server, item))
+    Ok(())
 }
 
 fn deleted(data: &Map<String, Value>) -> bool {
@@ -372,19 +377,29 @@ fn membership_patch(
         .get("collections")
         .and_then(Value::as_array)
         .ok_or_else(|| invalid("local-api-protocol", "Item collections must be an array"))?;
-    let mut next = current
+    let current = current
         .iter()
-        .map(|v| {
-            v.as_str()
+        .map(|value| {
+            value
+                .as_str()
                 .map(ToOwned::to_owned)
                 .ok_or_else(|| invalid("local-api-protocol", "Invalid collection membership"))
         })
         .collect::<ZotResult<Vec<_>>>()?;
+    next_memberships(&current, add, remove)
+}
+
+pub(crate) fn next_memberships(
+    current: &[String],
+    add: Option<&str>,
+    remove: Option<&str>,
+) -> ZotResult<Vec<String>> {
+    let mut next = current.to_vec();
     if add == remove {
         return Ok(next);
     }
     if let (Some(to), Some(from)) = (add, remove) {
-        if !next.iter().any(|v| v == from) && !next.iter().any(|v| v == to) {
+        if !next.iter().any(|value| value == from) && !next.iter().any(|value| value == to) {
             return Err(invalid(
                 "local-write-source-missing",
                 "Item is not in the source collection",
@@ -392,14 +407,212 @@ fn membership_patch(
         }
     }
     if let Some(remove) = remove {
-        next.retain(|v| v != remove);
+        next.retain(|value| value != remove);
     }
     if let Some(add) = add {
-        if !next.iter().any(|v| v == add) {
+        if !next.iter().any(|value| value == add) {
             next.push(add.to_string());
         }
     }
     Ok(next)
+}
+
+pub(crate) fn local_patch_matches(item: &LocalObject, patch: &Map<String, Value>) -> bool {
+    matches_patch(item, patch)
+}
+
+pub(crate) fn normalize_tag_names(names: &[String]) -> ZotResult<Vec<String>> {
+    let mut unique = Vec::new();
+    for name in names {
+        if name.trim().is_empty() {
+            return Err(invalid("local-write-tag", "Tag names must not be blank"));
+        }
+        if !unique.iter().any(|existing| existing == name) {
+            unique.push(name.clone());
+        }
+    }
+    Ok(unique)
+}
+
+/// Full target tag array. Existing objects are preserved; names match exactly.
+pub(crate) fn plan_tags(
+    current: Option<&Value>,
+    names: &[String],
+    remove: bool,
+) -> ZotResult<Vec<Value>> {
+    let names = normalize_tag_names(names)?;
+    let mut tags = parse_server_tags(current)?;
+    if names.is_empty() {
+        return Ok(tags);
+    }
+    if remove {
+        tags.retain(|entry| {
+            entry
+                .get("tag")
+                .and_then(Value::as_str)
+                .is_some_and(|name| !names.iter().any(|wanted| wanted == name))
+        });
+    } else {
+        for name in names {
+            let exists = tags
+                .iter()
+                .any(|entry| entry.get("tag").and_then(Value::as_str) == Some(name.as_str()));
+            if !exists {
+                tags.push(json!({"tag": name, "type": 0}));
+            }
+        }
+    }
+    Ok(tags)
+}
+
+fn parse_server_tags(current: Option<&Value>) -> ZotResult<Vec<Value>> {
+    let Some(current) = current else {
+        return Ok(Vec::new());
+    };
+    let entries = current.as_array().ok_or_else(|| {
+        invalid(
+            "local-api-protocol",
+            "Item tags must be an array of tag objects",
+        )
+    })?;
+    let mut tags = Vec::with_capacity(entries.len());
+    for entry in entries {
+        validate_server_tag(entry)?;
+        tags.push(entry.clone());
+    }
+    Ok(tags)
+}
+
+fn validate_server_tag(entry: &Value) -> ZotResult<()> {
+    let object = entry.as_object().ok_or_else(|| {
+        invalid(
+            "local-api-protocol",
+            "Item tags must be an array of tag objects",
+        )
+    })?;
+    if object.get("tag").and_then(Value::as_str).is_none() {
+        return Err(invalid(
+            "local-api-protocol",
+            "Item tags must be an array of tag objects",
+        ));
+    }
+    if let Some(tag_type) = object.get("type") {
+        if !matches!(tag_type.as_u64(), Some(0 | 1)) {
+            return Err(invalid(
+                "local-api-protocol",
+                "Item tag type must be 0, 1, or omitted",
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn tags_match(actual: Option<&Value>, expected: &Value) -> bool {
+    let actual_tags = match actual {
+        None if expected.as_array().is_some_and(Vec::is_empty) => return true,
+        None => return false,
+        Some(value) => value,
+    };
+    let (Some(actual_tags), Some(expected_tags)) = (actual_tags.as_array(), expected.as_array())
+    else {
+        return false;
+    };
+    let Some(actual_keys) = normalized_tags(actual_tags) else {
+        return false;
+    };
+    let Some(expected_keys) = normalized_tags(expected_tags) else {
+        return false;
+    };
+    same_tag_multiset(actual_keys, expected_keys)
+}
+
+fn normalized_tags(tags: &[Value]) -> Option<Vec<BTreeMap<String, Value>>> {
+    let mut normalized = Vec::with_capacity(tags.len());
+    for tag in tags {
+        normalized.push(normalized_tag(tag)?);
+    }
+    Some(normalized)
+}
+
+fn normalized_tag(value: &Value) -> Option<BTreeMap<String, Value>> {
+    let object = value.as_object()?;
+    object.get("tag").and_then(Value::as_str)?;
+    let mut normalized = BTreeMap::new();
+    for (key, entry) in object {
+        if key == "type" {
+            continue;
+        }
+        normalized.insert(key.clone(), entry.clone());
+    }
+    match object.get("type") {
+        None => {}
+        Some(tag_type) if tag_type.as_u64() == Some(0) => {}
+        Some(tag_type) if tag_type.as_u64() == Some(1) => {
+            normalized.insert("type".to_string(), json!(1));
+        }
+        Some(_) => return None,
+    }
+    Some(normalized)
+}
+
+fn same_tag_multiset(
+    left: Vec<BTreeMap<String, Value>>,
+    mut right: Vec<BTreeMap<String, Value>>,
+) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    for item in left {
+        let Some(index) = right.iter().position(|other| other == &item) else {
+            return false;
+        };
+        right.remove(index);
+    }
+    right.is_empty()
+}
+
+fn record_tag_change(report: &mut MutationReport, item: &LocalObject, next: Vec<Value>) {
+    let next_value = Value::Array(next);
+    if tags_match(item.data.get("tags"), &next_value) {
+        return;
+    }
+    report.before.insert(
+        "tags".to_string(),
+        item.data.get("tags").cloned().unwrap_or(Value::Null),
+    );
+    report.after.insert("tags".to_string(), next_value);
+}
+
+pub(crate) async fn update_tags(
+    ctx: &AppContext,
+    key: &str,
+    names: &[String],
+    remove: bool,
+    args: &LocalWriteArgs,
+) -> Result<CommandOutput> {
+    let names = normalize_tag_names(names)?;
+    if names.is_empty() {
+        return Err(invalid("local-write-tag", "Provide at least one --tag").into());
+    }
+    let client = ctx.local_api()?;
+    let report = tag_report(&client, &ctx.scope, key, &names, remove, args).await?;
+    complete(ctx, &client, report, args).await
+}
+
+async fn tag_report(
+    client: &LocalApiClient,
+    scope: &LibraryScope,
+    key: &str,
+    names: &[String],
+    remove: bool,
+    args: &LocalWriteArgs,
+) -> ZotResult<MutationReport> {
+    let (server, item) = read_target(client, scope, key, args).await?;
+    let operation = if remove { "tag-remove" } else { "tag-add" };
+    let mut report = MutationReport::new(server, scope, &item, operation);
+    let next = plan_tags(item.data.get("tags"), names, remove)?;
+    record_tag_change(&mut report, &item, next);
+    Ok(report)
 }
 
 async fn complete(
@@ -535,6 +748,8 @@ fn matches_patch(item: &LocalObject, patch: &Map<String, Value>) -> bool {
                 }
                 _ => false,
             }
+        } else if field == "tags" {
+            tags_match(item.data.get(field), value)
         } else {
             item.data.get(field) == Some(value)
         }

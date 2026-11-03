@@ -54,6 +54,30 @@ pub enum PatchReceipt {
     Unknown,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalCollection {
+    pub key: String,
+    pub version: u64,
+    pub name: String,
+    pub parent: Option<String>,
+    pub deleted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalCollectionSnapshot {
+    pub library_version: u64,
+    pub collections: Vec<LocalCollection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CreateReceipt {
+    Accepted {
+        key: String,
+    },
+    /// A request may have committed, but no reliable object result was received.
+    Unknown,
+}
+
 #[derive(Debug, Clone)]
 pub struct LocalApiClient {
     client: reqwest::Client,
@@ -307,6 +331,181 @@ impl LocalApiClient {
         }
         Ok(PatchReceipt::Accepted)
     }
+
+    pub async fn collection_snapshot(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+    ) -> ZotResult<LocalCollectionSnapshot> {
+        let mut collections = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        let mut library_version = None;
+        let mut expected_total = None;
+        let mut start = 0u64;
+        for _ in 0..100 {
+            let path = if start == 0 {
+                format!("{}/collections", prefix(scope))
+            } else {
+                format!("{}/collections?start={start}", prefix(scope))
+            };
+            let response = self
+                .request(Method::GET, &path, Some(server))?
+                .send()
+                .await
+                .map_err(read_error)?;
+            check_response(&response, server)?;
+            let version = header(&response, "Last-Modified-Version")
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| {
+                    error(
+                        "local-api-protocol",
+                        "Collection list is missing a local library version",
+                        None,
+                    )
+                })?
+                .parse::<u64>()
+                .map_err(|_| {
+                    error(
+                        "local-api-protocol",
+                        "Collection list library version is invalid",
+                        None,
+                    )
+                })?;
+            if let Some(seen_version) = library_version {
+                if seen_version != version {
+                    return Err(error(
+                        "local-api-conflict",
+                        "Library version changed while reading collections; preview again",
+                        None,
+                    ));
+                }
+            } else {
+                library_version = Some(version);
+            }
+            let total = optional_u64_header(&response, "Total-Results")?;
+            if let Some(total) = total {
+                if let Some(expected) = expected_total {
+                    if expected != total {
+                        return Err(error(
+                            "local-api-protocol",
+                            "Collection list total changed while reading",
+                            None,
+                        ));
+                    }
+                } else {
+                    expected_total = Some(total);
+                }
+            }
+            let next = next_start(header_all(&response, "Link").as_deref(), start)?;
+            let page: Vec<LocalObject> = match decode(response).await {
+                Ok(page) => page,
+                Err(error) => return Err(error),
+            };
+            if page.is_empty() && next.is_some() {
+                return Err(error(
+                    "local-api-protocol",
+                    "Collection list pagination did not advance",
+                    None,
+                ));
+            }
+            for object in page {
+                let record = collection_record(object)?;
+                if !seen.insert(record.key.clone()) {
+                    return Err(error(
+                        "local-api-protocol",
+                        "Collection list pagination repeated an object",
+                        None,
+                    ));
+                }
+                collections.push(record);
+            }
+            match next {
+                None => {
+                    if let Some(total) = expected_total {
+                        if collections.len() != usize::try_from(total).unwrap_or(usize::MAX) {
+                            return Err(error(
+                                "local-api-protocol",
+                                "Collection list is incomplete",
+                                None,
+                            ));
+                        }
+                    }
+                    return Ok(LocalCollectionSnapshot {
+                        library_version: library_version.unwrap_or(version),
+                        collections,
+                    });
+                }
+                Some(next_start) => start = next_start,
+            }
+        }
+        Err(error(
+            "local-api-protocol",
+            "Collection list pagination did not close",
+            None,
+        ))
+    }
+
+    pub async fn create_collection(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+        library_version: u64,
+        name: &str,
+        parent: Option<&str>,
+        authorization: &SecretString,
+    ) -> ZotResult<CreateReceipt> {
+        if name.trim().is_empty() {
+            return Err(error(
+                "local-write-collection",
+                "Collection name must not be blank",
+                None,
+            ));
+        }
+        let parent_value = match parent {
+            Some(key) => {
+                validate_key(key)?;
+                Value::String(key.to_string())
+            }
+            None => Value::Bool(false),
+        };
+        let response = self
+            .request(
+                Method::POST,
+                &format!("{}/collections", prefix(scope)),
+                Some(server),
+            )?
+            .header("Zotero-API-Key", authorization.expose_secret())
+            .header("If-Unmodified-Since-Version", library_version.to_string())
+            .json(&json!([{
+                "name": name,
+                "parentCollection": parent_value,
+            }]))
+            .send()
+            .await;
+        let response = match response {
+            Ok(response) => response,
+            Err(_) => return Ok(CreateReceipt::Unknown),
+        };
+        if response.status().is_server_error() || response.status() == StatusCode::NO_CONTENT {
+            return Ok(CreateReceipt::Unknown);
+        }
+        if !response.status().is_success() {
+            check_status(&response)?;
+            return Ok(CreateReceipt::Unknown);
+        }
+        if header(&response, SERVER_ID).as_deref() != Some(server)
+            || response.status() != StatusCode::OK
+        {
+            return Ok(CreateReceipt::Unknown);
+        }
+        let body = match response.json::<Value>().await {
+            Ok(body) => body,
+            Err(_) => return Ok(CreateReceipt::Unknown),
+        };
+        interpret_create_body(&body)
+    }
 }
 
 fn prefix(scope: &LibraryScope) -> String {
@@ -329,6 +528,204 @@ fn validate_key(key: &str) -> ZotResult<()> {
         ));
     }
     Ok(())
+}
+
+fn header_all(response: &Response, name: &str) -> Option<String> {
+    let values = response
+        .headers()
+        .get_all(name)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>();
+    if values.is_empty() {
+        None
+    } else {
+        Some(values.join(","))
+    }
+}
+
+fn optional_u64_header(response: &Response, name: &str) -> ZotResult<Option<u64>> {
+    match header(response, name).as_deref().map(str::trim) {
+        None | Some("") => Ok(None),
+        Some(value) => value.parse::<u64>().map(Some).map_err(|_| {
+            error(
+                "local-api-protocol",
+                "Collection list total is invalid",
+                None,
+            )
+        }),
+    }
+}
+
+fn next_start(link: Option<&str>, current_start: u64) -> ZotResult<Option<u64>> {
+    let Some(link) = link else {
+        return Ok(None);
+    };
+    for part in link.split(',') {
+        let lower = part.to_ascii_lowercase();
+        if !lower.contains("rel=\"next\"") && !lower.contains("rel=next") {
+            continue;
+        }
+        let url = part
+            .split_once('<')
+            .and_then(|(_, rest)| rest.split_once('>'))
+            .map(|(url, _)| url)
+            .ok_or_else(|| {
+                error(
+                    "local-api-protocol",
+                    "Collection list next link is invalid",
+                    None,
+                )
+            })?;
+        let start = url
+            .split("start=")
+            .nth(1)
+            .and_then(|value| value.split(['&', '#', ' ']).next())
+            .and_then(|value| value.parse::<u64>().ok())
+            .ok_or_else(|| {
+                error(
+                    "local-api-protocol",
+                    "Collection list next link has no start",
+                    None,
+                )
+            })?;
+        if start <= current_start {
+            return Err(error(
+                "local-api-protocol",
+                "Collection list pagination did not advance",
+                None,
+            ));
+        }
+        return Ok(Some(start));
+    }
+    Ok(None)
+}
+
+fn collection_record(object: LocalObject) -> ZotResult<LocalCollection> {
+    let data_key = object.data.get("key").and_then(Value::as_str);
+    let data_version = object.data.get("version").and_then(Value::as_u64);
+    if data_key != Some(object.key.as_str()) || data_version != Some(object.version) {
+        return Err(error(
+            "local-api-protocol",
+            "Collection identity or version is inconsistent",
+            None,
+        ));
+    }
+    validate_key(&object.key)?;
+    let name = object
+        .data
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| error("local-api-protocol", "Collection name is missing", None))?;
+    let parent = match object.data.get("parentCollection") {
+        None | Some(Value::Null) | Some(Value::Bool(false)) => None,
+        Some(Value::String(parent)) if parent.is_empty() => None,
+        Some(Value::String(parent)) => {
+            validate_key(parent)?;
+            Some(parent.clone())
+        }
+        Some(_) => {
+            return Err(error(
+                "local-api-protocol",
+                "Collection parentCollection is invalid",
+                None,
+            ));
+        }
+    };
+    Ok(LocalCollection {
+        key: object.key,
+        version: object.version,
+        name: name.to_string(),
+        parent,
+        deleted: object
+            .data
+            .get("deleted")
+            .is_some_and(|value| value == &json!(1) || value == &json!(true)),
+    })
+}
+
+fn interpret_create_body(body: &Value) -> ZotResult<CreateReceipt> {
+    let Some(object) = body.as_object() else {
+        return Ok(CreateReceipt::Unknown);
+    };
+    let successful = match object.get("successful") {
+        Some(Value::Object(entries)) => entries,
+        Some(_) => return Ok(CreateReceipt::Unknown),
+        None => return Ok(CreateReceipt::Unknown),
+    };
+    let failed = match object.get("failed") {
+        Some(Value::Object(entries)) => Some(entries),
+        Some(_) => return Ok(CreateReceipt::Unknown),
+        None => None,
+    };
+    let unchanged = match object.get("unchanged") {
+        Some(Value::Object(entries)) => Some(entries),
+        Some(_) => return Ok(CreateReceipt::Unknown),
+        None => None,
+    };
+    let unchanged_zero = unchanged.is_some_and(|entries| entries.contains_key("0"));
+    let failed_has_other = failed.is_some_and(|entries| entries.keys().any(|key| key != "0"));
+    let failed_zero = failed.and_then(|entries| entries.get("0"));
+    if successful.keys().any(|key| key != "0")
+        || failed_has_other
+        || unchanged.is_some_and(|entries| entries.keys().any(|key| key != "0"))
+        || (successful.contains_key("0") && failed_zero.is_some())
+        || (unchanged_zero && (successful.contains_key("0") || failed_zero.is_some()))
+    {
+        return Ok(CreateReceipt::Unknown);
+    }
+    if let Some(failure) = failed_zero {
+        if !failure.is_object() {
+            return Ok(CreateReceipt::Unknown);
+        }
+        let message = failure
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("Collection create was rejected");
+        let status = failure
+            .get("code")
+            .and_then(Value::as_u64)
+            .and_then(|code| u16::try_from(code).ok());
+        return Err(error("local-api-http", message, status));
+    }
+    let Some(created) = successful.get("0") else {
+        if unchanged_zero {
+            return Err(error(
+                "local-api-protocol",
+                "Collection create did not return a new object",
+                None,
+            ));
+        }
+        return Ok(CreateReceipt::Unknown);
+    };
+    let Some(key) = create_object_key(created) else {
+        return Ok(CreateReceipt::Unknown);
+    };
+    if validate_key(&key).is_err() {
+        return Ok(CreateReceipt::Unknown);
+    }
+    Ok(CreateReceipt::Accepted { key })
+}
+
+fn create_object_key(value: &Value) -> Option<String> {
+    if let Some(key) = value.as_str() {
+        return Some(key.to_string());
+    }
+    let object = value.as_object()?;
+    let top = object.get("key").and_then(Value::as_str);
+    let nested = object
+        .get("data")
+        .and_then(Value::as_object)
+        .and_then(|data| data.get("key"))
+        .and_then(Value::as_str);
+    match (top, nested) {
+        (Some(top), Some(nested)) if top == nested => Some(top.to_string()),
+        (Some(top), None) => Some(top.to_string()),
+        (None, Some(nested)) => Some(nested.to_string()),
+        _ => None,
+    }
 }
 
 fn header(response: &Response, name: &str) -> Option<String> {

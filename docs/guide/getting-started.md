@@ -66,7 +66,7 @@ zot --json item import --file references.bib --confirm
 
 如果你后面要做这些事：
 
-- 写 note / tag / collection
+- 写 note、批量标签或未指定 local 的 collection 变更
 - 保存或删除 saved search
 - 做 publication status sync
 

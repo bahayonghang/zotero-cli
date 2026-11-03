@@ -22,6 +22,8 @@
 - `library saved-search list`
 - `library saved-search create`
 - `library saved-search delete`
+- `library organize plan`
+- `library organize apply`
 
 ## search
 
@@ -180,6 +182,25 @@ Notes:
 - ordinary confirmation does not authorize low-confidence groups. Use `--include-low-confidence` only after showing those groups separately and obtaining explicit risk authorization
 - desktop requires Zotero running, an installed and paired bridge, and an editable library; desktop failures do not consult Web credentials or fall back
 - to hand-pick the keeper of a single group, stay with `library duplicates-merge`
+
+## organize
+
+`library organize` accepts only `--write-backend local`. It does not replace `item tag batch` and does not create collections inside the batch.
+
+```bash
+zot --json library organize plan --file requests.json --output plan.json --write-backend local
+zot --json library organize apply --plan plan.json --confirm --expected-plan-sha256 <sha256> --report report.json --write-backend local
+```
+
+Request v1 contains only `schema_version` and `items`. Each item may include `item_key`, `add_tags`, `remove_tags`, `add_collections`, `remove_collections`, `move_collection`, and a display-only `reason`. Unknown fields, duplicate items, contradictory actions, and a move combined with other membership actions are rejected before any write.
+
+Planning reads the Local API. It does not open SQLite, authorize, or PATCH. SHA-256 covers the exact plan-file bytes and is returned in the command JSON, not embedded in the file. A hash mismatch, edited file, invalid schema, or after value that does not match a fresh calculation from `original_request` is rejected before any write.
+
+The default ceiling is 50 changed items, counted once per item. Over-limit means zero writes. plan and apply must use the same explicit ceiling and be reviewed again. Each item gets at most one conditional PATCH. The first failed, conflict, unknown, or verification-failed item stops the batch; later items are not-attempted. There is no automatic rollback or blind retry. Only an explicit 401 may reauthorize once.
+
+Final aggregate states are applied, unchanged, partial, failed, and unknown; a running disk report uses in-progress. Exit 0 requires every item to be applied or unchanged and the report to be saved. Other results exit non-zero, while stdout remains one JSON envelope containing the full report. After a post-submission save failure, stdout retains known outcomes with a report error, while disk may retain in-flight. An in-flight item after process interruption requires review: it proves neither success nor failure and must not be resumed automatically.
+
+Apply recalculates actions, differences, and counts, rejecting forged changed flags or target sets. All targets pass preflight, then each item version (including no-ops) and referenced collection name/version is checked again. Collections are also checked after authorization waits. These collection checks and the item PATCH are still not a cross-object atomic transaction.
 
 ## saved search
 

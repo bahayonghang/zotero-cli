@@ -5,9 +5,11 @@ pub(crate) mod graph;
 pub(crate) mod item;
 pub(crate) mod library;
 pub(crate) mod library_dedupe;
+mod local_create;
 mod local_credentials;
 pub(crate) mod local_write;
 pub(crate) mod mcp;
+mod organize;
 pub(crate) mod sync;
 pub(crate) mod workspace;
 
@@ -18,7 +20,7 @@ use crate::cli::{Cli, Commands};
 use crate::context::AppContext;
 use crate::output::CommandOutput;
 
-pub(crate) async fn dispatch(ctx: &AppContext, command: Commands) -> Result<()> {
+pub(crate) async fn dispatch(ctx: &AppContext, command: Commands) -> Result<i32> {
     let output = match command {
         Commands::Doctor => doctor::handle(ctx).await?,
         Commands::Config { command } => config::handle(ctx, command).await?,
@@ -35,6 +37,7 @@ pub(crate) async fn dispatch(ctx: &AppContext, command: Commands) -> Result<()> 
             CommandOutput::silent()
         }
     };
+    let code = output.exit_code();
     output.emit();
-    Ok(())
+    Ok(code)
 }

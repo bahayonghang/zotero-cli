@@ -6,13 +6,16 @@ use crate::format::{ENVELOPE_API_VERSION, EnvelopeMetaSeed, to_pretty_json};
 /// Successful command output. Handlers return this; the dispatch layer calls
 /// [`CommandOutput::emit`] to print it. This is the single place where the
 /// json-vs-human decision and envelope meta assembly happen.
-pub(crate) struct CommandOutput(Payload);
+pub(crate) struct CommandOutput {
+    payload: Payload,
+    exit_code: i32,
+}
 
 /// Manual impl because the human variant holds a render closure; tests need
 /// `Debug` for `Result::expect_err` on handler return values.
 impl std::fmt::Debug for CommandOutput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.0 {
+        match &self.payload {
             Payload::Json(text) => f.debug_tuple("CommandOutput::Json").field(text).finish(),
             Payload::Human(_) => f.write_str("CommandOutput::Human(..)"),
             Payload::Silent => f.write_str("CommandOutput::Silent"),
@@ -58,21 +61,38 @@ impl CommandOutput {
                 fulltext_index: seed.fulltext_index,
                 api_version: Some(ENVELOPE_API_VERSION),
             };
-            Ok(Self(Payload::Json(to_pretty_json(
-                &CliEnvelope::ok_with_meta(&data, meta),
-            )?)))
+            Ok(Self {
+                payload: Payload::Json(to_pretty_json(&CliEnvelope::ok_with_meta(&data, meta))?),
+                exit_code: 0,
+            })
         } else {
-            Ok(Self(Payload::Human(Box::new(move || human(&data)))))
+            Ok(Self {
+                payload: Payload::Human(Box::new(move || human(&data))),
+                exit_code: 0,
+            })
         }
     }
 
     pub(crate) fn silent() -> Self {
-        Self(Payload::Silent)
+        Self {
+            payload: Payload::Silent,
+            exit_code: 0,
+        }
+    }
+
+    /// Non-zero success exit for a completed report. Old commands stay at 0.
+    pub(crate) fn with_exit_code(mut self, exit_code: i32) -> Self {
+        self.exit_code = exit_code;
+        self
+    }
+
+    pub(crate) fn exit_code(&self) -> i32 {
+        self.exit_code
     }
 
     /// The single print action, invoked once by the dispatch layer.
     pub(crate) fn emit(self) {
-        match self.0 {
+        match self.payload {
             Payload::Json(text) => println!("{text}"),
             Payload::Human(render) => render(),
             Payload::Silent => {}
@@ -82,7 +102,7 @@ impl CommandOutput {
     /// Test-only: assert the JSON envelope content directly, without stdout.
     #[cfg(test)]
     pub(crate) fn as_json(&self) -> Option<&str> {
-        match &self.0 {
+        match &self.payload {
             Payload::Json(text) => Some(text),
             _ => None,
         }

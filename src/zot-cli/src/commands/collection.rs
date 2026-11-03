@@ -9,6 +9,11 @@ use crate::output::CommandOutput;
 pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Result<CommandOutput> {
     match command {
         CollectionCommand::Create(args) => {
+            if args.write.write_backend == crate::cli::WriteBackendArg::Local {
+                // Keep the local create future off the Windows main-thread stack.
+                return Box::pin(super::local_create::create(ctx, args)).await;
+            }
+            super::local_create::validate_web_options(&args.write)?;
             let key = ctx
                 .remote()?
                 .create_collection(&args.name, args.parent.as_deref())

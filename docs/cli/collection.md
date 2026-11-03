@@ -13,6 +13,8 @@ zot --json collection item-count COLL001
 zot --json collection tags COLL001
 zot --json collection search Transform --limit 20
 zot --json collection create "New Project"
+zot --json collection create "待读" --write-backend local
+zot --json collection create "子类" --parent ROOT2345 --write-backend local
 zot --json collection rename COLL001 "Renamed Project"
 zot --json collection delete COLL001
 zot --json collection add-item COLL001 ATTN001
@@ -21,7 +23,7 @@ zot --json collection remove-item COLL001 ATTN001
 
 ## 什么时候使用 collection
 
-`add-item` / `remove-item` 默认使用 Web API，也可显式指定 `--write-backend local`。
+`create`、`add-item` / `remove-item` 默认使用 Web API，也可显式指定 `--write-backend local`。本地创建的确认参数是 `--expected-library-version`，不是条目 version。详见[本地内容操作](./local-write.md)。
 Zotero 10+ 的 `move-item ITEMKEY --from SOURCEKEY --to TARGETKEY --write-backend local`
 会预览同库分类移动并保留其他分类。确认参数见[本地内容操作](./local-write.md)。
 

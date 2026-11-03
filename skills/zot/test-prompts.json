@@ -17,7 +17,7 @@
   {
     "id": 4,
     "prompt": "把 Zotero 里 ATTN001 这个条目标上 priority 标签；如果当前环境没有写权限，就先告诉我缺什么，不要假装成功。",
-    "expected": "先检查 doctor/写权限，再决定执行写入或停在缺失凭据说明。"
+    "expected": "先检查 doctor。单条已知 key 优先走 item tag add --write-backend local 预览；Local API 与 Web 都不可用时说明缺什么，不假装成功。"
   },
   {
     "id": 5,
@@ -193,5 +193,20 @@
     "id": 39,
     "prompt": "SQLite snapshot busy，但 Zotero 10 的 local_api_write supported=true；先预览补充会议名。",
     "expected": "直接用 local API 读取 item/schema 做预览，不依赖 SQLite/Web key，不弹授权框。"
+  },
+  {
+    "id": 40,
+    "prompt": "没有 Web API key，给本机条目 ITEMABCD 加上“待读”和“C++/安全”，并去掉“过期”；已有自动标签和未点名的标签都要保留。",
+    "expected": "doctor 后分别预览 local item tag add 与 item tag remove，确认同一 server/version 后再写入；不走 batch，不改其他标签类型。"
+  },
+  {
+    "id": 41,
+    "prompt": "没有 Web API key，在本机 Zotero 根下创建一个叫“待读”的分类；如果同级已经有同名分类，不要复用，告诉我已有 key。",
+    "expected": "doctor 后用 collection create --write-backend local 预览，确认库版本后再创建；同级同名拒绝并列出候选 key。"
+  },
+  {
+    "id": 42,
+    "prompt": "没有 Web API key。给 ITEMABCD 加待读并挂到 COLL0001，给 ITEMBCDE 去掉过期并移出 COLL0002；先给我完整差异，不要用同一套标签套所有命中。",
+    "expected": "用 library organize plan --write-backend local 生成显式计划，审阅 SHA-256 后再 apply；不用 item tag batch，不在批次里创建分类。"
   }
 ]

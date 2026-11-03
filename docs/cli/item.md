@@ -111,7 +111,7 @@ zot --json item merge KEEP001 DUPE001 --confirm
 
 ## note / tag / annotation / scite
 
-note、tag 和 annotation mutation 当前仍走 Web API；不要把 Zotero Local HTTP 或内置 connector 描述成这些命令的写通道。
+note 和 annotation mutation 仍走 Web API。单条 `item tag add/remove` 可显式选择 Local API，见[本地内容操作](./local-write.md)；不带 `--write-backend local` 时仍走 Web。`item tag batch` 仍只走 Web。不要把内置 connector 或旧 Local HTTP 描述成这些命令的写通道。
 
 ### notes
 
@@ -129,6 +129,8 @@ zot --json item note delete NOTE001
 zot --json item tag list ATTN001
 zot --json item tag add ATTN001 --tag important --tag reading-list
 zot --json item tag remove ATTN001 --tag obsolete
+zot --json item tag add ITEMABCD --tag 待读 --write-backend local
+zot --json item tag remove ITEMABCD --tag obsolete --write-backend local
 # 先 preview；此命令不会写库
 zot --json item tag batch --tag test --add-tag verified --limit 50
 # 核对 matched/affected/sample_keys 后，用相同参数确认写入

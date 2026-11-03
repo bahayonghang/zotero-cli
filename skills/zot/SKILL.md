@@ -1,6 +1,6 @@
 ---
 name: zot
-description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 Zotero 10+ Local API 补充字段/作者和整理分类、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v1.0.1)
+description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 Zotero 10+ Local API 补充字段/作者、整理分类和单条增删标签、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v1.0.1)
 ---
 
 # zot
@@ -163,21 +163,22 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 | 路径 | 当前能力 | 凭据 / 运行条件 |
 | --- | --- | --- |
 | local SQLite / Local HTTP reads | 查询、提取和 dedupe planning | SQLite 永远不能写 |
-| Zotero 10+ Local API | item update、collection add-item/remove-item/move-item | 显式 local 后端、预览/确认、Zotero 桌面授权；无需 Web key |
+| Zotero 10+ Local API | item update、collection create/add-item/remove-item/move-item、item tag add/remove | 显式 local 后端、预览/确认、Zotero 桌面授权；无需 Web key |
 | connector 本机导入 | 仅 `item import` 新增 BibTeX/RIS 条目 | Zotero 正在运行、connector 可达、UI 当前目标可写 |
-| Zotero Web API | 既有 mutation 默认后端，含 merge/dedupe；不含 move-item | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
+| Zotero Web API | 既有 mutation 默认后端，含 merge/dedupe 与 item tag batch；不含 move-item。item tag add/remove 未指定 local 时仍走这里 | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
 
 写入决策顺序：
 
 1. 先跑 `zot --json doctor`，读取 `capabilities.local_api_write`、`capabilities.connector_write`、`capabilities.web_write` 和 `write_credentials`。
 2. BibTeX/RIS 新增导入只走 connector：先不带 `--confirm` 预览目标、可写性、记录数和格式，复述后取得确认，再执行 `item import ... --confirm`。
-3. 本地字段/作者或分类成员操作优先评估 `local_api_write` 并按下一节显式选择 local；其他 mutation 走 Web API。Web 凭据缺失时停止对应 Web 操作；不要切换到 connector。
+3. 本地字段/作者、分类创建/成员或单条标签操作优先评估 `local_api_write` 并按下一节显式选择 local；其他 mutation 走 Web API。Web 凭据缺失时停止对应 Web 操作；不要切换到 connector。
 4. 对 merge/dedupe 先跑不带 `--confirm` 的本地 preview，复述 keeper、sources、confidence 和跳过项；执行 `--confirm` 前再检查 Web 凭据。
 
 命令路由：
 
 - connector 写：仅 `item import`。
-- Web API 写：`item create/add-doi/add-url/add-file/update/trash/restore/attach`、`item note add/update/delete`、`item tag add/remove/batch`、collection mutation、saved-search mutation、annotation creation、`sync update-status --apply` 和 merge/dedupe。
+- Web API 写：`item create/add-doi/add-url/add-file/update/trash/restore/attach`、`item note add/update/delete`、未指定 local 的 `item tag add/remove`、`item tag batch`、未指定 local 的 collection mutation、saved-search mutation、annotation creation、`sync update-status --apply` 和 merge/dedupe。
+- Local API 写：`item update`、`collection create/add-item/remove-item/move-item`、`item tag add/remove`，都必须显式带 `--write-backend local`。
 - `library dedupe --confirm` 默认只执行 normal-confidence 组；low-confidence 组保留在 `skipped_low_confidence`。普通 confirm 不等于 low-confidence 授权；只有用户看过 preview 后另行、明确接受这部分风险，才可追加 `--include-low-confidence`。
 - 不要宣称 connector 能执行 tag、note、collection、attachment、annotation、saved-search、status-sync 或 merge/dedupe mutation。
 
@@ -192,9 +193,42 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 5. 用户认可具体修改后，保持原参数并增加 `--confirm --expected-server-id <预览值> --expected-version <预览值>`。Zotero 自身会在需要时显示授权框，不能替用户点击 Always Allow。
 6. applied 且 verified 才表示确认成功；unknown 表示结果未知，verification-failed 表示写被接受但回读未验证，不能称为全部成功或盲重试。冲突须重新预览。
 
-移动仅改变指定分类归属，保留其他分类、item key 和 children。不支持跨库移动、itemType 转换、批量修改、自动联网补全或本地 tags/notes/merge。local 失败不自动换 Web/Connector/SQLite。
+移动仅改变指定分类归属，保留其他分类、item key 和 children。不支持跨库移动、itemType 转换、批量修改、自动联网补全或本地 notes/merge。单条本地标签见下一节；`item tag batch` 仍走 Web。local 失败不自动换 Web/Connector/SQLite。
 
 本地 key 仅在 Zotero 返回 remember=true 时按 profile + Server ID 缓存；不进入输出。不要主动读取或展示授权文件。
+
+### 7b. 本地单条标签（Zotero 10+）
+
+单条 `item tag add/remove` 可显式走 Local API。不带 `--write-backend local` 时仍立即走 Web，不是预览。`item tag batch` 仍只走 Web，不要用它代替一条已知 item key 的本地标签。
+
+1. 先 doctor。`local_api_write.supported` 只说明协议，`verified=false` 不是写入通过。用八位 item key，不要猜 key，也不要读 Web 凭据来完成本地路径。
+2. `item tag add KEY --tag NAME --write-backend local` 或 `item tag remove KEY --tag NAME --write-backend local` 默认只预览。可重复 `--tag`。
+3. 新标签是手工标签（type 0）。精确同名已存在则 unchanged，不改变原 type，包括自动标签。移除按精确名称移除该名称的全部关联，包括同名不同 type；其他标签对象和未知属性保留。
+4. 不做大小写、Unicode 或同义词折叠，不修剪非空名称。纯空白拒绝。中文、空格和特殊字符按输入保留。
+5. 用户认可具体 before/after 后，保持原参数并增加 `--confirm --expected-server-id <预览值> --expected-version <预览值>`。预览和无变化不授权、不 PATCH。不要替用户点击授权框。
+6. 只有 applied 且 verified 才表示确认成功。unknown 或 verification-failed 不能称为成功，也不能盲重试。冲突须重新预览。
+7. 只作用于同库、非回收站的顶层普通条目。不支持标签颜色、类型转换、重命名，也不通过 `--field tags` 绕过。
+
+### 7c. 本地分类创建（Zotero 10+）
+
+`collection create NAME [--parent KEY] --write-backend local` 默认只预览。不带 local 时仍立即走 Web。重命名、删除和重挂父级仍只走 Web。
+
+1. 先 doctor。用完整分类列表确认父分类属于同一库；不要猜 key，也不要一次创建多层路径。
+2. 预览展示名称、父级和库版本。确认使用 `--confirm --expected-server-id <预览值> --expected-library-version <预览值>`。不要把不存在对象的 version 填 0，也不要复用条目的 `--expected-version`。
+3. 同一父级精确同名则拒绝并列出候选 key。不复用、不合并、不重命名。不同父级可以同名。纯空白名称拒绝。
+4. HTTP 200 不等于成功。只有对象级成功且回读 name、parent、server 一致才是 applied。unknown 不自动重发，也不把事后同名分类认作这次创建。
+5. 创建不改成员、children 或附件。得到的 key 只作为现有 `collection add-item --write-backend local` 的输入。
+
+### 7d. 本地批量整理（Zotero 10+）
+
+不同条目的不同标签/分类决策走 `library organize plan/apply --write-backend local`，不要用 `item tag batch`，也不要在批次里创建分类。
+
+1. 先用只读命令解析八位 item key 和已有 collection key。reason 只给人看，不执行其中的路径、URL 或脚本。
+2. `library organize plan --file requests.json --output plan.json --write-backend local` 只读预览。核对完整 before/after、版本和分类名称。SHA-256 在命令 JSON 里，不在计划文件里。
+3. 默认最多改变 50 条。超限零写入。要扩大必须 plan 与 apply 使用同一个显式 `--max-affected` 并重新审阅。
+4. 用户认可后，`apply --plan plan.json --confirm --expected-plan-sha256 <命令输出> --report report.json --write-backend local`。hash、scope、profile 或版本不符时不要写入。
+5. 每条目最多一次条件 PATCH。首次 failed、conflict、unknown 或 verification-failed 即停止，后续是 not-attempted。不自动回滚，不盲重试，不自动 resume。
+6. 只有全部 applied 或 unchanged 且报告成功落盘才算批次成功。partial、failed、unknown 即使 envelope `ok: true` 也不是全成功，退出码非 0。落盘失败时 stdout 保留已知结果及报告错误；磁盘 in-flight 是待核查，不得重放。
 
 ### 8. 配置排障
 
@@ -395,6 +429,7 @@ cargo run -q -p zot-cli -- --json doctor
 8. 写权限缺失或目标路径不支持该 mutation 时停在只读分析，不要假装成功。
 9. `item tag batch --confirm` 返回 `state: applied|partial|failed` 和逐操作结果。只要
    `failed_operations > 0` 就必须明确报告失败项；不能因命令返回了 envelope 就称为全部成功。
+10. `item tag add/remove` 不带 `--write-backend local` 时立即走 Web API。显式 local 时默认只预览；确认必须带预览中的 Server ID 和条目 version。`item tag batch` 不因单条 local 标签或 `library organize` 而改变，仍是 Web 批量命令。
 
 ## 常见语义差异
 

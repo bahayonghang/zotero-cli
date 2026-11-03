@@ -301,6 +301,21 @@ mod tests {
             ]
             .as_slice(),
             ["zot", "config", "profiles", "use", "work"].as_slice(),
+            [
+                "zot",
+                "library",
+                "organize",
+                "plan",
+                "--file",
+                "requests.json",
+                "--output",
+                "plan.json",
+                "--write-backend",
+                "local",
+                "--max-affected",
+                "50",
+            ]
+            .as_slice(),
             ["zot", "library", "semantic-status"].as_slice(),
             ["zot", "library", "citekey", "Smith2024"].as_slice(),
             ["zot", "library", "recent", "--count", "10"].as_slice(),
@@ -350,6 +365,23 @@ mod tests {
                 "--confirm",
             ]
             .as_slice(),
+            [
+                "zot",
+                "item",
+                "tag",
+                "add",
+                "ITEMABCD",
+                "--tag",
+                "待读",
+                "--write-backend",
+                "local",
+                "--confirm",
+                "--expected-server-id",
+                "server",
+                "--expected-version",
+                "7",
+            ]
+            .as_slice(),
             ["zot", "item", "download", "ATCH005"].as_slice(),
             [
                 "zot",
@@ -396,6 +428,22 @@ mod tests {
                 "retractions",
                 "--tag",
                 "reading-list",
+            ]
+            .as_slice(),
+            [
+                "zot",
+                "collection",
+                "create",
+                "待读",
+                "--parent",
+                "ROOT2345",
+                "--write-backend",
+                "local",
+                "--confirm",
+                "--expected-server-id",
+                "server",
+                "--expected-library-version",
+                "12",
             ]
             .as_slice(),
             ["zot", "collection", "search", "Transform"].as_slice(),

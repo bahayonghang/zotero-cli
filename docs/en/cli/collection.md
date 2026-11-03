@@ -13,6 +13,8 @@ zot --json collection item-count COLL001
 zot --json collection tags COLL001
 zot --json collection search Transform --limit 20
 zot --json collection create "New Project"
+zot --json collection create "待读" --write-backend local
+zot --json collection create "子类" --parent ROOT2345 --write-backend local
 zot --json collection rename COLL001 "Renamed Project"
 zot --json collection delete COLL001
 zot --json collection add-item COLL001 ATTN001
@@ -21,7 +23,7 @@ zot --json collection remove-item COLL001 ATTN001
 
 ## When to use collection
 
-`add-item` / `remove-item` default to the Web API and accept explicit `--write-backend local`.
+`create`, `add-item`, and `remove-item` default to the Web API and accept explicit `--write-backend local`. Local creation confirms with `--expected-library-version`, not an item version. See [local content operations](./local-write.md).
 On Zotero 10+, `move-item ITEMKEY --from SOURCEKEY --to TARGETKEY --write-backend local`
 previews a same-library move while preserving other memberships. See
 [local content operations](./local-write.md) for confirmation flags.

@@ -69,8 +69,8 @@ Command handlers orchestrate separate write paths. See [Local API contract](./lo
 Examples:
 
 - `item note add/update/delete` calls `ctx.remote()?`.
-- `collection create/rename/delete` calls `ctx.remote()?`; add/remove default
-  to Web, with an explicit local backend. Move is local only.
+- `collection rename/delete` calls `ctx.remote()?`. `collection create` and
+  add/remove default to Web, with an explicit local backend. Move is local only.
 - `sync update-status --apply` calls `ctx.remote()?` only when apply is set.
 - Merge commands return a preview unless `--confirm` is set.
 - `library dedupe --confirm` skips low-confidence groups before writer calls
