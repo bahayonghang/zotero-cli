@@ -1,0 +1,34 @@
+{
+  "id": "zotero-local-organization",
+  "name": "zotero-local-organization",
+  "title": "Agent 驱动的 Zotero 本地分类与标签完善",
+  "description": "补齐本地标签、本地分类创建与可复核的批量整理，保持 SQLite 只读和显式 Local API 写入。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "lyh",
+  "assignee": "lyh",
+  "createdAt": "2026-11-02",
+  "completedAt": "2026-11-02",
+  "branch": "dev",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "01a13470375e194000885f7422fc0ed6e9ba68f9",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-02-zotero-local-tags",
+    "11-02-zotero-local-collection-create",
+    "11-02-zotero-local-organize-batch"
+  ],
+  "parent": null,
+  "relatedFiles": [
+    "skills/zot/SKILL.md",
+    "docs/cli/local-write.md",
+    ".trellis/spec/zot-cli/backend/local-api.md"
+  ],
+  "notes": "2026-11-02 核心实现、自动化及 Windows Zotero 10.0.7 隔离 API/UI/重启验收完成；原实例已恢复。功能提交 01a1347。用户已授权本地提交与归档；未 push/PR。真实组库、其他 OS 和提交中断未实测；证据见同组父任务 validation.md。",
+  "meta": {}
+}
