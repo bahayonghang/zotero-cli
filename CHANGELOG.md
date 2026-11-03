@@ -5,14 +5,27 @@ All notable changes to this project will be documented in this file. Dates use
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-02
+
 ### Added
 
 - Zotero 10+ official Local API backend for previewed item field/creator edits
   and collection membership add, remove, and move. Confirmed writes bind the
   local server and item version, request desktop authorization, and verify by
   reading back. Existing Web API commands retain their default backend.
+- Local tag mutation (`zot item tag add` and `zot item tag remove`) with
+  `--write-backend local`, version precondition check, and post-write readback.
+- Local collection creation (`zot collection create --write-backend local`)
+  supporting root and nested collections with duplicate prevention.
+- Batch organize workflow (`zot organize plan` and `zot organize apply`) for
+  multi-item tag and collection organization with frozen plan files, plan hash
+  verification, failure containment, and JSON/human reports.
 - `doctor` reports Local API write support separately from credentials and
   actual write verification.
+
+### Fixed
+
+- Support Zotero 7.1+ fulltext index splitting across `items_fts` tables.
 
 ## [1.0.1] - 2026-07-26
 
