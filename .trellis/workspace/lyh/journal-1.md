@@ -1004,3 +1004,38 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Status
 
 [OK] **Completed**
+
+
+## Session 31: 完成本地标签、分类创建与批量整理
+
+**Date**: 2026-11-02
+**Task**: 完成本地标签、分类创建与批量整理
+**Branch**: `dev`
+
+### Summary
+
+完成 A/B/C 实现与审查修复，Windows Zotero 10.0.7 独立 profile/data 核心 API/UI/重启验收通过，原实例已恢复；四个任务已归档，未推送或创建 PR。
+
+### Main Changes
+
+- 实现本地标签增删、条件创建分类、冻结计划与逐项批量整理报告。
+- 修复计划校验、创建回执解析、报告落盘及 Windows item 分发器栈溢出。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `01a1347` | (see git log) |
+
+### Testing
+
+- [OK] just ci：173 个 CLI 测试及 workspace 质量门通过；23 个 Python 测试、双语文档构建、git diff --check 通过。
+- [OK] 真实隔离库标签增删、根/子分类创建、三条不同决策 apply、UI 与正常重启回读通过；恢复原 Zotero。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 按需审阅后推送或创建 PR；真实组库、其他操作系统及真实提交中断未实测。
