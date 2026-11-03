@@ -205,7 +205,7 @@ just docs
 
 Cargo 的 `workspace.package.version` 保持数字形式 `X.Y.Z`。
 
-当前示例标签是 `v1.0.1`。
+当前示例标签是 `v1.1.0`。
 
 `github-pages` 环境目前允许分支 `main` 和标签模式 `v*`。
 

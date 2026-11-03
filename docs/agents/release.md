@@ -6,7 +6,7 @@ Claude Code, Codex, Grok Build, Kimi Code, and OMP share this release contract.
 
 - Future GitHub release tags MUST be `v` plus Cargo `workspace.package.version`: `vX.Y.Z`.
 - Cargo `workspace.package.version` stays numeric `X.Y.Z` with no `v` prefix.
-- Current Cargo version is `1.0.1`. The current example tag is `v1.0.1`.
+- Current Cargo version is `1.1.0`. The current example tag is `v1.1.0`.
 
 Do not change `Cargo.toml` to add a `v` prefix.
 
