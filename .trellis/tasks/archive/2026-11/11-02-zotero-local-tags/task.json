@@ -3,7 +3,7 @@
   "name": "zotero-local-tags",
   "title": "本地标签增删与安全回读",
   "description": "扩展 item tag add/remove 的显式 Local API 后端，保留既有标签类型与非目标数据。",
-  "status": "review",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "lyh",
   "assignee": "lyh",
   "createdAt": "2026-11-02",
-  "completedAt": null,
-  "branch": null,
+  "completedAt": "2026-11-02",
+  "branch": "dev",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "01a13470375e194000885f7422fc0ed6e9ba68f9",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -28,6 +28,6 @@
     "src/zot-cli/tests/json_error_contract.rs",
     "skills/zot/SKILL.md"
   ],
-  "notes": "2026-11-02 核心实现与验收完成，进入 review 待提交收口。Windows Zotero 10.0.7 独立 profile/data：标签增删、根/子分类创建、3 条不同决策批量 apply、API/UI/正常重启回读通过；原实例已恢复。173 个 CLI 测试及 workspace/质量门通过。故障注入与真实桌面证据分列；用户要求聚焦核心，不扩展桌面故障测试。未 commit/push/PR，未归档。见父 validation.md。",
+  "notes": "2026-11-02 核心实现、自动化及 Windows Zotero 10.0.7 隔离 API/UI/重启验收完成；原实例已恢复。功能提交 01a1347。用户已授权本地提交与归档；未 push/PR。真实组库、其他 OS 和提交中断未实测；证据见同组父任务 validation.md。",
   "meta": {}
 }
