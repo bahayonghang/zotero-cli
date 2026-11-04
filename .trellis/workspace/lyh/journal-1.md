@@ -1078,3 +1078,37 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - 另处理配置推送后新开的 #30-#34。
+
+
+## Session 33: 处置剩余 Dependabot PR
+
+**Date**: 2026-11-04
+**Task**: 处置剩余 Dependabot PR
+**Branch**: `dev`
+
+### Summary
+
+合并 #31、#32、#34 到 main，关闭 #30 和 #33，并删除原来的 5 个 Dependabot 分支。
+
+### Main Changes
+
+- main 收到 serde 1.0.229、md5 0.8.1 和 toml 1.2.0
+- 关闭 uuid 1.29 与 sha2 0.11，并收紧这两条 Dependabot 忽略
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8ff5d8d` | (see git log) |
+
+### Testing
+
+- [OK] 对照 origin/main 的锁版本、PR 状态和分支列表验收
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- #35 到 #39 仍开着，不在这次任务里
