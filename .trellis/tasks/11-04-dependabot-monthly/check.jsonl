@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "验收时核对 MSRV 与安全检查不被放行"}
+{"file": ".trellis/tasks/11-04-dependabot-monthly/research/pr-triage.md", "reason": "用研究记录核对目标版本和分支头"}
