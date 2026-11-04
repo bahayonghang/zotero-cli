@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "MSRV 1.85、toolchain ignore，以及禁止用 ignore 把安全检查改成通过"}
+{"file": ".trellis/tasks/11-04-dependabot-open-prs/research/pr-triage.md", "reason": "五个 PR 的实际锁版本、CI、分支头和合并预演"}
+{"file": ".trellis/tasks/11-04-dependabot-open-prs/design.md", "reason": "main 与 dev 的边界、ignore 块、固定的 PR 头"}
