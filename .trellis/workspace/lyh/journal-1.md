@@ -1039,3 +1039,42 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - 按需审阅后推送或创建 PR；真实组库、其他操作系统及真实提交中断未实测。
+
+
+## Session 32: 处置 Dependabot PR 并改为每月检查
+
+**Date**: 2026-11-04
+**Task**: 处置 Dependabot PR 并改为每月检查
+**Branch**: `dev`
+
+### Summary
+
+把 #25-#27 合并进 main，关闭 #28 和 #29，并将 main 上的 Dependabot 改为每月检查。任务已归档，dev 未推送。
+
+### Main Changes
+
+- main 锁文件更新为 chrono 0.4.45、flate2 1.1.10、clap 4.6.7。
+- 关闭 uuid 1.28.0 与 quick-xml 0.42.0，并删除原先 5 个 Dependabot 分支。
+- cargo 与 docs npm 改为 monthly，并忽略越界的 uuid、quick-xml 与 rust-toolchain。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `42253a5` | (see git log) |
+| `2bba6bc` | (see git log) |
+| `f2bc245` | (see git log) |
+| `70537d0` | (see git log) |
+| `e04a7f8` | (see git log) |
+
+### Testing
+
+- [OK] 核对 origin/main 锁版本、PR 状态和 dependabot.yml；未运行 just ci。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 另处理配置推送后新开的 #30-#34。
