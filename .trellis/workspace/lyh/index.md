@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 34
+- **Total Sessions**: 35
 - **Last Active**: 2026-11-05
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1157 | Active |
+| `journal-1.md` | ~1192 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 35 | 2026-11-05 | 瘦身 zot 与 zot-brainstorm skill 入口 | `9427714` | `dev` |
 | 34 | 2026-11-05 | 开着 Zotero 时读取条目和本地 PDF | `4156eff`, `af4d543`, `5889e0b`, `8283852`, `10b373f`, `7261bd2`, `137547b` | `dev` |
 | 33 | 2026-11-04 | 处置剩余 Dependabot PR | `8ff5d8d` | `dev` |
 | 32 | 2026-11-04 | 处置 Dependabot PR 并改为每月检查 | `42253a5`, `2bba6bc`, `f2bc245`, `70537d0`, `e04a7f8` | `dev` |

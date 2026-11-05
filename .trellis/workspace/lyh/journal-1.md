@@ -1155,3 +1155,38 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - 用可丢弃测试库补做 Windows 桌面真实验收
+
+
+## Session 35: 瘦身 zot 与 zot-brainstorm skill 入口
+
+**Date**: 2026-11-05
+**Task**: 瘦身 zot 与 zot-brainstorm skill 入口
+**Branch**: `dev`
+
+### Summary
+
+把两个 skill 入口改成路由和安全内核，命令细节移到同包 references，并用 description 区分库操作与文献综合。
+
+### Main Changes
+
+- zot 与 zot-brainstorm 根入口分别压到 63 行和 53 行
+- 命令、诊断、迁移、来源解析和报告约束进入各自 references
+- 重写两条单行 description，并补齐静态入口测试与回归样例
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9427714` | (see git log) |
+
+### Testing
+
+- [OK] just ci 通过，含 skills-check 与 26 个 Python 测试
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 真实 agent 是否按新 description 触发仍是 missing evidence
