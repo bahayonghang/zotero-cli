@@ -83,8 +83,10 @@ skill 分别路由本地只读查询、Zotero 10+ 授权 Local API 字段/作者
 
 ## 相关文件
 
-- 技能正文：`skills/zot/SKILL.md`
+- 路由入口：`skills/zot/SKILL.md`
+- 按需参考：`skills/zot/references/`
 - 回归 prompt：`skills/zot/test-prompts.json`
 - 量化 eval：`skills/zot/evals/evals.json`
-- Brainstorm 技能正文：`skills/zot-brainstorm/SKILL.md`
+- Brainstorm 路由入口：`skills/zot-brainstorm/SKILL.md`
+- Brainstorm 按需参考：`skills/zot-brainstorm/references/`
 - Brainstorm 报告模板：`skills/zot-brainstorm/templates/report.md` 和 `skills/zot-brainstorm/templates/report.html`

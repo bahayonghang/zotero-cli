@@ -82,8 +82,10 @@ Those requests do not treat Zotero as the primary content source.
 
 ## Related files
 
-- Main skill file: `skills/zot/SKILL.md`
+- Routing entry: `skills/zot/SKILL.md`
+- On-demand references: `skills/zot/references/`
 - Regression prompts: `skills/zot/test-prompts.json`
 - Eval set: `skills/zot/evals/evals.json`
-- Brainstorm skill file: `skills/zot-brainstorm/SKILL.md`
+- Brainstorm routing entry: `skills/zot-brainstorm/SKILL.md`
+- Brainstorm on-demand references: `skills/zot-brainstorm/references/`
 - Brainstorm report templates: `skills/zot-brainstorm/templates/report.md` and `skills/zot-brainstorm/templates/report.html`
