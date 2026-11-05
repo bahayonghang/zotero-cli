@@ -5,7 +5,10 @@
 Use when editing `zot-desktop/src/local_api.rs`, CLI `local_write.rs`,
 `local_credentials.rs`, local command flags, or `doctor.local_api_write`.
 Zotero 10+ official Local API writes are separate from connector imports,
-SQLite reads, and the Web API. Evidence: task `10-13-zotero-local-content-operations`.
+SQLite reads, and the Web API. Ordinary open-library GETs are also separate:
+see [Desktop Library Reads](./desktop-read.md). Do not send write
+authorization on those reads, and do not route them through `local_library()`.
+Evidence: task `10-13-zotero-local-content-operations`.
 
 ## 2. Signatures
 
