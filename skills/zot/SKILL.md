@@ -13,6 +13,7 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 - 用户在 Claude Code、Codex 里应该直接说需求，不应该先背命令。skill 负责把需求翻成运行时动作。
 - `zot` 是唯一执行面。`ref/` 里的旧 Python 参考实现和 `zot mcp serve` 都不是当前主路径。
 - 本地 SQLite 只读；Zotero 10+ Local API 支持显式 local 后端的字段/作者和分类成员操作；connector 仅新增导入；其他 mutation 走 Web API。各路径不能混用。
+- Zotero 打开并锁住 `zotero.sqlite` 时，`item get`、`item children`、`item pdf` / `fulltext`、`library search`、`library citekey` 可以读正在运行的桌面。其它读取和全部写入仍走原来的路径。一次命令只用一个来源，不把桌面结果和快照拼成一份。不自动改走 Web API。
 - 每条写路径拥有本次操作的成功和失败；connector 或 Web API 出错时不能自动 fallback 到另一条路径。
 - 回答先给结论、证据、变更或失败原因。不要先把 raw JSON 倒给用户。
 
@@ -35,9 +36,18 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 
 - 普通库内检索：`library search`
   - 非空 search 的 `meta.fulltext_index` 为 `legacy-tables` / `fts5-sidecar` / `unavailable`。`unavailable` 表示本次未查附件全文，标题/作者/标签仍可能命中。不要把 `no such table: fulltextItemWords` 当成 SQLite 不可读。
+  - 标题、期刊、主题是字段条件：`--title`、`--journal`（只匹配 `publicationTitle` 或 `journalAbbreviation`）、`--topic`（标题、摘要或标签的词匹配）。主题检索不是语义召回，也不读 PDF 正文。
+  - 默认位置参数仍会查附件全文。Zotero 占着库锁时，这条查询改读正在运行的桌面，并用 `meta.fulltext_index=unavailable` 说明没查正文。空结果不表示正文里没有这个词。
+  - 唯一标题才直接读单条。多条候选先列出来让用户选，不要把第一页第一条当成那一篇。
+  - 成功时 `meta.read_source` 为 `desktop`、`desktop-unbound` 或 `snapshot`。回答要说明这次用的来源。
+  - 配置了 profile 或明确数据目录、又还没证明和正在运行的 Zotero 是同一个库时，读运行中的实例要加 `--running-zotero`。默认不要换成另一套库。
 - 纯列表 / 翻页：`library list --collection ... --limit ... --offset ...`
 - 整库统计：`library stats`
 - citation key 直达：`library citekey`
+  - 精确匹配，区分大小写。前缀相似不是命中。
+  - 关闭的库同时查原生 `citationKey` 和 Extra 里的 `Citation Key:` / `CitationKey:`。
+  - 打开的库先用 Local API 字段和 Extra。插件候选只有在同一库条目上核对到这个 key 时才接受。插件不可达、而且库里没存过这个 key 时，说明来源限制，不要说成确定没有。
+  - 多条条目共用同一个 key 时停下来让用户选，并给出标题、作者、年份和 item key。
 - 最近入库条目：`library recent --count`
 - collection 细粒度读取：`collection get` / `subcollections` / `items` / `item-count` / `tags`
 - collection 名内检索：`collection search`
@@ -309,6 +319,8 @@ cargo run -q -p zot-cli -- ...
 - saved search / 配置排障 / profile 切换
 - 用户说“为什么不工作”
 
+`item get`、`item children`、`item pdf`、`library search`、`library citekey` 不必先跑完整 doctor 就能读。doctor 仍用于第一次接触环境、写操作、PDF 排障和“为什么不工作”。SQLite snapshot 单独失败（库被 Zotero 锁住）不要中止上述读取：看 `capabilities.sqlite_snapshot` 和 `capabilities.desktop_read` 的 `next`，再执行读命令。探针可达不是条目或 PDF 已经读成功。`desktop_read.item_read_verified` 和 `pdf_read_verified` 恒为 false。
+
 首选：
 
 ```bash
@@ -325,6 +337,8 @@ cargo run -q -p zot-cli -- --json doctor
 
 - `db_exists`
 - `capabilities.local_sqlite_read`
+- `capabilities.sqlite_snapshot`（快照能不能打开，以及这条 CLI 下一步能做什么）
+- `capabilities.desktop_read`（运行中的桌面读能不能走；探针成功不是条目或 PDF 已读）
 - `capabilities.local_sqlite_read.fulltext.legacy_tables`
 - `capabilities.local_sqlite_read.fulltext.sidecar_present`
 - `capabilities.local_api_write`（版本/可达/凭据存在分别报告，`verified: false` 不表示已验证可写）
@@ -448,7 +462,16 @@ cargo run -q -p zot-cli -- --json doctor
 ## 自然语言到动作的典型映射
 
 - “找我库里 reward hacking 相关的论文，再挑一篇最相关的给我引用”  
-  先 `library search`，再 `item get` / `item cite`
+  先 `library search`。多条候选先列出再选一篇，然后 `item get` / `item cite`。这是库内词匹配，不是语义召回
+
+- “Zotero 开着，按标题找这篇再读 PDF”  
+  `library search --title`，唯一命中后再 `item get` / `item pdf`。SQLite busy 不要停。看 `meta.read_source`。探针成功不算已经读到正文
+
+- “按期刊 Nature 找”  
+  `library search --journal Nature`。只认 `publicationTitle` 或 `journalAbbreviation`，摘要里提到 Nature 不算
+
+- “主题是 transformer”  
+  `library search --topic transformer`。这是标题、摘要或标签的词匹配。语义召回另走 `library semantic-search`。库锁着时桌面结果的 `fulltext_index` 是 `unavailable`，不要声称查过 PDF 正文
 
 - “给我看最近 10 条刚进库的文献”  
   走 `library recent --count 10`
@@ -559,7 +582,7 @@ cargo run -q -p zot-cli -- --json doctor
 遇到这些请求时怎么处理：
 
 - `search-in` / `expand`：明确说当前没有等价命令，只能先 `item fulltext` / `item pdf` 拉文本，再做 agent 侧二次定位
-- `metadata`：说明当前没有 field-scoped metadata search；最多退到 `library search` 加已有 filter
+- `metadata`：标题用 `library search --title`，期刊用 `--journal`（`publicationTitle` 或 `journalAbbreviation`），主题词用 `--topic`（标题、摘要或标签，不是语义，也不是 PDF 正文）。桌面读做不到的条件组合要说明，不要丢掉过滤条件
 - `status`：用 `doctor` + `library semantic-status` 组合回答，不要把 `sync update-status` 说成索引状态
 - `s2` / `--s2-paper-id`：直接说明当前未实现，不要伪造替代命令
 - zotagent `sync`：说明当前只能用 `library semantic-index --fulltext` 或 `workspace index` 做部分替代，而且范围主要是 metadata + PDF
@@ -571,7 +594,7 @@ cargo run -q -p zot-cli -- --json doctor
 - connector 目标只读：点名当前目标不可写，请用户在 Zotero UI 选择可写 collection/library 后重新 dry-run；不改走 Web
 - Web 写不可用：明确告诉用户缺 `ZOT_API_KEY` / `ZOT_LIBRARY_ID`；connector 不能替代其他 mutation
 - 目标路径不支持该 mutation：说明能力边界并停止，不要暗示 connector 可以 merge、dedupe、tag 或 update
-- 没有 Better BibTeX：`library citekey` 只走 Extra fallback
+- 没有 Better BibTeX：`library citekey` 仍查原生 `citationKey` 和 Extra。插件没把 key 存进库、插件也不可达时，报告来源限制。前缀和大小写不一致都不是命中
 - 没有 Pdfium：不要承诺 fulltext / outline / annotation / PDF 下载后的文本处理
 - 没有 embedding：semantic 检索说明会降级；workspace 问答改用 `--mode bm25`
 - `attach-mode auto` 没找到 OA PDF：条目仍可能创建成功

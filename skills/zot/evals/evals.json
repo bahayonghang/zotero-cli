@@ -8,19 +8,19 @@
       "files": [],
       "expectations": [
         "Routes the request to Zotero-first search and item detail workflows.",
-        "Returns the result in user-facing language instead of dumping raw JSON first.",
-        "Completes search -> detail -> citation as one flow."
+        "Treats a keyword search as a candidate list and picks one item only after showing the matches.",
+        "Completes search -> detail -> citation as one flow and does not treat the search as semantic recall."
       ]
     },
     {
       "id": 2,
       "prompt": "我只有一个 citation key：Smith2024。帮我把对应文献找出来，如果能找到就给我元数据和 Nature 风格引用。",
-      "expected_output": "优先走 citation key 工作流，并在需要时说明 Better BibTeX / Extra fallback。",
+      "expected_output": "按精确 citation key 查找。大小写必须一致。原生 citationKey 和 Extra 都查。多条同 key 先让用户选。插件不可达且库内未存储时说明来源限制。",
       "files": [],
       "expectations": [
-        "Chooses citation-key lookup before broad full-text or metadata search.",
-        "Mentions fallback behavior honestly when Better BibTeX is unavailable.",
-        "Returns metadata plus a Nature-style citation on success."
+        "Chooses exact citation-key lookup before broad full-text or metadata search.",
+        "Does not accept a prefix or a different case, and asks the user to choose when several items share the key.",
+        "Reports the source limit when Better BibTeX is unreachable and the key was never stored, then returns metadata plus a Nature-style citation on a unique hit."
       ]
     },
     {
@@ -461,6 +461,50 @@
         "Uses library organize plan/apply with explicit local backend and explicit item keys, not item tag batch or a query apply.",
         "Reviews the full before/after plan and passes its exact SHA-256; does not raise the 50-item ceiling silently.",
         "Stops after the first failed or unknown item, leaves later items not-attempted, and does not treat partial or in-flight as full success."
+      ]
+    },
+    {
+      "id": 43,
+      "prompt": "Zotero 开着，SQLite 被锁住了。按标题帮我找到 Attention Is All You Need，然后读本地 PDF。不要因为 snapshot busy 就停。",
+      "expected_output": "继续做标题查找和 PDF 读取。说明 meta.read_source 是 desktop。探针可达不算已经读到条目或 PDF。",
+      "files": [],
+      "expectations": [
+        "Does not abort a supported desktop read when only the SQLite snapshot is busy.",
+        "Uses title lookup then item pdf, and reports read_source desktop.",
+        "Does not treat a reachable Local API probe as the completed item or PDF read."
+      ]
+    },
+    {
+      "id": 44,
+      "prompt": "citation key 是 Smith2024。帮我精确找到那一篇。如果有好几条共用这个 key，先问我选哪条。不要把 Smith 或 smith2024 当成命中。",
+      "expected_output": "精确匹配 Smith2024。前缀和大小写不同都不是命中。多条同 key 时给出标题、作者、年份和 item key 让用户选。",
+      "files": [],
+      "expectations": [
+        "Uses library citekey for an exact, case-sensitive key.",
+        "Rejects prefix similarity and case mismatch.",
+        "Asks the user to choose when several items share the citation key."
+      ]
+    },
+    {
+      "id": 45,
+      "prompt": "帮我找期刊是 Nature 的文献。摘要里提到 Nature 不算。缩写也要认。",
+      "expected_output": "用 library search --journal。只匹配 publicationTitle 或 journalAbbreviation，不把摘要提及当期刊命中。",
+      "files": [],
+      "expectations": [
+        "Uses --journal rather than a generic full-text query.",
+        "Matches publicationTitle or journalAbbreviation, including an abbreviation.",
+        "Does not treat an abstract mention of the journal name as a journal hit."
+      ]
+    },
+    {
+      "id": 46,
+      "prompt": "在库里找主题是 transformer 的论文。不要做语义召回，也不要靠 PDF 正文。如果 SQLite 被锁，就读正在运行的 Zotero，并说明全文索引不可用。",
+      "expected_output": "用 library search --topic。这是标题、摘要或标签的词匹配。库锁着时走桌面读，fulltext_index 为 unavailable，不声称查过正文。",
+      "files": [],
+      "expectations": [
+        "Uses --topic as title, abstract, or tag term match, not semantic search and not PDF body search.",
+        "Continues with a desktop read when SQLite is busy and reports fulltext_index unavailable.",
+        "Keeps writes on their existing separate flow."
       ]
     }
   ]
