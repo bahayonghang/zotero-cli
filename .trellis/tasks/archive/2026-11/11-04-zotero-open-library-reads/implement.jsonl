@@ -1,0 +1,20 @@
+{"file": ".trellis/spec/zot-cli/backend/index.md", "reason": "CLI owns item/library/doctor surfaces and the pre-dev checklist for command changes."}
+{"file": ".trellis/spec/zot-cli/backend/directory-structure.md", "reason": "Place new read routing and clap flags in the existing command modules."}
+{"file": ".trellis/spec/zot-cli/backend/database-guidelines.md", "reason": "Keep local SQLite, desktop HTTP, and remote clients behind the existing context boundary."}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "Map busy, identity mismatch, 404, disabled API, and missing PDF to ZotError envelopes."}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "Add clap parse tests and JSON contract tests for the new read routes."}
+{"file": ".trellis/spec/zot-cli/backend/connector.md", "reason": "Connector stays import-only; doctor must keep connector and local HTTP capabilities distinct from item reads."}
+{"file": ".trellis/spec/zot-cli/backend/local-api.md", "reason": "Reuse the Zotero 10 local client without sending write authorization on ordinary GETs."}
+{"file": ".trellis/spec/zot-cli/backend/desktop-read.md", "reason": "Open-library route, identity binding, error matrix, and PDF file URL contract."}
+{"file": ".trellis/spec/zot-cli/backend/logging-guidelines.md", "reason": "Human and JSON output must not leak library identifiers, credentials, or document text."}
+{"file": ".trellis/spec/zot-local/backend/index.md", "reason": "Snapshot reads, search, and PDF extraction stay owned by zot-local."}
+{"file": ".trellis/spec/zot-local/backend/directory-structure.md", "reason": "Do not move PDF extraction or search out of their existing modules."}
+{"file": ".trellis/spec/zot-local/backend/database-guidelines.md", "reason": "Source zotero.sqlite stays read-only; snapshot consistency tests must keep working."}
+{"file": ".trellis/spec/zot-local/backend/error-handling.md", "reason": "Map rusqlite busy, filesystem, and Pdfium failures without inventing zero values."}
+{"file": ".trellis/spec/zot-local/backend/quality-guidelines.md", "reason": "Title, journal, tag, and citation-key search need the existing search test invariants."}
+{"file": ".trellis/spec/zot-core/backend/error-handling.md", "reason": "New read-route error codes and envelope fields belong in zot-core."}
+{"file": ".trellis/spec/zot-remote/backend/directory-structure.md", "reason": "Better BibTeX item.search stays in zot-remote and must not grow CLI parsing."}
+{"file": ".trellis/spec/zot-remote/backend/error-handling.md", "reason": "BBT JSON-RPC failures stay remote errors and must not fall through to another library."}
+{"file": ".trellis/spec/zot-remote/backend/quality-guidelines.md", "reason": "Allow only the read-only item.search method and cover it with the existing network-test patterns."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "One command must keep a single library identity across cli, desktop, local, and remote."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse the loopback client, DTO mapping, attachment picker, and Pdfium path."}

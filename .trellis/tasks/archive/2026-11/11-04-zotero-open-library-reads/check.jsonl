@@ -1,0 +1,15 @@
+{"file": ".trellis/spec/zot-cli/backend/index.md", "reason": "Check that item, library, and doctor changes stay inside zot-cli ownership."}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "Verify clap, JSON contract, and workspace test gates for the new routes."}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "Verify busy, 404, identity, disabled API, and file errors do not cross sources."}
+{"file": ".trellis/spec/zot-cli/backend/database-guidelines.md", "reason": "Verify commands do not open SQLite when the desktop route is the selected source."}
+{"file": ".trellis/spec/zot-cli/backend/connector.md", "reason": "Verify the connector remains import-only and doctor capabilities stay separate."}
+{"file": ".trellis/spec/zot-cli/backend/local-api.md", "reason": "Verify ordinary reads do not call authorize or change the local write contract."}
+{"file": ".trellis/spec/zot-cli/backend/desktop-read.md", "reason": "Verify one-source routing, incomplete scans, version consistency, and citation-key candidates."}
+{"file": ".trellis/spec/zot-cli/backend/logging-guidelines.md", "reason": "Verify human and JSON output redact secrets and do not dump PDF text in diagnostics."}
+{"file": ".trellis/spec/zot-local/backend/database-guidelines.md", "reason": "Verify snapshot consistency and the read-only source database constraint."}
+{"file": ".trellis/spec/zot-local/backend/error-handling.md", "reason": "Verify SQLite, IO, and Pdfium errors keep their existing codes."}
+{"file": ".trellis/spec/zot-local/backend/quality-guidelines.md", "reason": "Verify search pagination, field filters, and citation-key exactness."}
+{"file": ".trellis/spec/zot-core/backend/error-handling.md", "reason": "Verify any new error code is a real envelope code with a stable hint."}
+{"file": ".trellis/spec/zot-remote/backend/quality-guidelines.md", "reason": "Verify BBT is limited to item.search and cannot be pointed at an unproven library."}
+{"file": ".trellis/spec/zot-remote/backend/error-handling.md", "reason": "Verify plugin-unavailable is distinct from not-found and identity mismatch."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify one command uses one source and one library identity end to end."}
