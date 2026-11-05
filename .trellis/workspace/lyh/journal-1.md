@@ -1112,3 +1112,46 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - #35 到 #39 仍开着，不在这次任务里
+
+
+## Session 34: 开着 Zotero 时读取条目和本地 PDF
+
+**Date**: 2026-11-05
+**Task**: 开着 Zotero 时读取条目和本地 PDF
+**Branch**: `dev`
+
+### Summary
+
+实现开库只读路由：独占锁期间走 Local API，关闭后仍用一致快照。真实 Windows 桌面验收仍待验。
+
+### Main Changes
+
+- 抽出共享字段匹配，闭库快照识别原生 citation key
+- 桌面只读 GET 不授权；Better BibTeX 只允许本机 item.search
+- item get、children、pdf、library search、citekey 按单一来源路由
+- 更新 zot skill，并记录开库只读契约
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4156eff` | (see git log) |
+| `af4d543` | (see git log) |
+| `5889e0b` | (see git log) |
+| `8283852` | (see git log) |
+| `10b373f` | (see git log) |
+| `7261bd2` | (see git log) |
+| `137547b` | (see git log) |
+
+### Testing
+
+- [OK] 拆分前 just ci 与 skills-check 已通过
+- [OK] 各代码提交后 cargo check --locked --offline 通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用可丢弃测试库补做 Windows 桌面真实验收
