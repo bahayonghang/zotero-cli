@@ -155,8 +155,18 @@ impl LocalApiClient {
     }
 
     pub async fn probe(&self) -> ZotResult<LocalApiProbe> {
+        self.probe_with_timeout(self.timeout).await
+    }
+
+    /// Fast read-only probe. Does not change the write client's timeout.
+    pub async fn probe_for_read(&self) -> ZotResult<LocalApiProbe> {
+        self.probe_with_timeout(Duration::from_secs(2)).await
+    }
+
+    async fn probe_with_timeout(&self, timeout: Duration) -> ZotResult<LocalApiProbe> {
         let response = self
             .request(Method::GET, "", None)?
+            .timeout(timeout)
             .send()
             .await
             .map_err(read_error)?;
@@ -164,12 +174,12 @@ impl LocalApiClient {
         let zotero_version = header(&response, "X-Zotero-Version");
         let api_version = header(&response, "Zotero-API-Version");
         let schema_version = header(&response, "Zotero-Schema-Version");
-        let server_id = header(&response, SERVER_ID).filter(|v| !v.is_empty());
+        let server_id = header(&response, SERVER_ID).filter(|value| !value.is_empty());
         let supported = zotero_version
             .as_deref()
-            .and_then(|v| v.split('.').next())
-            .and_then(|v| v.parse::<u32>().ok())
-            .is_some_and(|v| v >= 10)
+            .and_then(|version| version.split('.').next())
+            .and_then(|version| version.parse::<u32>().ok())
+            .is_some_and(|version| version >= 10)
             && api_version.as_deref() == Some("3")
             && server_id.is_some();
         Ok(LocalApiProbe {
@@ -178,6 +188,71 @@ impl LocalApiClient {
             schema_version,
             server_id,
             supported,
+        })
+    }
+
+    /// Ordinary read GET. Never calls authorize and never sends a write key.
+    pub(crate) async fn read_exchange(
+        &self,
+        path: &str,
+        server: Option<&str>,
+    ) -> ZotResult<LocalReadExchange> {
+        let response = self
+            .request(Method::GET, path, server)?
+            .send()
+            .await
+            .map_err(read_error)?;
+        if response.status().is_redirection() {
+            return Err(error(
+                "local-api-redirect",
+                "Local API refused to follow a redirect",
+                Some(response.status().as_u16()),
+            ));
+        }
+        if response.status().as_u16() == 412 {
+            return Err(error(
+                "local-api-conflict",
+                "Zotero instance or object version changed; preview again",
+                Some(412),
+            ));
+        }
+        let status = response.status();
+        if let Some(expected) = server {
+            if status.is_success() && header(&response, SERVER_ID).as_deref() != Some(expected) {
+                return Err(error(
+                    "local-api-conflict",
+                    "Zotero instance changed; preview again",
+                    None,
+                ));
+            }
+        }
+        let allowed = status.is_success() || matches!(status.as_u16(), 404 | 405 | 501);
+        if !allowed {
+            check_status(&response)?;
+            return Err(error(
+                "local-api-http",
+                "Local API rejected the read",
+                Some(status.as_u16()),
+            ));
+        }
+        let server_id = header(&response, SERVER_ID).filter(|value| !value.is_empty());
+        let library_version = optional_u64_header(&response, "Last-Modified-Version")?;
+        let total = optional_u64_header(&response, "Total-Results")?;
+        let link = header(&response, "Link");
+        let body = response.text().await.map_err(|_| {
+            error(
+                "local-api-protocol",
+                "Invalid Local API response body",
+                None,
+            )
+        })?;
+        Ok(LocalReadExchange {
+            status,
+            server_id,
+            library_version,
+            total,
+            link,
+            body,
         })
     }
 
@@ -508,7 +583,19 @@ impl LocalApiClient {
     }
 }
 
-fn prefix(scope: &LibraryScope) -> String {
+pub(crate) struct LocalReadExchange {
+    pub status: StatusCode,
+    /// Present for callers that want the response instance id. Reads compare it
+    /// only when a server id was sent.
+    #[allow(dead_code)]
+    pub server_id: Option<String>,
+    pub library_version: Option<u64>,
+    pub total: Option<u64>,
+    pub link: Option<String>,
+    pub body: String,
+}
+
+pub(crate) fn prefix(scope: &LibraryScope) -> String {
     match scope {
         LibraryScope::User => "users/0".to_string(),
         LibraryScope::Group { group_id } => format!("groups/{group_id}"),
@@ -552,14 +639,14 @@ fn optional_u64_header(response: &Response, name: &str) -> ZotResult<Option<u64>
         Some(value) => value.parse::<u64>().map(Some).map_err(|_| {
             error(
                 "local-api-protocol",
-                "Collection list total is invalid",
+                "Local API numeric header is invalid",
                 None,
             )
         }),
     }
 }
 
-fn next_start(link: Option<&str>, current_start: u64) -> ZotResult<Option<u64>> {
+pub(crate) fn next_start(link: Option<&str>, current_start: u64) -> ZotResult<Option<u64>> {
     let Some(link) = link else {
         return Ok(None);
     };
@@ -752,32 +839,39 @@ fn check_status(response: &Response) -> ZotResult<()> {
     if response.status().is_success() {
         return Ok(());
     }
-    let (code, message) = match response.status().as_u16() {
-        401 => (
-            "local-api-unauthorized",
-            "Local authorization is missing or expired",
-        ),
-        403 => (
-            "local-api-forbidden",
-            "Local API disabled, authorization denied, or target not writable",
-        ),
-        404 => (
-            "local-api-not-found",
-            "Target not found in the selected local library",
-        ),
-        412 => (
-            "local-api-conflict",
-            "Zotero instance or object version changed; preview again",
-        ),
-        428 => (
-            "local-api-precondition",
-            "Local API requires instance and version preconditions",
-        ),
-        429 => (
-            "local-api-rate-limit",
-            "Authorization rate limited; retry after the indicated delay",
-        ),
-        _ => ("local-api-http", "Local API rejected the request"),
+    let (code, message) = if response.status().is_redirection() {
+        (
+            "local-api-redirect",
+            "Local API refused to follow a redirect",
+        )
+    } else {
+        match response.status().as_u16() {
+            401 => (
+                "local-api-unauthorized",
+                "Local authorization is missing or expired",
+            ),
+            403 => (
+                "local-api-forbidden",
+                "Local API disabled, authorization denied, or target not writable",
+            ),
+            404 => (
+                "local-api-not-found",
+                "Target not found in the selected local library",
+            ),
+            412 => (
+                "local-api-conflict",
+                "Zotero instance or object version changed; preview again",
+            ),
+            428 => (
+                "local-api-precondition",
+                "Local API requires instance and version preconditions",
+            ),
+            429 => (
+                "local-api-rate-limit",
+                "Authorization rate limited; retry after the indicated delay",
+            ),
+            _ => ("local-api-http", "Local API rejected the request"),
+        }
     };
     let mut result = error(code, message, Some(response.status().as_u16()));
     if let ZotError::LocalApi { hint, .. } = &mut result {
@@ -811,7 +905,7 @@ fn read_error(err: reqwest::Error) -> ZotError {
     )
 }
 
-fn error(code: &str, message: &str, status: Option<u16>) -> ZotError {
+pub(crate) fn error(code: &str, message: &str, status: Option<u16>) -> ZotError {
     ZotError::LocalApi {
         code: code.to_string(),
         message: message.to_string(),

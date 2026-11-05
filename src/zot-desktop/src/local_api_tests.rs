@@ -394,7 +394,7 @@ fn create_receipt_rejects_contradictory_or_malformed_result_buckets() {
 #[tokio::test]
 async fn refuses_redirects_conflicts_permissions_and_missing_preconditions() {
     for (status, code) in [
-        (301, "local-api-http"),
+        (301, "local-api-redirect"),
         (401, "local-api-unauthorized"),
         (403, "local-api-forbidden"),
         (412, "local-api-conflict"),
