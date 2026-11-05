@@ -506,6 +506,17 @@
         "Continues with a desktop read when SQLite is busy and reports fulltext_index unavailable.",
         "Keeps writes on their existing separate flow."
       ]
+    },
+    {
+      "id": 47,
+      "prompt": "基于我 Zotero 里 LLM Safety 这个 collection，分析这些论文的共同缺陷和下一步创新点，并生成本地 Markdown/HTML brainstorm 报告。不要改库。",
+      "expected_output": "这是文献综合，交给 zot-brainstorm。不要把它展开成普通 library search、单篇摘要或 Zotero 写入。",
+      "files": [],
+      "expectations": [
+        "Routes defect analysis, innovation directions, and the local report to zot-brainstorm.",
+        "Does not turn the request into ordinary library maintenance or a write.",
+        "Keeps Zotero read-only unless a separate write is explicitly authorized."
+      ]
     }
   ]
 }
