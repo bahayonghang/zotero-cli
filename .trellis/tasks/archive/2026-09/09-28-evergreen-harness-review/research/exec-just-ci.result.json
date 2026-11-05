@@ -1,0 +1,16 @@
+{
+  "command": [
+    "C:\\Users\\lyh\\scoop\\shims\\just.EXE",
+    "ci"
+  ],
+  "cwd": "D:\\Documents\\Code\\CLI\\zotero-cli",
+  "started_utc": "2026-09-28T06:37:42.450441+00:00",
+  "baseline_head": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+  "input_tree_sha256": "d6c2bcc6a2a8360dd16ce6bd6847a18002f09314b5ad09e747e5dd76b09afc70",
+  "lock_sha256": "857974bce8e060ed25212b68463e2bd1e0c42be3dce908517d001428d93e706f",
+  "environment_overrides": {},
+  "exit_code": 0,
+  "ended_utc": "2026-09-28T06:39:12.586579+00:00",
+  "output_tree_sha256": "d6c2bcc6a2a8360dd16ce6bd6847a18002f09314b5ad09e747e5dd76b09afc70",
+  "log": "exec-just-ci.log"
+}

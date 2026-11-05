@@ -1,0 +1,473 @@
+cargo fmt	UNKNOWN STEP	﻿2026-07-08T13:16:12.9995122Z Current runner version: '2.335.1'
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0021194Z ##[group]Runner Image Provisioner
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0022047Z Hosted Compute Agent
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0022710Z Version: 20260624.560
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0023406Z Commit: 925d229a51159bc391ae97e54a2dd1fe20af789d
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0024176Z Build Date: 2026-06-24T18:26:47Z
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0024920Z Worker ID: {9cc7c2b8-2383-4163-99e5-1a888e6fbf21}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0025657Z Azure Region: eastus2
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0026232Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0028250Z ##[group]Operating System
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0028906Z Ubuntu
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0029509Z 24.04.4
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0030056Z LTS
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0030587Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0031248Z ##[group]Runner Image
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0031879Z Image: ubuntu-24.04
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0032439Z Version: 20260705.232.1
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0033785Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260705.232/images/ubuntu/Ubuntu2404-Readme.md
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0035463Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260705.232
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0036474Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0038249Z ##[group]GITHUB_TOKEN Permissions
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0041044Z Contents: read
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0041930Z Metadata: read
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0042752Z Packages: read
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0043333Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0045818Z Secret source: Actions
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0046838Z Prepare workflow directory
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0433609Z Prepare all required actions
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.0472083Z Getting action download info
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.2783255Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.3486006Z Download action repository 'dtolnay/rust-toolchain@stable' (SHA:4be7066ada62dd38de10e7b70166bc74ed198c30)
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.4532293Z Download action repository 'Swatinem/rust-cache@v2' (SHA:e18b497796c12c097a38f9edb9d0641fb99eee32)
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.8829805Z Complete job name: cargo fmt
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9585320Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9594479Z ##[group]Run actions/checkout@v4
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9595214Z with:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9595701Z   repository: bahayonghang/zotero-cli
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9600325Z   token: ***
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9600808Z   ssh-strict: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9601282Z   ssh-user: git
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9601760Z   persist-credentials: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9602278Z   clean: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9602757Z   sparse-checkout-cone-mode: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9603326Z   fetch-depth: 1
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9603788Z   fetch-tags: false
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9604269Z   show-progress: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9604787Z   lfs: false
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9605285Z   submodules: false
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9605757Z   set-safe-directory: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9606535Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9606982Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9607653Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:13.9608143Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0712239Z Syncing repository: bahayonghang/zotero-cli
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0715229Z ##[group]Getting Git version info
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0716556Z Working directory is '/home/runner/work/zotero-cli/zotero-cli'
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0718800Z [command]/usr/bin/git version
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0798699Z git version 2.54.0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0829846Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0848595Z Temporarily overriding HOME='/home/runner/work/_temp/00315586-506c-4fc4-a542-63bc925af029' before making global git config changes
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0878982Z Adding repository directory to the temporary git global config as a safe directory
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0881922Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/zotero-cli/zotero-cli
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0920181Z Deleting the contents of '/home/runner/work/zotero-cli/zotero-cli'
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0922406Z ##[group]Initializing the repository
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.0924943Z [command]/usr/bin/git init /home/runner/work/zotero-cli/zotero-cli
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1012117Z hint: Using 'master' as the name for the initial branch. This default branch name
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1014225Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1016005Z hint: to use in all of your new repositories, which will suppress this warning,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1017785Z hint: call:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1018573Z hint:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1019543Z hint: 	git config --global init.defaultBranch <name>
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1026827Z hint:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1028239Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1030271Z hint: 'development'. The just-created branch can be renamed via this command:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1032215Z hint:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1033079Z hint: 	git branch -m <name>
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1033987Z hint:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1035162Z hint: Disable this message with "git config set advice.defaultBranchName false"
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1037369Z Initialized empty Git repository in /home/runner/work/zotero-cli/zotero-cli/.git/
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1041864Z [command]/usr/bin/git remote add origin https://github.com/bahayonghang/zotero-cli
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1084944Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1086411Z ##[group]Disabling automatic garbage collection
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1088405Z [command]/usr/bin/git config --local gc.auto 0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1121813Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1123149Z ##[group]Setting up auth
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1127723Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1165222Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1531601Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1574219Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1828179Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.1866963Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.2112202Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.2154220Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.2155547Z ##[group]Fetching the repository
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.2164657Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +cd39ab4618fdc3c5fc1617cd404e8139f6f77c29:refs/remotes/origin/main
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5393872Z From https://github.com/bahayonghang/zotero-cli
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5396438Z  * [new ref]         cd39ab4618fdc3c5fc1617cd404e8139f6f77c29 -> origin/main
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5427616Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5429375Z ##[group]Determining the checkout info
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5431401Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5437588Z [command]/usr/bin/git sparse-checkout disable
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5489985Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5524138Z ##[group]Checking out the ref
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5529025Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5804319Z Switched to a new branch 'main'
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5805931Z branch 'main' set up to track 'origin/main'.
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5814302Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5876599Z [command]/usr/bin/git log -1 --format=%H
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.5908201Z cd39ab4618fdc3c5fc1617cd404e8139f6f77c29
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6684442Z ##[group]Run dtolnay/rust-toolchain@stable
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6685734Z with:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6686684Z   components: rustfmt, clippy
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6688212Z   toolchain: stable
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6689187Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6690102Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6691243Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6692290Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6855658Z ##[group]Run : parse toolchain version
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6857305Z ^[[36;1m: parse toolchain version^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6858531Z ^[[36;1mif [[ -z $toolchain ]]; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6860558Z ^[[36;1m  # GitHub does not enforce `required: true` inputs itself. https://github.com/actions/runner/issues/1070^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6862741Z ^[[36;1m  echo "'toolchain' is a required input" >&2^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6864009Z ^[[36;1m  exit 1^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6865419Z ^[[36;1melif [[ $toolchain =~ ^stable' '[0-9]+' '(year|month|week|day)s?' 'ago$ ]]; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6867357Z ^[[36;1m  if [[ Linux == macOS ]]; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6869473Z ^[[36;1m    echo "toolchain=1.$((($(date -v-$(sed 's/stable \([0-9]*\) \(.\).*/\1\2/' <<< $toolchain) +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6871531Z ^[[36;1m  else^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6873157Z ^[[36;1m    echo "toolchain=1.$((($(date --date "${toolchain#stable }" +%s)/60/60/24-16569)/7/6))" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6875024Z ^[[36;1m  fi^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6876264Z ^[[36;1melif [[ $toolchain =~ ^stable' 'minus' '[0-9]+' 'releases?$ ]]; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6878633Z ^[[36;1m  echo "toolchain=1.$((($(date +%s)/60/60/24-16569)/7/6-${toolchain//[^0-9]/}))" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6880507Z ^[[36;1melif [[ $toolchain =~ ^1\.[0-9]+$ ]]; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6882604Z ^[[36;1m  echo "toolchain=1.$((i=${toolchain#1.}, c=($(date +%s)/60/60/24-16569)/7/6, i+9*i*(10*i<=c)+90*i*(100*i<=c)))" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6884639Z ^[[36;1melse^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6885707Z ^[[36;1m  echo "toolchain=$toolchain" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.6886991Z ^[[36;1mfi^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8038821Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8040253Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8041703Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8043167Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8044578Z   toolchain: stable
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8045840Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8271789Z ##[group]Run : construct rustup command line
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8273097Z ^[[36;1m: construct rustup command line^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8274855Z ^[[36;1mecho "targets=$(for t in ${targets//,/ }; do echo -n ' --target' $t; done)" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8277479Z ^[[36;1mecho "components=$(for c in ${components//,/ }; do echo -n ' --component' $c; done)" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8279471Z ^[[36;1mecho "downgrade=" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8317564Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8318936Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8319774Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8320774Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8321736Z   targets: 
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8322601Z   components: rustfmt, clippy
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8323615Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8561762Z ##[group]Run : set $CARGO_HOME
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8562820Z ^[[36;1m: set $CARGO_HOME^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8564110Z ^[[36;1mecho CARGO_HOME=${CARGO_HOME:-"$HOME/.cargo"} >> $GITHUB_ENV^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8601492Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8602801Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8603653Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8604652Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.8605596Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9058885Z ##[group]Run : install rustup if needed
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9060618Z ^[[36;1m: install rustup if needed^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9062590Z ^[[36;1mif ! command -v rustup &>/dev/null; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9066715Z ^[[36;1m  curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused --location --silent --show-error --fail https://sh.rustup.rs | sh -s -- --default-toolchain none -y^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9069687Z ^[[36;1m  echo "$CARGO_HOME/bin" >> $GITHUB_PATH^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9070874Z ^[[36;1mfi^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9111476Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9112790Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9113616Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9114621Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9115621Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9116672Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9540180Z ##[group]Run rustup toolchain install stable --component rustfmt --component clippy --profile minimal --no-self-update
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9543150Z ^[[36;1mrustup toolchain install stable --component rustfmt --component clippy --profile minimal --no-self-update^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9586894Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9588290Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9589091Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9590047Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9590998Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9592042Z   RUSTUP_PERMIT_COPY_RENAME: 1
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:14.9593015Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.4983205Z info: syncing channel updates for stable-x86_64-unknown-linux-gnu
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8187801Z info: latest update on 2026-06-30 for version 1.96.1 (31fca3adb 2026-06-26)
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8367799Z info: component clippy is up to date
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8368617Z info: component rustfmt is up to date
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8381106Z 
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8474337Z   stable-x86_64-unknown-linux-gnu unchanged - rustc 1.96.1 (31fca3adb 2026-06-26)
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8474785Z 
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8588150Z ##[group]Run rustup default stable
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8588553Z ^[[36;1mrustup default stable^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8623718Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8624122Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8624382Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8624672Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8624981Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8625290Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8739660Z info: using existing install for stable-x86_64-unknown-linux-gnu
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8744937Z info: default toolchain set to stable-x86_64-unknown-linux-gnu
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8745250Z 
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8833660Z   stable-x86_64-unknown-linux-gnu unchanged - rustc 1.96.1 (31fca3adb 2026-06-26)
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8834070Z 
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8879635Z ##[group]Run : create cachekey
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8879994Z ^[[36;1m: create cachekey^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8880564Z ^[[36;1mDATE=$(rustc +stable --version --verbose | sed -ne 's/^commit-date: \(20[0-9][0-9]\)-\([01][0-9]\)-\([0-3][0-9]\)$/\1\2\3/p')^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8881268Z ^[[36;1mHASH=$(rustc +stable --version --verbose | sed -ne 's/^commit-hash: //p')^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8881845Z ^[[36;1mecho "cachekey=$(echo $DATE$HASH | head -c12)" >> $GITHUB_OUTPUT^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8914840Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8915232Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8915484Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8915791Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8916108Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.8916417Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9585080Z ##[group]Run : disable incremental compilation
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9585537Z ^[[36;1m: disable incremental compilation^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9585932Z ^[[36;1mif [ -z "${CARGO_INCREMENTAL+set}" ]; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9586396Z ^[[36;1m  echo CARGO_INCREMENTAL=0 >> $GITHUB_ENV^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9586734Z ^[[36;1mfi^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9621045Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9621454Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9622012Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9622492Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9622789Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9623085Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9712429Z ##[group]Run : enable colors in Cargo output
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9712827Z ^[[36;1m: enable colors in Cargo output^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9713192Z ^[[36;1mif [ -z "${CARGO_TERM_COLOR+set}" ]; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9713579Z ^[[36;1m  echo CARGO_TERM_COLOR=always >> $GITHUB_ENV^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9713913Z ^[[36;1mfi^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9746138Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9746652Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9746972Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9747536Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9747896Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9748294Z   CARGO_INCREMENTAL: 0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9748663Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9838683Z ##[group]Run : enable Cargo sparse registry
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9839112Z ^[[36;1m: enable Cargo sparse registry^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9839542Z ^[[36;1m# implemented in 1.66, stabilized in 1.68, made default in 1.70^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9840291Z ^[[36;1mif [ -z "${CARGO_REGISTRIES_CRATES_IO_PROTOCOL+set}" -o -f "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol ]; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9841039Z ^[[36;1m  if rustc +stable --version --verbose | grep -q '^release: 1\.6[89]\.'; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9841636Z ^[[36;1m    touch "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol || true^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9842211Z ^[[36;1m    echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse >> $GITHUB_ENV^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9842745Z ^[[36;1m  elif rustc +stable --version --verbose | grep -q '^release: 1\.6[67]\.'; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9843335Z ^[[36;1m    touch "/home/runner/work/_temp"/.implicit_cargo_registries_crates_io_protocol || true^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9843880Z ^[[36;1m    echo CARGO_REGISTRIES_CRATES_IO_PROTOCOL=git >> $GITHUB_ENV^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9844279Z ^[[36;1m  fi^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9844533Z ^[[36;1mfi^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9875076Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9875470Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9875725Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9876013Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9876305Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9876605Z   CARGO_INCREMENTAL: 0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:17.9876869Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0276610Z ##[group]Run : work around spurious network errors in curl 8.0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0277473Z ^[[36;1m: work around spurious network errors in curl 8.0^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0278333Z ^[[36;1m# https://rust-lang.zulipchat.com/#narrow/stream/246057-t-cargo/topic/timeout.20investigation^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0279027Z ^[[36;1mif rustc +stable --version --verbose | grep -q '^release: 1\.7[01]\.'; then^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0279531Z ^[[36;1m  echo CARGO_HTTP_MULTIPLEXING=false >> $GITHUB_ENV^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0279913Z ^[[36;1mfi^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0313861Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0314278Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0314539Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0314832Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0315131Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0315451Z   CARGO_INCREMENTAL: 0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0315714Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0559692Z ##[group]Run rustc +stable --version --verbose
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0560110Z ^[[36;1mrustc +stable --version --verbose^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0592863Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0593269Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0593527Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0593825Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0594117Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0594419Z   CARGO_INCREMENTAL: 0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0594684Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0780250Z rustc 1.96.1 (31fca3adb 2026-06-26)
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0780821Z binary: rustc
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0781652Z commit-hash: 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0782256Z commit-date: 2026-06-26
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0783034Z host: x86_64-unknown-linux-gnu
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0783843Z release: 1.96.1
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0784690Z LLVM version: 22.1.2
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0936322Z ##[group]Run Swatinem/rust-cache@v2
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0936669Z with:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0936920Z   shared-key: fmt
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0937422Z   prefix-key: v0-rust
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0937692Z   add-job-id-key: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0937977Z   add-rust-environment-hash-key: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0938295Z   cache-targets: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0938561Z   cache-all-crates: false
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0938851Z   cache-workspace-crates: false
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0939143Z   save-if: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0939421Z   cache-provider: github
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0939733Z   cache-bin: true
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0940015Z   lookup-only: false
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0940269Z   cmd-format: {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0940517Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0940754Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0941040Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0941315Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0941619Z   CARGO_INCREMENTAL: 0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.0941926Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.3718193Z (node:2360) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:18.3719710Z (Use `node --trace-deprecation ...` to show where the warning was created)
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6838431Z ##[group]Cache Configuration
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6838919Z Cache Provider:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6839226Z     github
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6839526Z Workspaces:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6839898Z     /home/runner/work/zotero-cli/zotero-cli
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6840351Z Cache Paths:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6840686Z     /home/runner/.cargo/bin
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6841072Z     /home/runner/.cargo/.crates.toml
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6841549Z     /home/runner/.cargo/.crates2.json
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6842001Z     /home/runner/.cargo/registry
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6842377Z     /home/runner/.cargo/git
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6842843Z     /home/runner/work/zotero-cli/zotero-cli/target
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6843297Z Restore Key:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6843657Z     v0-rust-fmt-Linux-x64-335838ce
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6844050Z Cache Key:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6844399Z     v0-rust-fmt-Linux-x64-335838ce-a1aaec3a
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6844851Z .. Prefix:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6845176Z   - v0-rust-fmt-Linux-x64
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6845600Z .. Environment considered:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6846020Z   - Rust Versions:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6846585Z     - 1.96.1 x86_64-unknown-linux-gnu 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6847619Z     - 1.96.1 x86_64-unknown-linux-gnu 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6848226Z   - CARGO_HOME
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6848559Z   - CARGO_INCREMENTAL
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6848927Z   - CARGO_TERM_COLOR
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6849278Z   - RUSTFLAGS
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6849607Z .. Lockfiles considered:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6850069Z   - /home/runner/work/zotero-cli/zotero-cli/Cargo.lock
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6850698Z   - /home/runner/work/zotero-cli/zotero-cli/src/zot-cli/Cargo.toml
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6851405Z   - /home/runner/work/zotero-cli/zotero-cli/src/zot-core/Cargo.toml
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6852166Z   - /home/runner/work/zotero-cli/zotero-cli/src/zot-local/Cargo.toml
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6852923Z   - /home/runner/work/zotero-cli/zotero-cli/src/zot-remote/Cargo.toml
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6853789Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6853978Z 
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.6854130Z ... Restoring cache ...
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7668252Z No cache found.
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7821401Z ##[group]Run cargo fmt --all --check
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7821747Z ^[[36;1mcargo fmt --all --check^[[0m
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7856720Z shell: /usr/bin/bash -e {0}
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7856974Z env:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7857522Z   CARGO_TERM_COLOR: always
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7857778Z   RUSTFLAGS: -D warnings
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7858025Z   CARGO_HOME: /home/runner/.cargo
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7858278Z   CARGO_INCREMENTAL: 0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7858499Z   CACHE_ON_FAILURE: false
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:19.7858727Z ##[endgroup]
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9569076Z Diff in /home/runner/work/zotero-cli/zotero-cli/src/zot-cli/src/commands/collection.rs:38:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9569863Z                  "item_key": args.item_key,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9570324Z                  "collection_key": args.collection_key,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9570750Z              });
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9577003Z -            CommandOutput::new(ctx, payload, None, |_| println!("Item added to collection."))
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9578125Z +            CommandOutput::new(ctx, payload, None, |_| {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9578567Z +                println!("Item added to collection.")
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9578852Z +            })
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9579044Z          }
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9579287Z          CollectionCommand::RemoveItem(args) => {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9579576Z              ctx.remote()?
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9934357Z Diff in /home/runner/work/zotero-cli/zotero-cli/src/zot-cli/src/commands/item/write.rs:142:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9935164Z      ctx.remote()?.delete_item(&args.key).await?;
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9935632Z      let key = args.key;
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9936067Z      let payload = serde_json::json!({ "trashed": key });
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9936765Z -    CommandOutput::new(ctx, payload, None, move |_| println!("Moved to trash: {key}"))
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9937678Z +    CommandOutput::new(ctx, payload, None, move |_| {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9938152Z +        println!("Moved to trash: {key}")
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9938547Z +    })
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9938836Z  }
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9939094Z  
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9939667Z  pub(crate) async fn handle_restore(ctx: &AppContext, args: ItemKeyArgs) -> Result<CommandOutput> {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9981598Z Diff in /home/runner/work/zotero-cli/zotero-cli/src/zot-cli/src/commands/library.rs:464:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9982408Z      fn saved_search_delete_output_is_enveloped() {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9982877Z          let ctx = json_ctx();
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9983406Z          let payload = serde_json::json!({ "deleted": ["SRCH01", "SRCH02"] });
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9984253Z -        let out = CommandOutput::new(&ctx, payload, None, |_| unreachable!()).expect("build output");
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9984923Z +        let out =
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9985464Z +            CommandOutput::new(&ctx, payload, None, |_| unreachable!()).expect("build output");
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9985915Z          let json = out.as_json().expect("json payload");
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9986230Z          assert!(json.contains("\"ok\": true"));
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:20.9986533Z          assert!(json.contains("\"deleted\""));
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0051676Z Diff in /home/runner/work/zotero-cli/zotero-cli/src/zot-cli/src/output.rs:1:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0052401Z  use zot_core::{CliEnvelope, EnvelopeMeta};
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0052841Z  
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0053135Z  use crate::context::AppContext;
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0053705Z -use crate::format::{to_pretty_json, EnvelopeMetaSeed, ENVELOPE_API_VERSION};
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0054516Z +use crate::format::{ENVELOPE_API_VERSION, EnvelopeMetaSeed, to_pretty_json};
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0055079Z  
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0055527Z  /// Successful command output. Handlers return this; the dispatch layer calls
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0056193Z  /// [`CommandOutput::emit`] to print it. This is the single place where the
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0870790Z Diff in /home/runner/work/zotero-cli/zotero-cli/src/zot-local/src/graph.rs:71:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0871953Z  
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0872565Z      if opts.relations.coauthor {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0873637Z          for group in invert_authors(&ordered).values() {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0874394Z -            accumulate(group, opts.max_group_size, &mut pairs, |acc| acc.coauthor += 1);
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0875184Z +            accumulate(group, opts.max_group_size, &mut pairs, |acc| {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0875963Z +                acc.coauthor += 1
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0876348Z +            });
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0876644Z          }
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0876918Z      }
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0877471Z      if opts.relations.tag {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0878078Z Diff in /home/runner/work/zotero-cli/zotero-cli/src/zot-local/src/graph.rs:176:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0878746Z          })
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0879032Z          .collect();
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0879340Z  
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0879927Z -    let metrics = compute_metrics(&nodes, &ordered, &community, connected_components, opts.top_n);
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0880666Z +    let metrics = compute_metrics(
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0881056Z +        &nodes,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0881370Z +        &ordered,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0881678Z +        &community,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0882001Z +        connected_components,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0882361Z +        opts.top_n,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0882658Z +    );
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0882927Z  
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0883199Z      KnowledgeGraph {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0883521Z          scope,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0884051Z Diff in /home/runner/work/zotero-cli/zotero-cli/src/zot-local/src/graph.rs:385:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0884676Z          top_by_degree,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0885023Z          top_by_weighted_degree,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0885521Z          communities: summarise_communities(ordered, community),
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0886196Z -        top_authors: top_counts(ordered.iter().flat_map(|item| {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0886745Z -            item.creators
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0887303Z -                .iter()
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0887698Z -                .map(|creator| creator.full_name())
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0888197Z -                .filter(|name| !name.is_empty())
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0888634Z -        }), top_n),
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0888971Z +        top_authors: top_counts(
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0889388Z +            ordered.iter().flat_map(|item| {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0889823Z +                item.creators
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0890194Z +                    .iter()
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0890595Z +                    .map(|creator| creator.full_name())
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0891089Z +                    .filter(|name| !name.is_empty())
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0891499Z +            }),
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0891810Z +            top_n,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0892102Z +        ),
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0892396Z          top_tags: top_counts(
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0892888Z              ordered.iter().flat_map(|item| item.tags.iter().cloned()),
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0893421Z              top_n,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0893951Z Diff in /home/runner/work/zotero-cli/zotero-cli/src/zot-local/src/graph.rs:398:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0894575Z      }
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0894838Z  }
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0895100Z  
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0895703Z -fn rank_nodes(nodes: &[GraphNode], top_n: usize, score: impl Fn(&GraphNode) -> i64) -> Vec<RankedNode> {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0896444Z +fn rank_nodes(
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0896750Z +    nodes: &[GraphNode],
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0897275Z +    top_n: usize,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0897624Z +    score: impl Fn(&GraphNode) -> i64,
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0898033Z +) -> Vec<RankedNode> {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0898425Z      let mut ranked: Vec<RankedNode> = nodes
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0898847Z          .iter()
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.0899161Z          .map(|node| RankedNode {
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.1976994Z ##[error]Process completed with exit code 1.
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.2117760Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.2119240Z Post job cleanup.
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.2963461Z [command]/usr/bin/git version
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3006483Z git version 2.54.0
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3044591Z Temporarily overriding HOME='/home/runner/work/_temp/0ceefe20-6e05-44e8-b586-2e63c3ee6dfe' before making global git config changes
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3046490Z Adding repository directory to the temporary git global config as a safe directory
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3050398Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/zotero-cli/zotero-cli
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3090642Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3127317Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3390878Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3419675Z http.https://github.com/.extraheader
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3431550Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3466494Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3731420Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.3771954Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.4171959Z Cleaning up orphan processes
+cargo fmt	UNKNOWN STEP	2026-07-08T13:16:21.4456255Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -37,14 +37,20 @@ async fn main() {
     let mut json = cli.json;
     let verbose = cli.verbose;
     let mut profile = cli.profile.clone();
-    if let Err(err) = run(cli, &mut json, &mut profile).await {
-        let error = AppError::runtime(err);
-        emit_error(&error, json, verbose, profile.as_deref());
-        std::process::exit(1);
+    // Command futures contain nested HTTP workflows. Heap allocation keeps their
+    // construction and polling within the Windows main-thread stack budget.
+    match Box::pin(run(cli, &mut json, &mut profile)).await {
+        Err(err) => {
+            let error = AppError::runtime(err);
+            emit_error(&error, json, verbose, profile.as_deref());
+            std::process::exit(1);
+        }
+        Ok(code) if code != 0 => std::process::exit(code),
+        Ok(_) => {}
     }
 }
 
-async fn run(mut cli: Cli, json: &mut bool, profile: &mut Option<String>) -> Result<()> {
+async fn run(mut cli: Cli, json: &mut bool, profile: &mut Option<String>) -> Result<i32> {
     let ctx = AppContext::from_cli(&cli)?;
     *json = ctx.json;
     *profile = ctx.profile.clone();

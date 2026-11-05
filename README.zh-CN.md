@@ -12,7 +12,7 @@
 
 **面向 Agent 的 Zotero skill 运行时，用来查询、阅读并安全更新库里的内容。**
 
-把已有的 Zotero 文献库变成稳定的 AI 工作面：找条目、读 PDF 证据、提取批注和笔记、建立主题 workspace、通过 Zotero Desktop 合并重复项，并在安全门下执行 Zotero Web API 写操作。
+在 AI 工作流中使用已有的 Zotero 文献库：查找条目、读取 PDF 证据、提取批注和笔记、建立主题 workspace。Zotero 10+ 支持经预览和桌面授权的本地字段/作者补充、分类成员操作和单条标签增删；合并重复项和批量标签等其他修改仍走 Zotero Web API。Desktop connector 用于新增导入 BibTeX/RIS 条目。
 
 <img src="./docs/public/images/zot-icon.png" alt="zot 图标" width="180" />
 
@@ -45,9 +45,9 @@
 - Zotero 的库数据在 `zotero.sqlite` 和 `storage/` 附件目录里。
 - 条目本身携带 metadata、notes、tags、attachments 等结构化内容。
 - Zotero 批注可以进入 note，并带回源 PDF 页面的链接。
-- Zotero Desktop 内置 connector 可把 BibTeX / RIS 导入当前选中的可写目标；其他已支持 mutation 走带写权限和版本控制的 Web API。
+- Zotero Desktop 内置 connector 可把 BibTeX / RIS 导入当前选中的可写目标；Zotero 10+ Local API 支持本地字段/作者、分类成员和单条标签修改；其他 mutation 走 Web API。
 
-`zot` 把这套模型变成 Agent 可稳定调用的工作流：本地直读内容，通过内置 connector 新增导入，merge/dedupe 与其他 mutation 统一走 Web API。
+`zot` 将读取、connector 导入、经授权的 Local API 内容操作和 Web API 修改分开路由，失败时不自动切换后端。
 
 ---
 
@@ -96,7 +96,7 @@ cargo run -q -p zot-cli -- --json doctor
 
 同一轮任务里固定一种调用方式，不要来回切。
 
-`doctor` 会分别报告 `local_sqlite_read`、`local_http_read`、`connector_write` 和 `web_write`。本地读取与 connector 导入不要求 Web 凭据；merge/dedupe 与其他 Web API mutation 需要写凭据。
+`doctor` 会分别报告 `local_sqlite_read`、`local_http_read`、`connector_write`、`local_api_write` 和 `web_write`。本地读取、Local API 操作与 connector 导入不要求 Web 凭据；merge/dedupe 与其他 Web API mutation 需要写凭据。
 
 如果本地 PDF 读取需要 Pdfium，而当前机器上还没有可用库，`zot` 会在受支持的 Windows、macOS、glibc Linux 平台上，在第一次本地 PDF 读取时自动下载受管 Pdfium。
 
@@ -205,7 +205,7 @@ just docs
 
 Cargo 的 `workspace.package.version` 保持数字形式 `X.Y.Z`。
 
-当前示例标签是 `v1.0.1`。
+当前示例标签是 `v1.1.0`。
 
 `github-pages` 环境目前允许分支 `main` 和标签模式 `v*`。
 
@@ -216,9 +216,9 @@ Cargo 的 `workspace.package.version` 保持数字形式 `X.Y.Z`。
 ## 当前边界
 
 - `zot mcp serve` 现在只是 scaffold，会返回 `mcp-not-implemented`。当前应走 skill + runtime。
-- 本地 SQLite 和 Zotero Local HTTP 都只读，不能作为写通道。
+- 本地 SQLite 保持只读。Zotero 10+ 的字段/作者、分类成员和单条标签增删可使用官方 Local API，见[本地内容操作](docs/cli/local-write.md)。
 - 内置 connector 只负责把新的 BibTeX / RIS 记录导入 Zotero UI 当前选中的可写目标，不能更新或合并已有条目。
-- merge/dedupe、note、tag、collection、Web import、annotation、saved-search、status-sync mutation 统一走 Zotero Web API。
+- merge/dedupe、note、`item tag batch`、分类重命名/删除、Web import、annotation、saved-search、status-sync mutation 走 Zotero Web API。单条 `item tag add/remove` 和 `collection create` 不带 `--write-backend local` 时仍走 Web。
 - 旧 `desktop_bridge` / `write_backend` 配置会被忽略；`doctor` 会给出迁移提示，方便安全删除。
 - merge/dedupe 默认先 preview；批量 dedupe 默认跳过 low-confidence，只有单独展示并取得明确风险授权后才可使用 `--include-low-confidence`。
 - `item tag batch` 默认先 preview，只有 `--confirm` 才写入；确认目标不得超过

@@ -16,8 +16,9 @@ doctor's `connector_write` capability.
 
 The connector talks to Zotero's own built-in server with **no plugin installed
 and no auth**. It is import-only, and the target is whatever the Zotero UI
-currently has selected. `connector.rs` is the sole module in `zot-desktop` and
-also owns the adjacent read-only `/api/` readiness probe.
+currently has selected. `connector.rs` owns import and the adjacent read-only
+`/api/` readiness probe. `local_api.rs` separately implements authenticated
+Zotero 10+ content operations; see [Local API contract](./local-api.md).
 
 ### 2. Signatures
 

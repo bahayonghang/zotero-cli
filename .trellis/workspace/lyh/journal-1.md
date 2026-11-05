@@ -904,3 +904,254 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Status
 
 [OK] **Completed**
+
+
+## Session 28: 常青项目审查实施与五工具契约对齐
+
+**Date**: 2026-09-28
+**Task**: 常青项目审查实施与五工具契约对齐
+**Branch**: `dev`
+
+### Summary
+
+完成 C1-C4 本地实施、验收、工作提交与主子任务归档。远端交付仍未执行。
+
+### Main Changes
+
+- 修补 rustls 安全依赖，修复三组平台别名，显式 Codex inline，对齐五工具规则与每周安全 CI。
+- 主任务及四个子任务归档至 .trellis/tasks/archive/2026-09，保持父子关系并更新上下文清单。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a2120b3` | (see git log) |
+| `d2ab47c` | (see git log) |
+| `2b93e1b` | (see git log) |
+| `456c6a0` | (see git log) |
+
+### Testing
+
+- [OK] 此前 just ci 通过：281 个不同 Rust 测试与 23 项 Python 测试；audit/deny/MSRV/machete/udeps/actionlint/文档构建通过。
+- [OK] 本次提交复核 10 个产品文件与已验收哈希一致；归档后五项 task.py validate、任务关系和会话指针检查通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 未推送；跨平台 hosted CI、五客户端新会话及实际 scheduled run 保持 UNVERIFIED。
+
+
+## Session 29: 处置 Dependabot PR #17-#24
+
+**Date**: 2026-10-12
+**Task**: 处置 Dependabot PR #17-#24
+**Branch**: `dev`
+
+### Summary
+
+在本地 dev 吸收 #17-#23，拒绝 #24 的 MSRV 误升级，关闭八个 PR 且不合并 main。
+
+### Main Changes
+
+- 锁文件升到 clap 4.6.6、thiserror 2.0.20、tar 0.4.46、http 1.5.0，rustls 保持 0.23.45
+- dirs 升到 7.0.0；dirs-sys 仍是 0.5.0
+- actions/checkout 与 actions/setup-node 升到 v7，Node 仍是 20
+- Dependabot 忽略 dtolnay/rust-toolchain，MSRV 保持 1.85.0
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `974334dda8280691b6a1665f244132d76132660f` | (see git log) |
+| `e1221155bc522497c9b99939d042c0ad1f1e8cca` | (see git log) |
+| `588e2bf65051177a6a35eb031bd715f09ee9e747` | (see git log) |
+| `815cd97215d456146a1b44cb615ab21498315d39` | (see git log) |
+| `99c87c3f37197e683ec06434b1557e7340a4fe87` | (see git log) |
+
+### Testing
+
+- [OK] just ci 在提交前通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 推送本地 dev 后再让这些升级进入 main
+
+
+## Session 30: Zotero local content operations acceptance
+
+**Date**: 2026-10-13
+**Task**: Zotero local content operations acceptance
+**Branch**: `dev`
+
+### Summary
+
+完成 Zotero 10.0.6 独立测试库真实授权、字段/作者写入、分类移动和增删、UI 并发编辑拒绝、重启授权复用及恢复主库后的实例冲突验收。just ci 通过：303 个 Rust 测试和 23 个 Python 测试。补齐验收脚本、结果与规范，任务已归档，原已跟踪调研报告完整保留。主库恢复且未写入，未推送或全局安装；真实组库权限、提交中断连、Undo/BBT 和其他平台保留为验证限制。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `16ce140` | (see git log) |
+| `c9548ce` | (see git log) |
+
+### Status
+
+[OK] **Completed**
+
+
+## Session 31: 完成本地标签、分类创建与批量整理
+
+**Date**: 2026-11-02
+**Task**: 完成本地标签、分类创建与批量整理
+**Branch**: `dev`
+
+### Summary
+
+完成 A/B/C 实现与审查修复，Windows Zotero 10.0.7 独立 profile/data 核心 API/UI/重启验收通过，原实例已恢复；四个任务已归档，未推送或创建 PR。
+
+### Main Changes
+
+- 实现本地标签增删、条件创建分类、冻结计划与逐项批量整理报告。
+- 修复计划校验、创建回执解析、报告落盘及 Windows item 分发器栈溢出。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `01a1347` | (see git log) |
+
+### Testing
+
+- [OK] just ci：173 个 CLI 测试及 workspace 质量门通过；23 个 Python 测试、双语文档构建、git diff --check 通过。
+- [OK] 真实隔离库标签增删、根/子分类创建、三条不同决策 apply、UI 与正常重启回读通过；恢复原 Zotero。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 按需审阅后推送或创建 PR；真实组库、其他操作系统及真实提交中断未实测。
+
+
+## Session 32: 处置 Dependabot PR 并改为每月检查
+
+**Date**: 2026-11-04
+**Task**: 处置 Dependabot PR 并改为每月检查
+**Branch**: `dev`
+
+### Summary
+
+把 #25-#27 合并进 main，关闭 #28 和 #29，并将 main 上的 Dependabot 改为每月检查。任务已归档，dev 未推送。
+
+### Main Changes
+
+- main 锁文件更新为 chrono 0.4.45、flate2 1.1.10、clap 4.6.7。
+- 关闭 uuid 1.28.0 与 quick-xml 0.42.0，并删除原先 5 个 Dependabot 分支。
+- cargo 与 docs npm 改为 monthly，并忽略越界的 uuid、quick-xml 与 rust-toolchain。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `42253a5` | (see git log) |
+| `2bba6bc` | (see git log) |
+| `f2bc245` | (see git log) |
+| `70537d0` | (see git log) |
+| `e04a7f8` | (see git log) |
+
+### Testing
+
+- [OK] 核对 origin/main 锁版本、PR 状态和 dependabot.yml；未运行 just ci。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 另处理配置推送后新开的 #30-#34。
+
+
+## Session 33: 处置剩余 Dependabot PR
+
+**Date**: 2026-11-04
+**Task**: 处置剩余 Dependabot PR
+**Branch**: `dev`
+
+### Summary
+
+合并 #31、#32、#34 到 main，关闭 #30 和 #33，并删除原来的 5 个 Dependabot 分支。
+
+### Main Changes
+
+- main 收到 serde 1.0.229、md5 0.8.1 和 toml 1.2.0
+- 关闭 uuid 1.29 与 sha2 0.11，并收紧这两条 Dependabot 忽略
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8ff5d8d` | (see git log) |
+
+### Testing
+
+- [OK] 对照 origin/main 的锁版本、PR 状态和分支列表验收
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- #35 到 #39 仍开着，不在这次任务里
+
+
+## Session 34: 开着 Zotero 时读取条目和本地 PDF
+
+**Date**: 2026-11-05
+**Task**: 开着 Zotero 时读取条目和本地 PDF
+**Branch**: `dev`
+
+### Summary
+
+实现开库只读路由：独占锁期间走 Local API，关闭后仍用一致快照。真实 Windows 桌面验收仍待验。
+
+### Main Changes
+
+- 抽出共享字段匹配，闭库快照识别原生 citation key
+- 桌面只读 GET 不授权；Better BibTeX 只允许本机 item.search
+- item get、children、pdf、library search、citekey 按单一来源路由
+- 更新 zot skill，并记录开库只读契约
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4156eff` | (see git log) |
+| `af4d543` | (see git log) |
+| `5889e0b` | (see git log) |
+| `8283852` | (see git log) |
+| `10b373f` | (see git log) |
+| `7261bd2` | (see git log) |
+| `137547b` | (see git log) |
+
+### Testing
+
+- [OK] 拆分前 just ci 与 skills-check 已通过
+- [OK] 各代码提交后 cargo check --locked --offline 通过
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 用可丢弃测试库补做 Windows 桌面真实验收

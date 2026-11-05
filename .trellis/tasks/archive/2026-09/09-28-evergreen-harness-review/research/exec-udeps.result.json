@@ -1,0 +1,22 @@
+{
+  "command": [
+    "C:\\Users\\lyh\\AppData\\Local\\mbx\\bin\\cargo.EXE",
+    "+nightly-2026-07-01",
+    "udeps",
+    "--workspace",
+    "--all-targets",
+    "--locked"
+  ],
+  "cwd": "D:\\Documents\\Code\\CLI\\zotero-cli",
+  "started_utc": "2026-09-28T06:40:12.423328+00:00",
+  "baseline_head": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+  "input_tree_sha256": "c4bdf66a2ce03b4c41d4a55ba57885fe1d1280822c716f75b9979b210be8bdea",
+  "lock_sha256": "857974bce8e060ed25212b68463e2bd1e0c42be3dce908517d001428d93e706f",
+  "environment_overrides": {
+    "CARGO_TARGET_DIR": "target/audit-udeps"
+  },
+  "exit_code": 0,
+  "ended_utc": "2026-09-28T06:40:46.836999+00:00",
+  "output_tree_sha256": "c4bdf66a2ce03b4c41d4a55ba57885fe1d1280822c716f75b9979b210be8bdea",
+  "log": "exec-udeps.log"
+}

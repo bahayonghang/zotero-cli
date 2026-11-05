@@ -1,0 +1,27 @@
+[
+  {
+    "task": "09-28-evergreen-harness-review",
+    "exit_code": 0,
+    "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\09-28-evergreen-harness-review\n\n  \u001b[0;32mimplement.jsonl: ✓ (3 entries)\u001b[0m\n  \u001b[0;32mcheck.jsonl: ✓ (3 entries)\u001b[0m\n\n\u001b[0;32m✓ All validations passed\u001b[0m\n"
+  },
+  {
+    "task": "09-28-security-lock-refresh",
+    "exit_code": 0,
+    "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\09-28-security-lock-refresh\n\n  \u001b[0;32mimplement.jsonl: ✓ (3 entries)\u001b[0m\n  \u001b[0;32mcheck.jsonl: ✓ (3 entries)\u001b[0m\n\n\u001b[0;32m✓ All validations passed\u001b[0m\n"
+  },
+  {
+    "task": "09-28-harness-platform-routing",
+    "exit_code": 0,
+    "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\09-28-harness-platform-routing\n\n  \u001b[1;33mimplement.jsonl:2: Warning: .trellis/scripts/common/workflow_phase.py looks like a code file — implement/check.jsonl should reference spec/research docs; agents read code themselves\u001b[0m\n  \u001b[0;32mimplement.jsonl: ✓ (3 entries)\u001b[0m\n  \u001b[1;33mcheck.jsonl:2: Warning: .trellis/scripts/common/workflow_phase.py looks like a code file — implement/check.jsonl should reference spec/research docs; agents read code themselves\u001b[0m\n  \u001b[0;32mcheck.jsonl: ✓ (3 entries)\u001b[0m\n\n\u001b[0;32m✓ All validations passed\u001b[0m\n"
+  },
+  {
+    "task": "09-28-harness-contract-refresh",
+    "exit_code": 0,
+    "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\09-28-harness-contract-refresh\n\n  \u001b[0;32mimplement.jsonl: ✓ (3 entries)\u001b[0m\n  \u001b[0;32mcheck.jsonl: ✓ (3 entries)\u001b[0m\n\n\u001b[0;32m✓ All validations passed\u001b[0m\n"
+  },
+  {
+    "task": "09-28-evergreen-security-cadence",
+    "exit_code": 0,
+    "output": "\u001b[0;34m=== Validating Context Files ===\u001b[0m\nTarget dir: D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\09-28-evergreen-security-cadence\n\n  \u001b[0;32mimplement.jsonl: ✓ (3 entries)\u001b[0m\n  \u001b[0;32mcheck.jsonl: ✓ (3 entries)\u001b[0m\n\n\u001b[0;32m✓ All validations passed\u001b[0m\n"
+  }
+]

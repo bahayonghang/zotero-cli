@@ -1,0 +1,7 @@
+{
+  "started": "2026-09-28T01:33:46.8916412-05:00",
+  "ended": "2026-09-28T01:34:33.7732263-05:00",
+  "machete_exit": 101,
+  "udeps_exit": 101,
+  "install_root": "target/audit-tools"
+}

@@ -1,0 +1,55 @@
+{
+  "base_commit": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+  "lock_sha256": "857974bce8e060ed25212b68463e2bd1e0c42be3dce908517d001428d93e706f",
+  "lock_git_blob": "6416182d6ab5b0fb17b202ed044a1c832fc85f0f",
+  "manifest_diff": "",
+  "lock_diff_check": {
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "warning: in the working copy of 'Cargo.lock', LF will be replaced by CRLF the next time Git touches it"
+  },
+  "audit_database_commit": {
+    "exit_code": 0,
+    "stdout": "e2111519ba6d14a5da59a7b2e5c8083ae8a37c01",
+    "stderr": ""
+  },
+  "deny_database_commit": {
+    "exit_code": 0,
+    "stdout": "e2111519ba6d14a5da59a7b2e5c8083ae8a37c01",
+    "stderr": ""
+  },
+  "checks": {
+    "update": {
+      "command": "cargo update -p rustls --precise 0.23.45 --offline",
+      "exit_code": 0,
+      "timestamp_utc": "2026-09-28T06:34:44.2923587Z"
+    },
+    "tree": {
+      "command": "cargo tree -i rustls --locked",
+      "exit_code": 0,
+      "timestamp_utc": "2026-09-28T06:35:32.1531865Z"
+    },
+    "cargo-audit": {
+      "command": "cargo audit",
+      "exit_code": 0,
+      "start_utc": "2026-09-28T06:36:10.6799144Z",
+      "end_utc": "2026-09-28T06:36:14.1719051Z",
+      "base_commit": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+      "cargo_lock_sha256": "857974BCE8E060ED25212B68463E2BD1E0C42BE3DCE908517D001428D93E706F"
+    },
+    "cargo-deny": {
+      "command": "cargo deny check",
+      "exit_code": 0,
+      "start_utc": "2026-09-28T06:36:14.2355708Z",
+      "end_utc": "2026-09-28T06:36:16.8541211Z",
+      "base_commit": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+      "cargo_lock_sha256": "857974BCE8E060ED25212B68463E2BD1E0C42BE3DCE908517D001428D93E706F"
+    }
+  },
+  "deny_warning_categories": [
+    "duplicate"
+  ],
+  "baseline_deny_warning_categories": [
+    "duplicate"
+  ]
+}

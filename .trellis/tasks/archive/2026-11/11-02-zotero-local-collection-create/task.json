@@ -1,0 +1,33 @@
+{
+  "id": "zotero-local-collection-create",
+  "name": "zotero-local-collection-create",
+  "title": "本地分类创建与层级校验",
+  "description": "扩展 collection create 的显式 Local API 后端，支持根分类和已有父分类下创建。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "lyh",
+  "assignee": "lyh",
+  "createdAt": "2026-11-02",
+  "completedAt": "2026-11-02",
+  "branch": "dev",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": "01a13470375e194000885f7422fc0ed6e9ba68f9",
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-02-zotero-local-organization",
+  "relatedFiles": [
+    "src/zot-desktop/src/local_api.rs",
+    "src/zot-desktop/src/local_api_tests.rs",
+    "src/zot-cli/src/cli/args.rs",
+    "src/zot-cli/src/commands/collection.rs",
+    "src/zot-cli/src/commands/local_write.rs",
+    "skills/zot/SKILL.md"
+  ],
+  "notes": "2026-11-02 核心实现、自动化及 Windows Zotero 10.0.7 隔离 API/UI/重启验收完成；原实例已恢复。功能提交 01a1347。用户已授权本地提交与归档；未 push/PR。真实组库、其他 OS 和提交中断未实测；证据见同组父任务 validation.md。",
+  "meta": {}
+}

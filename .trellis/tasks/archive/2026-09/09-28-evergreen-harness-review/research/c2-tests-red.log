@@ -1,0 +1,241 @@
+..FFFFFFFF...FFFFFFFFFFFF.
+======================================================================
+FAIL: test_aliases_ignore_case_and_separators_in_both_directions (test_harness_platform_routing.PlatformMatchingTests.test_aliases_ignore_case_and_separators_in_both_directions) (canonical='Claude Code', variant='claude')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 32, in test_aliases_ignore_case_and_separators_in_both_directions
+    self.assertTrue(_platform_matches(variant, [canonical]))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_aliases_ignore_case_and_separators_in_both_directions (test_harness_platform_routing.PlatformMatchingTests.test_aliases_ignore_case_and_separators_in_both_directions) (canonical='Claude Code', variant='CLAUDE')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 32, in test_aliases_ignore_case_and_separators_in_both_directions
+    self.assertTrue(_platform_matches(variant, [canonical]))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_aliases_ignore_case_and_separators_in_both_directions (test_harness_platform_routing.PlatformMatchingTests.test_aliases_ignore_case_and_separators_in_both_directions) (canonical='Kimi Code', variant='kimi')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 32, in test_aliases_ignore_case_and_separators_in_both_directions
+    self.assertTrue(_platform_matches(variant, [canonical]))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_aliases_ignore_case_and_separators_in_both_directions (test_harness_platform_routing.PlatformMatchingTests.test_aliases_ignore_case_and_separators_in_both_directions) (canonical='Kimi Code', variant='KIMI')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 32, in test_aliases_ignore_case_and_separators_in_both_directions
+    self.assertTrue(_platform_matches(variant, [canonical]))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_aliases_ignore_case_and_separators_in_both_directions (test_harness_platform_routing.PlatformMatchingTests.test_aliases_ignore_case_and_separators_in_both_directions) (canonical='Oh My Pi', variant='omp')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 32, in test_aliases_ignore_case_and_separators_in_both_directions
+    self.assertTrue(_platform_matches(variant, [canonical]))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_aliases_ignore_case_and_separators_in_both_directions (test_harness_platform_routing.PlatformMatchingTests.test_aliases_ignore_case_and_separators_in_both_directions) (canonical='Oh My Pi', variant='OMP')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 32, in test_aliases_ignore_case_and_separators_in_both_directions
+    self.assertTrue(_platform_matches(variant, [canonical]))
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_filter_keeps_only_matching_body_and_common_text (test_harness_platform_routing.PlatformMatchingTests.test_filter_keeps_only_matching_body_and_common_text) (platform='claude')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 72, in test_filter_keeps_only_matching_body_and_common_text
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        filter_platform(content, platform),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        f"Shared start\n{body}Shared end\n",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 'Shared start\nShared end\n' != 'Shared start\nClaude body\nShared end\n'
+  Shared start
++ Claude body
+  Shared end
+
+
+======================================================================
+FAIL: test_filter_keeps_only_matching_body_and_common_text (test_harness_platform_routing.PlatformMatchingTests.test_filter_keeps_only_matching_body_and_common_text) (platform='omp')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 72, in test_filter_keeps_only_matching_body_and_common_text
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        filter_platform(content, platform),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        f"Shared start\n{body}Shared end\n",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 'Shared start\nShared end\n' != 'Shared start\nOMP body\nShared end\n'
+  Shared start
++ OMP body
+  Shared end
+
+
+======================================================================
+FAIL: test_five_platforms_render_implementation_and_check_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_five_platforms_render_implementation_and_check_bodies) (platform='claude', step='2.1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 167, in test_five_platforms_render_implementation_and_check_bodies
+    self.assert_step_body(self.render(platform, step), step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 148, in assert_step_body
+    self.assertIn("Spawn the implement sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the implement sub-agent:' not found in '#### 2.1 Implement `[required · repeatable]`\n'
+
+======================================================================
+FAIL: test_five_platforms_render_implementation_and_check_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_five_platforms_render_implementation_and_check_bodies) (platform='claude', step='2.2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 167, in test_five_platforms_render_implementation_and_check_bodies
+    self.assert_step_body(self.render(platform, step), step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 158, in assert_step_body
+    self.assertIn("Spawn the check sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the check sub-agent:' not found in "#### 2.2 Quality check `[required · repeatable]`\n\n\n**Final pass (before Phase 3.4 commit)**: the last 2.2 of a task must run full-scope, not just on the latest implement chunk. List all affected packages with `python ./.trellis/scripts/get_context.py --mode packages`, then load each package's spec index Quality Check section. This catches cross-layer / multi-package issues a mid-iteration local 2.2 cannot.\n"
+
+======================================================================
+FAIL: test_five_platforms_render_implementation_and_check_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_five_platforms_render_implementation_and_check_bodies) (platform='kimi', step='2.1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 167, in test_five_platforms_render_implementation_and_check_bodies
+    self.assert_step_body(self.render(platform, step), step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 148, in assert_step_body
+    self.assertIn("Spawn the implement sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the implement sub-agent:' not found in '#### 2.1 Implement `[required · repeatable]`\n'
+
+======================================================================
+FAIL: test_five_platforms_render_implementation_and_check_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_five_platforms_render_implementation_and_check_bodies) (platform='kimi', step='2.2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 167, in test_five_platforms_render_implementation_and_check_bodies
+    self.assert_step_body(self.render(platform, step), step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 158, in assert_step_body
+    self.assertIn("Spawn the check sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the check sub-agent:' not found in "#### 2.2 Quality check `[required · repeatable]`\n\n\n**Final pass (before Phase 3.4 commit)**: the last 2.2 of a task must run full-scope, not just on the latest implement chunk. List all affected packages with `python ./.trellis/scripts/get_context.py --mode packages`, then load each package's spec index Quality Check section. This catches cross-layer / multi-package issues a mid-iteration local 2.2 cannot.\n"
+
+======================================================================
+FAIL: test_five_platforms_render_implementation_and_check_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_five_platforms_render_implementation_and_check_bodies) (platform='omp', step='2.1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 167, in test_five_platforms_render_implementation_and_check_bodies
+    self.assert_step_body(self.render(platform, step), step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 148, in assert_step_body
+    self.assertIn("Spawn the implement sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the implement sub-agent:' not found in '#### 2.1 Implement `[required · repeatable]`\n'
+
+======================================================================
+FAIL: test_five_platforms_render_implementation_and_check_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_five_platforms_render_implementation_and_check_bodies) (platform='omp', step='2.2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 167, in test_five_platforms_render_implementation_and_check_bodies
+    self.assert_step_body(self.render(platform, step), step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 158, in assert_step_body
+    self.assertIn("Spawn the check sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the check sub-agent:' not found in "#### 2.2 Quality check `[required · repeatable]`\n\n\n**Final pass (before Phase 3.4 commit)**: the last 2.2 of a task must run full-scope, not just on the latest implement chunk. List all affected packages with `python ./.trellis/scripts/get_context.py --mode packages`, then load each package's spec index Quality Check section. This catches cross-layer / multi-package issues a mid-iteration local 2.2 cannot.\n"
+
+======================================================================
+FAIL: test_short_ids_match_canonical_names_with_meaningful_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_short_ids_match_canonical_names_with_meaningful_bodies) (platform='claude', step='2.1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 178, in test_short_ids_match_canonical_names_with_meaningful_bodies
+    self.assert_step_body(body, step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 148, in assert_step_body
+    self.assertIn("Spawn the implement sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the implement sub-agent:' not found in '#### 2.1 Implement `[required · repeatable]`\n'
+
+======================================================================
+FAIL: test_short_ids_match_canonical_names_with_meaningful_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_short_ids_match_canonical_names_with_meaningful_bodies) (platform='claude', step='2.2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 178, in test_short_ids_match_canonical_names_with_meaningful_bodies
+    self.assert_step_body(body, step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 158, in assert_step_body
+    self.assertIn("Spawn the check sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the check sub-agent:' not found in "#### 2.2 Quality check `[required · repeatable]`\n\n\n**Final pass (before Phase 3.4 commit)**: the last 2.2 of a task must run full-scope, not just on the latest implement chunk. List all affected packages with `python ./.trellis/scripts/get_context.py --mode packages`, then load each package's spec index Quality Check section. This catches cross-layer / multi-package issues a mid-iteration local 2.2 cannot.\n"
+
+======================================================================
+FAIL: test_short_ids_match_canonical_names_with_meaningful_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_short_ids_match_canonical_names_with_meaningful_bodies) (platform='kimi', step='2.1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 178, in test_short_ids_match_canonical_names_with_meaningful_bodies
+    self.assert_step_body(body, step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 148, in assert_step_body
+    self.assertIn("Spawn the implement sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the implement sub-agent:' not found in '#### 2.1 Implement `[required · repeatable]`\n'
+
+======================================================================
+FAIL: test_short_ids_match_canonical_names_with_meaningful_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_short_ids_match_canonical_names_with_meaningful_bodies) (platform='kimi', step='2.2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 178, in test_short_ids_match_canonical_names_with_meaningful_bodies
+    self.assert_step_body(body, step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 158, in assert_step_body
+    self.assertIn("Spawn the check sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the check sub-agent:' not found in "#### 2.2 Quality check `[required · repeatable]`\n\n\n**Final pass (before Phase 3.4 commit)**: the last 2.2 of a task must run full-scope, not just on the latest implement chunk. List all affected packages with `python ./.trellis/scripts/get_context.py --mode packages`, then load each package's spec index Quality Check section. This catches cross-layer / multi-package issues a mid-iteration local 2.2 cannot.\n"
+
+======================================================================
+FAIL: test_short_ids_match_canonical_names_with_meaningful_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_short_ids_match_canonical_names_with_meaningful_bodies) (platform='omp', step='2.1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 178, in test_short_ids_match_canonical_names_with_meaningful_bodies
+    self.assert_step_body(body, step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 148, in assert_step_body
+    self.assertIn("Spawn the implement sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the implement sub-agent:' not found in '#### 2.1 Implement `[required · repeatable]`\n'
+
+======================================================================
+FAIL: test_short_ids_match_canonical_names_with_meaningful_bodies (test_harness_platform_routing.WorkflowContextCliTests.test_short_ids_match_canonical_names_with_meaningful_bodies) (platform='omp', step='2.2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 178, in test_short_ids_match_canonical_names_with_meaningful_bodies
+    self.assert_step_body(body, step)
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "D:\Documents\Code\CLI\zotero-cli\scripts\tests\test_harness_platform_routing.py", line 158, in assert_step_body
+    self.assertIn("Spawn the check sub-agent:", body)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Spawn the check sub-agent:' not found in "#### 2.2 Quality check `[required · repeatable]`\n\n\n**Final pass (before Phase 3.4 commit)**: the last 2.2 of a task must run full-scope, not just on the latest implement chunk. List all affected packages with `python ./.trellis/scripts/get_context.py --mode packages`, then load each package's spec index Quality Check section. This catches cross-layer / multi-package issues a mid-iteration local 2.2 cannot.\n"
+
+----------------------------------------------------------------------
+Ran 10 tests in 2.936s
+
+FAILED (failures=20)

@@ -2,6 +2,7 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -19,7 +20,8 @@ use zot_core::{
     AnnotationRecord, Attachment, ChildAnnotation, ChildAttachment, ChildItem, ChildNote,
     CitationKeyMatch, Collection, Creator, DuplicateGroup, DuplicateScanResult, FeedInfo,
     GraphOptions, Item, KnowledgeGraph, LibraryInfo, LibraryScope, LibraryStats, Note,
-    NoteSearchResult, SearchResult, TagSummary, ZotError, ZotResult,
+    NoteSearchResult, SearchItemDirection, SearchItemSort, SearchResult, TagSummary, ZotError,
+    ZotResult, extra_line_has_citation_key, item_matches_field_filters,
 };
 
 use crate::citation::export_item;
@@ -36,6 +38,23 @@ const FULLTEXT_INDEX_FTS5_SIDECAR: &str = "fts5-sidecar";
 const FULLTEXT_INDEX_UNAVAILABLE: &str = "unavailable";
 const FULLTEXT_SIDECAR_FILENAME: &str = "fulltext.sqlite";
 const FULLTEXT_ATTACH_SCHEMA: &str = "ftindex";
+
+static SNAPSHOT_OPEN_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
+
+/// Count of `zotero.sqlite` snapshot open attempts since process start.
+///
+/// Desktop reads assert this stays unchanged. It is not a cache of snapshot rows.
+pub fn snapshot_open_attempts() -> usize {
+    SNAPSHOT_OPEN_ATTEMPTS.load(Ordering::Relaxed)
+}
+
+pub fn reset_snapshot_open_attempts() {
+    SNAPSHOT_OPEN_ATTEMPTS.store(0, Ordering::Relaxed);
+}
+
+fn record_snapshot_open_attempt() {
+    SNAPSHOT_OPEN_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LibrarySnapshotMeta {
@@ -77,6 +96,66 @@ fn escape_like(value: &str) -> String {
         }
     }
     out
+}
+
+const FIELD_LIKE_TITLE: &str = "EXISTS (SELECT 1 FROM itemData idf JOIN fields ff ON idf.fieldID = ff.fieldID JOIN itemDataValues ivf ON idf.valueID = ivf.valueID WHERE idf.itemID = i.itemID AND ff.fieldName = 'title' AND LOWER(ivf.value) LIKE ? ESCAPE '\\')";
+const FIELD_LIKE_ABSTRACT: &str = "EXISTS (SELECT 1 FROM itemData idf JOIN fields ff ON idf.fieldID = ff.fieldID JOIN itemDataValues ivf ON idf.valueID = ivf.valueID WHERE idf.itemID = i.itemID AND ff.fieldName = 'abstractNote' AND LOWER(ivf.value) LIKE ? ESCAPE '\\')";
+const FIELD_LIKE_PUBLICATION: &str = "EXISTS (SELECT 1 FROM itemData idf JOIN fields ff ON idf.fieldID = ff.fieldID JOIN itemDataValues ivf ON idf.valueID = ivf.valueID WHERE idf.itemID = i.itemID AND ff.fieldName = 'publicationTitle' AND LOWER(ivf.value) LIKE ? ESCAPE '\\')";
+const FIELD_LIKE_JOURNAL_ABBR: &str = "EXISTS (SELECT 1 FROM itemData idf JOIN fields ff ON idf.fieldID = ff.fieldID JOIN itemDataValues ivf ON idf.valueID = ivf.valueID WHERE idf.itemID = i.itemID AND ff.fieldName = 'journalAbbreviation' AND LOWER(ivf.value) LIKE ? ESCAPE '\\')";
+const TAG_LIKE_EXISTS: &str = "EXISTS (SELECT 1 FROM itemTags itt JOIN tags tt ON itt.tagID = tt.tagID WHERE itt.itemID = i.itemID AND LOWER(tt.name) LIKE ? ESCAPE '\\')";
+
+fn whitespace_like_pattern(value: &str) -> Option<String> {
+    let normalized = zot_core::collapse_field_text(value);
+    if normalized.is_empty() {
+        return None;
+    }
+    let parts = normalized
+        .split(' ')
+        .filter(|part| !part.is_empty())
+        .map(escape_like)
+        .collect::<Vec<_>>();
+    if parts.is_empty() {
+        return None;
+    }
+    Some(format!("%{}%", parts.join("%")))
+}
+
+fn field_filters_active(options: &SearchOptions) -> bool {
+    options
+        .title
+        .as_deref()
+        .and_then(whitespace_like_pattern)
+        .is_some()
+        || options
+            .journal
+            .as_deref()
+            .and_then(whitespace_like_pattern)
+            .is_some()
+        || options
+            .topic
+            .as_deref()
+            .and_then(whitespace_like_pattern)
+            .is_some()
+}
+
+fn push_like(values: &mut Vec<rusqlite::types::Value>, pattern: &str, times: usize) {
+    for _ in 0..times {
+        values.push(rusqlite::types::Value::from(pattern.to_string()));
+    }
+}
+
+fn sort_loaded_items(items: &mut [Item], sort: Option<SortField>, direction: SortDirection) {
+    let sort = sort.map(|field| match field {
+        SortField::DateAdded => SearchItemSort::DateAdded,
+        SortField::DateModified => SearchItemSort::DateModified,
+        SortField::Title => SearchItemSort::Title,
+        SortField::Creator => SearchItemSort::Creator,
+    });
+    let direction = match direction {
+        SortDirection::Asc => SearchItemDirection::Asc,
+        SortDirection::Desc => SearchItemDirection::Desc,
+    };
+    zot_core::sort_search_items(items, sort, direction);
 }
 
 struct Fts5Clause {
@@ -158,6 +237,12 @@ pub struct SearchOptions {
     pub tag: Option<String>,
     pub creator: Option<String>,
     pub year: Option<String>,
+    /// Substring of the title. Blank is unset. Applied before pagination.
+    pub title: Option<String>,
+    /// Substring of `publicationTitle` or `journalAbbreviation` only.
+    pub journal: Option<String>,
+    /// Substring of title, abstract, or tag. Not attachment full text.
+    pub topic: Option<String>,
     pub sort: Option<SortField>,
     pub direction: SortDirection,
     pub limit: usize,
@@ -176,6 +261,9 @@ impl Default for SearchOptions {
             tag: None,
             creator: None,
             year: None,
+            title: None,
+            journal: None,
+            topic: None,
             sort: None,
             direction: SortDirection::Desc,
             limit: 50,
@@ -371,11 +459,30 @@ impl LocalLibrary {
                 escape_like(year)
             )));
         }
+        if let Some(pattern) = options.title.as_deref().and_then(whitespace_like_pattern) {
+            predicates.push(FIELD_LIKE_TITLE.to_string());
+            push_like(&mut values, &pattern, 1);
+        }
+        if let Some(pattern) = options.journal.as_deref().and_then(whitespace_like_pattern) {
+            predicates.push(format!(
+                "({FIELD_LIKE_PUBLICATION} OR {FIELD_LIKE_JOURNAL_ABBR})"
+            ));
+            push_like(&mut values, &pattern, 2);
+        }
+        if let Some(pattern) = options.topic.as_deref().and_then(whitespace_like_pattern) {
+            predicates.push(format!(
+                "({FIELD_LIKE_TITLE} OR {FIELD_LIKE_ABSTRACT} OR {TAG_LIKE_EXISTS})"
+            ));
+            push_like(&mut values, &pattern, 3);
+        }
 
         let from_where = format!(
             "FROM items i JOIN itemTypes it ON i.itemTypeID = it.itemTypeID WHERE {}",
             predicates.join(" AND ")
         );
+        if field_filters_active(&options) {
+            return self.search_field_filtered(&from_where, &values, options, fulltext_index);
+        }
         let total = self
             .conn
             .prepare_cached(&format!("SELECT COUNT(*) {from_where}"))
@@ -428,6 +535,53 @@ impl LocalLibrary {
             .map_err(sql_err("search-page"))?;
         let items = self.get_items_batch(&item_ids)?;
 
+        Ok(SearchResult {
+            items,
+            total,
+            query: options.query,
+            fulltext_index,
+        })
+    }
+
+    /// SQL `LIKE` is a superset of collapsed-whitespace matching. Load that
+    /// superset, then filter, sort, and page in Rust so a limit cannot hide a hit.
+    fn search_field_filtered(
+        &self,
+        from_where: &str,
+        values: &[rusqlite::types::Value],
+        options: SearchOptions,
+        fulltext_index: Option<String>,
+    ) -> ZotResult<SearchResult> {
+        let id_sql = format!("SELECT i.itemID {from_where} ORDER BY i.itemID ASC");
+        let mut stmt = self
+            .conn
+            .prepare_cached(&id_sql)
+            .map_err(sql_err("search-field-filter"))?;
+        let rows = stmt
+            .query_map(params_from_iter(values.iter()), |row| row.get::<_, i64>(0))
+            .map_err(sql_err("search-field-filter"))?;
+        let item_ids = rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("search-field-filter"))?;
+        let loaded = self.get_items_batch(&item_ids)?;
+        let mut items = loaded
+            .into_iter()
+            .filter(|item| {
+                item_matches_field_filters(
+                    item,
+                    options.title.as_deref(),
+                    options.journal.as_deref(),
+                    options.topic.as_deref(),
+                )
+            })
+            .collect::<Vec<_>>();
+        sort_loaded_items(&mut items, options.sort, options.direction);
+        let total = items.len();
+        let items = items
+            .into_iter()
+            .skip(options.offset)
+            .take(options.limit)
+            .collect::<Vec<_>>();
         Ok(SearchResult {
             items,
             total,
@@ -574,48 +728,87 @@ impl LocalLibrary {
             .map_err(sql_err("get-tags"))
     }
 
-    pub fn search_by_citation_key(&self, citekey: &str) -> ZotResult<Option<CitationKeyMatch>> {
-        let field_id = self.field_id("extra")?;
-        let Some(field_id) = field_id else {
-            return Ok(None);
-        };
-        let mut stmt = self
-            .conn
-            .prepare_cached(
-                "SELECT i.key, iv.value
-                 FROM items i
-                 JOIN itemData id ON i.itemID = id.itemID
-                 JOIN itemDataValues iv ON id.valueID = iv.valueID
-                 WHERE i.libraryID = ?1 AND id.fieldID = ?2",
-            )
-            .map_err(sql_err("search-citation-key"))?;
-        let rows = stmt
-            .query_map(params![self.library_id, field_id], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })
-            .map_err(sql_err("search-citation-key"))?;
-        for row in rows {
-            let (item_key, extra) = row.map_err(sql_err("search-citation-key"))?;
-            for line in extra.lines() {
-                let normalized = line.trim().to_lowercase();
-                if (normalized.starts_with("citation key:")
-                    || normalized.starts_with("citationkey:"))
-                    && line
-                        .split_once(':')
-                        .map(|(_, value)| value.trim() == citekey)
-                        .unwrap_or(false)
-                {
-                    if let Some(item) = self.get_item(&item_key)? {
-                        return Ok(Some(CitationKeyMatch {
+    pub fn citation_key_matches(&self, citekey: &str) -> ZotResult<Vec<CitationKeyMatch>> {
+        let mut matches = BTreeMap::<String, CitationKeyMatch>::new();
+        if let Some(field_id) = self.field_id("citationKey")? {
+            let mut stmt = self
+                .conn
+                .prepare_cached(
+                    "SELECT i.key
+                     FROM items i
+                     JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+                     JOIN itemData id ON i.itemID = id.itemID
+                     JOIN itemDataValues iv ON id.valueID = iv.valueID
+                     WHERE i.libraryID = ?1
+                     AND id.fieldID = ?2
+                     AND iv.value = ?3
+                     AND it.typeName NOT IN ('attachment','note','annotation')",
+                )
+                .map_err(sql_err("search-citation-key"))?;
+            let rows = stmt
+                .query_map(params![self.library_id, field_id, citekey], |row| {
+                    row.get::<_, String>(0)
+                })
+                .map_err(sql_err("search-citation-key"))?;
+            for row in rows {
+                let item_key = row.map_err(sql_err("search-citation-key"))?;
+                if let Some(item) = self.get_item(&item_key)? {
+                    matches.insert(
+                        item.key.clone(),
+                        CitationKeyMatch {
                             citekey: citekey.to_string(),
-                            source: "extra".to_string(),
+                            source: "citation-key".to_string(),
                             item,
-                        }));
-                    }
+                        },
+                    );
                 }
             }
         }
-        Ok(None)
+        if let Some(field_id) = self.field_id("extra")? {
+            let mut stmt = self
+                .conn
+                .prepare_cached(
+                    "SELECT i.key, iv.value
+                     FROM items i
+                     JOIN itemData id ON i.itemID = id.itemID
+                     JOIN itemDataValues iv ON id.valueID = iv.valueID
+                     WHERE i.libraryID = ?1 AND id.fieldID = ?2",
+                )
+                .map_err(sql_err("search-citation-key"))?;
+            let rows = stmt
+                .query_map(params![self.library_id, field_id], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
+                .map_err(sql_err("search-citation-key"))?;
+            for row in rows {
+                let (item_key, extra) = row.map_err(sql_err("search-citation-key"))?;
+                if !extra_line_has_citation_key(&extra, citekey) {
+                    continue;
+                }
+                if matches.contains_key(&item_key) {
+                    continue;
+                }
+                if let Some(item) = self.get_item(&item_key)? {
+                    matches.insert(
+                        item.key.clone(),
+                        CitationKeyMatch {
+                            citekey: citekey.to_string(),
+                            source: "extra".to_string(),
+                            item,
+                        },
+                    );
+                }
+            }
+        }
+        Ok(matches.into_values().collect())
+    }
+
+    pub fn search_by_citation_key(&self, citekey: &str) -> ZotResult<Option<CitationKeyMatch>> {
+        let mut matches = self.citation_key_matches(citekey)?;
+        if matches.len() > 1 {
+            return Err(citation_key_ambiguous(citekey, &matches));
+        }
+        Ok(matches.pop())
     }
 
     pub fn get_item_children(&self, key: &str) -> ZotResult<Vec<ChildItem>> {
@@ -1726,6 +1919,7 @@ impl LocalLibrary {
         db_path: &Path,
         policy: SnapshotPolicy,
     ) -> ZotResult<(Connection, TempDir, LibrarySnapshotMeta)> {
+        record_snapshot_open_attempt();
         let source_modified_at = fs::metadata(db_path)
             .ok()
             .and_then(|metadata| metadata.modified().ok())
@@ -2298,6 +2492,53 @@ impl LocalLibrary {
             .map_err(sql_err("table-exists"))
     }
 
+    /// `localAPI/serverID` from an already opened snapshot. Missing table is unbound.
+    pub fn local_api_server_id(&self) -> ZotResult<Option<String>> {
+        if !self.table_exists("settings")? {
+            return Ok(None);
+        }
+        let mut info = self
+            .conn
+            .prepare_cached("PRAGMA table_info(settings)")
+            .map_err(sql_err("local-api-server-id"))?;
+        let names = info
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(sql_err("local-api-server-id"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("local-api-server-id"))?;
+        let has = |name: &str| names.iter().any(|column| column.eq_ignore_ascii_case(name));
+        if !has("value") {
+            return Ok(None);
+        }
+        let queries: &[&str] = if has("setting") && has("key") {
+            &[
+                "SELECT value FROM settings WHERE setting = 'localAPI' AND key = 'serverID'",
+                "SELECT value FROM settings WHERE key = 'localAPI/serverID'",
+            ]
+        } else if has("key") {
+            &[
+                "SELECT value FROM settings WHERE key = 'serverID'",
+                "SELECT value FROM settings WHERE key = 'localAPI/serverID'",
+            ]
+        } else {
+            return Ok(None);
+        };
+        for query in queries {
+            let value = self
+                .conn
+                .query_row(query, [], |row| row.get::<_, Option<String>>(0))
+                .optional()
+                .map_err(sql_err("local-api-server-id"))?;
+            if let Some(Some(id)) = value {
+                let trimmed = id.trim();
+                if !trimmed.is_empty() {
+                    return Ok(Some(trimmed.to_string()));
+                }
+            }
+        }
+        Ok(None)
+    }
+
     fn attached_table_exists(&self, table: &str) -> ZotResult<bool> {
         self.conn
             .query_row(
@@ -2792,6 +3033,31 @@ fn snapshot_sql_err(context: &'static str) -> impl Fn(rusqlite::Error) -> ZotErr
     }
 }
 
+fn citation_key_ambiguous(citekey: &str, matches: &[CitationKeyMatch]) -> ZotError {
+    let listed = matches
+        .iter()
+        .map(|found| {
+            let author = found
+                .item
+                .creators
+                .first()
+                .map(Creator::full_name)
+                .unwrap_or_default();
+            let year = found.item.date.as_deref().unwrap_or("");
+            format!(
+                "{} | {author} | {year} | {}",
+                found.item.title, found.item.key
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    ZotError::InvalidInput {
+        code: "citation-key-ambiguous".to_string(),
+        message: format!("Citation key '{citekey}' matches multiple items: {listed}"),
+        hint: Some("Choose one item key with 'zot item get <key>'".to_string()),
+    }
+}
+
 fn zotero_db_busy_error(message: &str) -> ZotError {
     ZotError::Database {
         code: "zotero-db-busy".to_string(),
@@ -2812,15 +3078,16 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use chrono::DateTime;
-    use rusqlite::Connection;
+    use rusqlite::{Connection, OpenFlags};
     use tempfile::TempDir;
     use zot_core::LibraryScope;
 
     use super::{
         DuplicateMatchMethod, DuplicateTitleCandidate, FULLTEXT_ATTACH_SCHEMA,
         FULLTEXT_INDEX_FTS5_SIDECAR, FULLTEXT_INDEX_LEGACY_TABLES, FULLTEXT_INDEX_UNAVAILABLE,
-        FULLTEXT_SIDECAR_FILENAME, LocalLibrary, SearchOptions, SnapshotPolicy, escape_like,
-        fts5_match_clause, title_duplicate_components,
+        FULLTEXT_SIDECAR_FILENAME, LocalLibrary, SearchOptions, SnapshotPolicy, SortDirection,
+        SortField, escape_like, fts5_match_clause, snapshot_open_attempts,
+        title_duplicate_components,
     };
     use zot_core::ChildItem;
 
@@ -4073,5 +4340,394 @@ Original Date: 2017');
         let excluded_stats = lib.get_stats().expect("excluded stats");
         let included_stats = lib.get_stats_with_trashed(true).expect("included stats");
         assert_eq!(included_stats.total_items, excluded_stats.total_items + 1);
+    }
+
+    #[test]
+    fn held_exclusive_connection_blocks_snapshot_until_dropped() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("zotero.sqlite");
+        let writer = Connection::open(&db_path).expect("open writer");
+        writer
+            .execute_batch(
+                "PRAGMA locking_mode=EXCLUSIVE;
+                 BEGIN EXCLUSIVE;
+                 CREATE TABLE version (schema TEXT PRIMARY KEY, version INTEGER NOT NULL);
+                 INSERT INTO version VALUES ('userdata', 7);
+                 CREATE TABLE snapshot_totals (id INTEGER PRIMARY KEY, total INTEGER NOT NULL);
+                 INSERT INTO snapshot_totals VALUES (1, 1);
+                 COMMIT;",
+            )
+            .expect("hold exclusive lock after commit");
+        assert!(writer.is_autocommit());
+
+        let reader = Connection::open_with_flags(&db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .expect("open competing reader");
+        reader
+            .busy_timeout(Duration::from_millis(20))
+            .expect("reader busy timeout");
+        let blocked = reader.query_row(
+            "SELECT total FROM snapshot_totals WHERE id = 1",
+            [],
+            |row| row.get::<_, i64>(0),
+        );
+        assert!(
+            blocked.is_err(),
+            "a committed exclusive connection must keep mode=ro busy"
+        );
+
+        let before = snapshot_open_attempts();
+        let locked = LocalLibrary::connect_with_policy(
+            &db_path,
+            SnapshotPolicy {
+                busy_timeout: Duration::from_millis(10),
+                busy_retry_limit: Duration::from_millis(25),
+                step_pause: Duration::from_millis(1),
+                pages_per_step: 1,
+            },
+        );
+        assert!(snapshot_open_attempts() > before);
+        let error = match locked {
+            Ok(_) => panic!("held exclusive lock must not produce a snapshot"),
+            Err(error) => error,
+        };
+        assert_eq!(error.payload().code, "zotero-db-busy");
+        drop(reader);
+        drop(writer);
+
+        let (snapshot, _dir, _) = LocalLibrary::connect_with_policy(
+            &db_path,
+            SnapshotPolicy {
+                busy_timeout: Duration::from_millis(50),
+                busy_retry_limit: Duration::from_millis(50),
+                step_pause: Duration::from_millis(1),
+                pages_per_step: 64,
+            },
+        )
+        .expect("snapshot opens after the exclusive connection closes");
+        let total: i64 = snapshot
+            .query_row(
+                "SELECT total FROM snapshot_totals WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read released snapshot");
+        assert_eq!(total, 1);
+    }
+
+    #[test]
+    fn field_filters_apply_before_pagination_and_ignore_body_only_hits() {
+        let fixture = rich_fixture_library_with_extra_sql(
+            "
+            UPDATE itemDataValues SET value = 'Deep X Learning' WHERE valueID = 9;
+            INSERT INTO itemDataValues VALUES (50, 'Deep X Learning');
+            INSERT INTO itemDataValues VALUES (51, 'Deep  Learning');
+            INSERT INTO itemDataValues VALUES (52, 'Nature');
+            INSERT INTO itemDataValues VALUES (53, 'Nat.');
+            INSERT INTO itemDataValues VALUES (54, 'Science');
+            INSERT INTO fields VALUES (12, 'publicationTitle');
+            INSERT INTO fields VALUES (13, 'journalAbbreviation');
+            INSERT INTO items VALUES (40, 2, '2020-01-01', '2020-01-01', '2020-01-01', 1, 'DECOY40');
+            INSERT INTO itemData VALUES (40, 4, 50);
+            INSERT INTO items VALUES (41, 2, '2020-01-02', '2020-01-02', '2020-01-02', 1, 'DECOY41');
+            INSERT INTO itemData VALUES (41, 4, 50);
+            INSERT INTO items VALUES (45, 2, '2020-02-01', '2020-02-01', '2020-02-01', 1, 'REAL045');
+            INSERT INTO itemData VALUES (45, 4, 51);
+            INSERT INTO itemData VALUES (1, 12, 52);
+            INSERT INTO itemData VALUES (1, 13, 53);
+            INSERT INTO itemData VALUES (2, 12, 54);
+            UPDATE itemDataValues SET value = 'This abstract mentions Nature' WHERE valueID = 6;
+            ",
+        );
+        let lib = &fixture.lib;
+        let titles = lib
+            .search(SearchOptions {
+                title: Some("deep learning".to_string()),
+                limit: 1,
+                direction: SortDirection::Asc,
+                ..SearchOptions::default()
+            })
+            .expect("title filter");
+        assert_eq!(titles.total, 1);
+        assert_eq!(titles.items.len(), 1);
+        assert_eq!(titles.items[0].key, "REAL045");
+        assert!(titles.fulltext_index.is_none());
+
+        let duplicates = lib
+            .search(SearchOptions {
+                title: Some("attention is all you need".to_string()),
+                sort: Some(SortField::DateAdded),
+                direction: SortDirection::Asc,
+                limit: 1,
+                offset: 1,
+                ..SearchOptions::default()
+            })
+            .expect("duplicate titles");
+        assert_eq!(duplicates.total, 2);
+        assert_eq!(duplicates.items.len(), 1);
+        assert_eq!(duplicates.items[0].key, "DUPE008");
+
+        let fragment = lib
+            .search(SearchOptions {
+                title: Some("Attention Is".to_string()),
+                ..SearchOptions::default()
+            })
+            .expect("title fragment");
+        let mut fragment_keys = fragment
+            .items
+            .iter()
+            .map(|item| item.key.as_str())
+            .collect::<Vec<_>>();
+        fragment_keys.sort_unstable();
+        assert_eq!(fragment_keys, vec!["ATTN001", "DUPE008"]);
+
+        let journal = lib
+            .search(SearchOptions {
+                journal: Some("nature".to_string()),
+                ..SearchOptions::default()
+            })
+            .expect("journal");
+        assert_eq!(
+            journal
+                .items
+                .iter()
+                .map(|item| item.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ATTN001"]
+        );
+        let abbreviated = lib
+            .search(SearchOptions {
+                journal: Some("Nat.".to_string()),
+                ..SearchOptions::default()
+            })
+            .expect("journal abbreviation");
+        assert_eq!(abbreviated.items[0].key, "ATTN001");
+
+        let topic = lib
+            .search(SearchOptions {
+                topic: Some("Transformer".to_string()),
+                ..SearchOptions::default()
+            })
+            .expect("topic");
+        assert!(topic.items.iter().any(|item| item.key == "ATTN001"));
+        assert!(topic.items.iter().any(|item| item.key == "BERT002"));
+        assert!(topic.items.iter().all(|item| item.key != "ATCH005"));
+        assert!(topic.items.iter().all(|item| item.key != "TRSH007"));
+
+        let abstract_topic = lib
+            .search(SearchOptions {
+                topic: Some("mentions nature".to_string()),
+                ..SearchOptions::default()
+            })
+            .expect("abstract topic");
+        assert_eq!(abstract_topic.total, 1);
+        assert_eq!(abstract_topic.items[0].key, "BERT002");
+
+        let body = lib
+            .search(SearchOptions {
+                query: "mechanism".to_string(),
+                ..SearchOptions::default()
+            })
+            .expect("body query");
+        assert!(body.items.iter().any(|item| item.key == "ATTN001"));
+        let body_topic = lib
+            .search(SearchOptions {
+                topic: Some("mechanism".to_string()),
+                ..SearchOptions::default()
+            })
+            .expect("body is not a topic");
+        assert_eq!(body_topic.total, 0);
+        assert!(body_topic.items.is_empty());
+    }
+
+    #[test]
+    fn citation_key_reads_native_field_and_keeps_extra_source() {
+        let fixture = rich_fixture_library();
+        let extra_only = fixture
+            .lib
+            .search_by_citation_key("Smith2024")
+            .expect("extra citekey");
+        let extra_only = extra_only.expect("extra citekey hit");
+        assert_eq!(extra_only.source, "extra");
+        assert_eq!(extra_only.item.key, "ATTN001");
+        assert!(
+            fixture
+                .lib
+                .local_api_server_id()
+                .expect("settings")
+                .is_none()
+        );
+        assert!(
+            fixture
+                .lib
+                .search_by_citation_key("smith2024")
+                .expect("case")
+                .is_none()
+        );
+        assert!(
+            fixture
+                .lib
+                .search_by_citation_key("Smith")
+                .expect("prefix")
+                .is_none()
+        );
+
+        let native = rich_fixture_library_with_extra_sql(
+            "
+            INSERT INTO fields VALUES (110, 'citationKey');
+            INSERT INTO itemDataValues VALUES (60, 'NativeKey');
+            INSERT INTO itemData VALUES (2, 110, 60);
+            INSERT INTO itemDataValues VALUES (61, 'Smith2024');
+            INSERT INTO itemData VALUES (1, 110, 61);
+            ",
+        );
+        let preferred = native
+            .lib
+            .search_by_citation_key("Smith2024")
+            .expect("native preferred");
+        let preferred = preferred.expect("native hit");
+        assert_eq!(preferred.source, "citation-key");
+        assert_eq!(preferred.item.key, "ATTN001");
+        let native_only = native
+            .lib
+            .search_by_citation_key("NativeKey")
+            .expect("native only");
+        assert_eq!(native_only.expect("native item").item.key, "BERT002");
+        assert!(
+            native
+                .lib
+                .search_by_citation_key("nativekey")
+                .expect("native case")
+                .is_none()
+        );
+
+        let ambiguous = rich_fixture_library_with_extra_sql(
+            "
+            INSERT INTO fields VALUES (110, 'citationKey');
+            INSERT INTO itemDataValues VALUES (62, 'SharedKey');
+            INSERT INTO itemData VALUES (1, 110, 62);
+            INSERT INTO itemData VALUES (2, 110, 62);
+            ",
+        );
+        let error = ambiguous
+            .lib
+            .search_by_citation_key("SharedKey")
+            .expect_err("ambiguous citekey");
+        assert_eq!(error.payload().code, "citation-key-ambiguous");
+        assert!(error.payload().message.contains("ATTN001"));
+        assert!(error.payload().message.contains("BERT002"));
+        assert_eq!(
+            ambiguous
+                .lib
+                .citation_key_matches("SharedKey")
+                .expect("matches")
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn citation_key_stays_inside_the_open_library() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let db_path = dir.path().join("zotero.sqlite");
+        let conn = Connection::open(&db_path).expect("open");
+        conn.execute_batch(
+            "
+            CREATE TABLE libraries (libraryID INTEGER PRIMARY KEY, type TEXT NOT NULL);
+            INSERT INTO libraries VALUES (1, 'user');
+            INSERT INTO libraries VALUES (2, 'group');
+            CREATE TABLE groups (groupID INTEGER PRIMARY KEY, libraryID INT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', version INT NOT NULL DEFAULT 1);
+            INSERT INTO groups VALUES (99999, 2, 'Lab Group', '', 1);
+            CREATE TABLE itemTypes (itemTypeID INTEGER PRIMARY KEY, typeName TEXT NOT NULL);
+            INSERT INTO itemTypes VALUES (2, 'journalArticle');
+            CREATE TABLE fields (fieldID INTEGER PRIMARY KEY, fieldName TEXT NOT NULL);
+            INSERT INTO fields VALUES (4, 'title');
+            INSERT INTO fields VALUES (14, 'date');
+            INSERT INTO fields VALUES (90, 'extra');
+            INSERT INTO fields VALUES (110, 'citationKey');
+            CREATE TABLE items (
+                itemID INTEGER PRIMARY KEY,
+                itemTypeID INT NOT NULL,
+                dateAdded TEXT,
+                dateModified TEXT,
+                clientDateModified TEXT,
+                libraryID INT NOT NULL,
+                key TEXT NOT NULL,
+                UNIQUE (libraryID, key)
+            );
+            CREATE TABLE itemData (itemID INT NOT NULL, fieldID INT NOT NULL, valueID INT NOT NULL, PRIMARY KEY (itemID, fieldID));
+            CREATE TABLE itemDataValues (valueID INTEGER PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE creators (creatorID INTEGER PRIMARY KEY, firstName TEXT, lastName TEXT NOT NULL);
+            CREATE TABLE creatorTypes (creatorTypeID INTEGER PRIMARY KEY, creatorType TEXT NOT NULL);
+            CREATE TABLE itemCreators (itemID INT NOT NULL, creatorID INT NOT NULL, creatorTypeID INT NOT NULL DEFAULT 1, orderIndex INT NOT NULL DEFAULT 0);
+            CREATE TABLE tags (tagID INTEGER PRIMARY KEY, name TEXT NOT NULL);
+            CREATE TABLE itemTags (itemID INT NOT NULL, tagID INT NOT NULL, type INT NOT NULL DEFAULT 0);
+            CREATE TABLE collections (collectionID INTEGER PRIMARY KEY, collectionName TEXT, parentCollectionID INT, libraryID INT, key TEXT);
+            CREATE TABLE collectionItems (collectionID INT, itemID INT, orderIndex INT);
+            CREATE TABLE deletedItems (itemID INTEGER PRIMARY KEY, dateDeleted TEXT);
+            CREATE TABLE version (schema TEXT PRIMARY KEY, version INT NOT NULL);
+            INSERT INTO version VALUES ('userdata', 120);
+            INSERT INTO items VALUES (1, 2, '2024-01-01', '2024-01-01', '2024-01-01', 1, 'ITEM0001');
+            INSERT INTO items VALUES (2, 2, '2024-01-01', '2024-01-01', '2024-01-01', 2, 'ITEM0001');
+            INSERT INTO itemDataValues VALUES (1, 'User Paper');
+            INSERT INTO itemDataValues VALUES (2, 'Group Only Paper');
+            INSERT INTO itemDataValues VALUES (3, 'Alpha');
+            INSERT INTO itemDataValues VALUES (4, 'Beta');
+            INSERT INTO itemData VALUES (1, 4, 1);
+            INSERT INTO itemData VALUES (2, 4, 2);
+            INSERT INTO itemData VALUES (1, 110, 3);
+            INSERT INTO itemData VALUES (2, 110, 4);
+            CREATE TABLE settings (setting TEXT NOT NULL, key TEXT NOT NULL, value TEXT, PRIMARY KEY (setting, key));
+            INSERT INTO settings VALUES ('localAPI', 'serverID', ' server-abc ');
+            ",
+        )
+        .expect("seed cross-library citekeys");
+        drop(conn);
+
+        let user = LocalLibrary::open(dir.path(), LibraryScope::User).expect("user");
+        let alpha = user
+            .search_by_citation_key("Alpha")
+            .expect("alpha")
+            .expect("user alpha");
+        assert_eq!(alpha.item.key, "ITEM0001");
+        assert_eq!(alpha.item.title, "User Paper");
+        assert_eq!(alpha.source, "citation-key");
+        assert!(user.search_by_citation_key("Beta").expect("beta").is_none());
+        assert_eq!(
+            user.local_api_server_id().expect("server id").as_deref(),
+            Some("server-abc")
+        );
+
+        let group =
+            LocalLibrary::open(dir.path(), LibraryScope::Group { group_id: 99999 }).expect("group");
+        let beta = group
+            .search_by_citation_key("Beta")
+            .expect("group beta")
+            .expect("group hit");
+        assert_eq!(beta.item.title, "Group Only Paper");
+        assert!(
+            group
+                .search_by_citation_key("Alpha")
+                .expect("group alpha")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn local_api_server_id_accepts_fallback_key_and_blank_as_unbound() {
+        let blank = rich_fixture_library_with_extra_sql(
+            "
+            CREATE TABLE settings (setting TEXT NOT NULL, key TEXT NOT NULL, value TEXT, PRIMARY KEY (setting, key));
+            INSERT INTO settings VALUES ('localAPI', 'serverID', '   ');
+            INSERT INTO settings VALUES ('localAPI', 'localAPI/serverID', 'fallback-id');
+            ",
+        );
+        assert_eq!(
+            blank
+                .lib
+                .local_api_server_id()
+                .expect("fallback")
+                .as_deref(),
+            Some("fallback-id")
+        );
     }
 }

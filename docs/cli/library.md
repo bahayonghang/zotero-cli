@@ -22,6 +22,8 @@
 - `library saved-search list`
 - `library saved-search create`
 - `library saved-search delete`
+- `library organize plan`
+- `library organize apply`
 
 ## search
 
@@ -175,6 +177,25 @@ zot --json library dedupe --collection COLL001 --confirm
 - 普通 confirm 不授权 low-confidence。只有单独展示这些组并取得明确风险授权后，才使用 `--include-low-confidence`
 - desktop 需要 Zotero 正在运行、bridge 已安装配对且目标库可写；desktop 失败不检查 Web credentials，也不 fallback
 - 要对单个组手工指定 keeper，继续用 `library duplicates-merge`
+
+## organize
+
+`library organize` 只接受 `--write-backend local`。它不替代 `item tag batch`，也不在批次内创建分类。
+
+```bash
+zot --json library organize plan --file requests.json --output plan.json --write-backend local
+zot --json library organize apply --plan plan.json --confirm --expected-plan-sha256 <sha256> --report report.json --write-backend local
+```
+
+请求 v1 只含 `schema_version` 和 `items`。每项可有 `item_key`、`add_tags`、`remove_tags`、`add_collections`、`remove_collections`、`move_collection` 和仅供阅读的 `reason`。未知字段、重复 item、自相矛盾动作，以及 move 与其他成员动作并存，都会在写入前拒绝。
+
+计划从 Local API 读取，不打开 SQLite，不授权，不 PATCH。SHA-256 针对计划文件的确切字节，出现在命令 JSON 中，不写入计划文件。hash 不匹配、文件被改、schema 无效或 after 与 original_request 重算不一致时，任何写入前拒绝。
+
+默认最多改变 50 条，同一条目只计一次。超限零写入。plan 与 apply 必须使用相同显式上限并重新审阅。每条目最多一次条件 PATCH。首次 failed、conflict、unknown 或 verification-failed 即停止，后续标 not-attempted。不自动回滚，不盲重试。仅明确 401 可重新授权一次。
+
+聚合状态使用 applied、unchanged、partial、failed、unknown；磁盘执行中的报告为 in-progress。只有全部 applied 或 unchanged 且报告成功落盘时退出 0；其余非 0，但 stdout 仍是一个带完整报告的 JSON envelope。提交后落盘失败时，stdout 保留已知结果并携带报告错误，磁盘可能仍是 in-flight。进程中断后的 in-flight 是待核查，不能推定失败或成功，禁止自动 resume。
+
+apply 会重新计算计划中的动作、差异及计数，拒绝伪造的 changed 标记或目标集合。全部目标先预检，逐项执行时再次检查条目版本（包括无变化项）及引用分类的名称/版本；授权等待后也复核分类。分类检查与条目 PATCH 之间仍不是跨对象原子事务。
 
 ## saved search
 

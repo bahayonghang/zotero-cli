@@ -1,0 +1,314 @@
+{
+  "date": "2026-10-13",
+  "implementation_commit": "16ce140",
+  "platform": "Windows",
+  "zotero_version": "10.0.6",
+  "api_version": "3",
+  "schema_version": "44",
+  "web_credentials": false,
+  "sqlite_doctor": "zotero-db-busy",
+  "scenarios": [
+    {
+      "name": "preview",
+      "passed": true,
+      "version_before": 4,
+      "version_after": 4,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "unchanged",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 1,
+          "state": null,
+          "verified": null,
+          "error_code": "local-write-field"
+        },
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        }
+      ],
+      "local_evidence_sha256": "9bd797a81b9b16727b66d2ae63a01bb1bfa83c6409cd4f4568d127184690a8a5"
+    },
+    {
+      "name": "deny",
+      "passed": true,
+      "version_before": 4,
+      "version_after": 4,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 1,
+          "state": null,
+          "verified": null,
+          "error_code": "local-api-forbidden"
+        }
+      ],
+      "local_evidence_sha256": "10abaee74e6e4de3241879ba4c403423bf6bce6b39f08222ab007f2a6680216e"
+    },
+    {
+      "name": "fields",
+      "passed": true,
+      "version_before": 4,
+      "version_after": 7,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "applied",
+          "verified": true,
+          "error_code": null
+        }
+      ],
+      "local_evidence_sha256": "2e7326ddb01bfd0aa0e96c02d966310771f753170d6398a31608e9a15f20d0f1"
+    },
+    {
+      "name": "creators",
+      "passed": true,
+      "version_before": 7,
+      "version_after": 8,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "applied",
+          "verified": true,
+          "error_code": null
+        }
+      ],
+      "local_evidence_sha256": "529b02e5d069cfd50256364fb8fe9d0d1c1ef1777accb7b5d9f24cf81f0b2bf2"
+    },
+    {
+      "name": "move",
+      "passed": true,
+      "version_before": 8,
+      "version_after": 9,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "applied",
+          "verified": true,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "unchanged",
+          "verified": false,
+          "error_code": null
+        }
+      ],
+      "local_evidence_sha256": "048bb3d9c21e01b56de7e79f3df178b29134886270d17001eb21de78affe3863"
+    },
+    {
+      "name": "memberships",
+      "passed": true,
+      "version_before": 9,
+      "version_after": 11,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "applied",
+          "verified": true,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "unchanged",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "applied",
+          "verified": true,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "unchanged",
+          "verified": false,
+          "error_code": null
+        }
+      ],
+      "local_evidence_sha256": "00197600cd32e84d095d28cbff443abc97d2cf03fc65aed75c635ac9c65912db"
+    },
+    {
+      "name": "overwrite",
+      "passed": true,
+      "version_before": 11,
+      "version_after": 12,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "unchanged",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "applied",
+          "verified": true,
+          "error_code": null
+        }
+      ],
+      "local_evidence_sha256": "f6523e851b5bf5facd6f5e770a50f21c372bfbf80323ea5f312a6feb807fb01d"
+    },
+    {
+      "name": "server-conflict",
+      "passed": true,
+      "version_before": 12,
+      "version_after": 12,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 1,
+          "state": null,
+          "verified": null,
+          "error_code": "local-api-conflict"
+        }
+      ],
+      "local_evidence_sha256": "df702282292e4c60f2cf0e522528816900376ffc398d8dfd2065cfe842924355"
+    },
+    {
+      "name": "save-stale",
+      "passed": true,
+      "version_before": 12,
+      "version_after": 12,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        }
+      ],
+      "local_evidence_sha256": "1e681fc1f5d494e1f19371821fc6535c835c08f8170ca2eae1b3a55fd963b778"
+    },
+    {
+      "name": "reject-stale",
+      "passed": true,
+      "version_before": 13,
+      "version_after": 13,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 1,
+          "state": null,
+          "verified": null,
+          "error_code": "local-api-conflict"
+        }
+      ],
+      "local_evidence_sha256": "dd0f3c25bb9bada79dca9cc2f4b12fc0a54f75704ac5a9a2a88ff6cae8a6e5fc"
+    },
+    {
+      "name": "after-restart",
+      "passed": true,
+      "version_before": 13,
+      "version_after": 14,
+      "children_unchanged": true,
+      "events": [
+        {
+          "exit_code": 0,
+          "state": "preview",
+          "verified": false,
+          "error_code": null
+        },
+        {
+          "exit_code": 0,
+          "state": "applied",
+          "verified": true,
+          "error_code": null
+        }
+      ],
+      "local_evidence_sha256": "16363fcd24db0f22136fafce1b3f741ee136e9ab9b11cde3fe9db82b3b368414"
+    }
+  ],
+  "instance_switch": {
+    "passed": true,
+    "main_restored": true,
+    "main_server_id": "2ZxitCcOtvOu",
+    "test_server_id": "onZz1IXmgT44",
+    "main_credential_present": false,
+    "error": {
+      "code": "local-api-conflict",
+      "message": "Expected Server ID is missing or changed; preview again"
+    },
+    "exit_code": 1
+  },
+  "ui_evidence": {
+    "ui-after-writes.txt": "c841411291059bd83d1b6df17f39b0d66f62893f90ed376aa08fbbd586668e79",
+    "ui-after-restart.txt": "988333b20179ae86cfe68e4cb1e7f360f159896f14c80b9ed42ef3dec98c4098"
+  },
+  "limitations": [
+    "real synced group permissions",
+    "real interrupted submission",
+    "Undo",
+    "Better BibTeX",
+    "Linux/macOS",
+    "Rust 1.85 local execution"
+  ]
+}

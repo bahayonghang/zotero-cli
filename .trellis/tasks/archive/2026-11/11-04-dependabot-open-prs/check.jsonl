@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "验收时核对 MSRV 与安全检查不被放行"}
+{"file": ".trellis/tasks/11-04-dependabot-open-prs/research/pr-triage.md", "reason": "用研究记录核对目标版本和分支头"}
+{"file": ".trellis/tasks/11-04-dependabot-open-prs/prd.md", "reason": "用 AC1-AC6 验收合并、关闭、分支和 dev 是否保持原状"}

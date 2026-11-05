@@ -1,0 +1,9 @@
+warning: in the working copy of '.github/workflows/ci.yml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.trellis/config.yaml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.trellis/scripts/common/workflow_phase.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.trellis/spec/zot-cli/backend/quality-guidelines.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'AGENTS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'Cargo.lock', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'README.zh-CN.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/agents/harnesses.md', LF will be replaced by CRLF the next time Git touches it

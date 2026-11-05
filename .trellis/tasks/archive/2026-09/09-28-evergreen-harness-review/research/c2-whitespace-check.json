@@ -1,0 +1,6 @@
+{
+  "check": "source and new test whitespace",
+  "exit_code": 0,
+  "issues": [],
+  "no_index_exit_note": "git diff --no-index implies --exit-code; exit 1 records the new file diff. No whitespace diagnostic was emitted."
+}

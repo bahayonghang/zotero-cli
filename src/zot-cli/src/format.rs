@@ -13,6 +13,7 @@ pub struct EnvelopeMetaSeed {
     pub total: Option<usize>,
     pub trash_policy: Option<String>,
     pub fulltext_index: Option<String>,
+    pub read_source: Option<String>,
 }
 
 pub fn to_pretty_json<T: serde::Serialize>(value: &T) -> anyhow::Result<String> {
@@ -28,6 +29,7 @@ pub fn render_error_json(err: &AppError, profile: Option<&str>) -> anyhow::Resul
             profile: profile.map(str::to_string),
             trash_policy: None,
             fulltext_index: None,
+            read_source: None,
             api_version: Some(ENVELOPE_API_VERSION),
         },
     ))
@@ -216,6 +218,7 @@ mod tests {
                 profile: Some("default".to_string()),
                 trash_policy: Some("excluded".to_string()),
                 fulltext_index: None,
+                read_source: None,
                 api_version: Some(1),
             },
         ))
@@ -243,6 +246,7 @@ mod tests {
                 profile: Some("work".to_string()),
                 trash_policy: None,
                 fulltext_index: None,
+                read_source: None,
                 api_version: Some(super::ENVELOPE_API_VERSION),
             },
         ))

@@ -95,6 +95,15 @@ impl AppContext {
         ConnectorClient::new()
     }
 
+    pub(crate) fn local_api(&self) -> zot_core::ZotResult<zot_desktop::LocalApiClient> {
+        zot_desktop::LocalApiClient::new()
+    }
+
+    pub(crate) fn local_api_credentials_path(&self) -> zot_core::ZotResult<PathBuf> {
+        // Credentials must never use state_dir's non-secret temporary-directory fallback.
+        Ok(AppConfig::config_dir()?.join("local-api-credentials.json"))
+    }
+
     pub(crate) fn library_index_path(&self) -> PathBuf {
         let scope = match &self.scope {
             LibraryScope::User => "user".to_string(),

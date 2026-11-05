@@ -8,19 +8,19 @@
       "files": [],
       "expectations": [
         "Routes the request to Zotero-first search and item detail workflows.",
-        "Returns the result in user-facing language instead of dumping raw JSON first.",
-        "Completes search -> detail -> citation as one flow."
+        "Treats a keyword search as a candidate list and picks one item only after showing the matches.",
+        "Completes search -> detail -> citation as one flow and does not treat the search as semantic recall."
       ]
     },
     {
       "id": 2,
       "prompt": "我只有一个 citation key：Smith2024。帮我把对应文献找出来，如果能找到就给我元数据和 Nature 风格引用。",
-      "expected_output": "优先走 citation key 工作流，并在需要时说明 Better BibTeX / Extra fallback。",
+      "expected_output": "按精确 citation key 查找。大小写必须一致。原生 citationKey 和 Extra 都查。多条同 key 先让用户选。插件不可达且库内未存储时说明来源限制。",
       "files": [],
       "expectations": [
-        "Chooses citation-key lookup before broad full-text or metadata search.",
-        "Mentions fallback behavior honestly when Better BibTeX is unavailable.",
-        "Returns metadata plus a Nature-style citation on success."
+        "Chooses exact citation-key lookup before broad full-text or metadata search.",
+        "Does not accept a prefix or a different case, and asks the user to choose when several items share the key.",
+        "Reports the source limit when Better BibTeX is unreachable and the key was never stored, then returns metadata plus a Nature-style citation on a unique hit."
       ]
     },
     {
@@ -37,12 +37,12 @@
     {
       "id": 4,
       "prompt": "把 Zotero 里 ATTN001 这个条目标上 priority 标签；如果当前环境没有写权限，就先告诉我缺什么，不要假装成功。",
-      "expected_output": "先检查 doctor/写权限，再决定执行写入或停在缺失凭据说明。",
+      "expected_output": "先检查 doctor。单条已知 key 优先走 item tag add --write-backend local 预览；Local API 与 Web 都不可用时说明缺什么，不假装成功。",
       "files": [],
       "expectations": [
-        "Treats the request as a write operation.",
-        "Checks or references write prerequisites before writing.",
-        "Stops with a clear missing-credentials explanation when needed."
+        "Treats the request as a write and checks doctor before writing.",
+        "Uses single-item item tag add with explicit local backend when Local API is available; does not use item tag batch for one known key.",
+        "Previews before confirm and stops with a clear explanation when neither Local API nor Web write access is available."
       ]
     },
     {
@@ -349,7 +349,7 @@
       "files": [],
       "expectations": [
         "Refuses to execute SQL or modify zotero.sqlite directly.",
-        "States that local SQLite and Zotero Local HTTP are read-only paths rather than write transports.",
+        "States that SQLite stays read-only and only implemented Zotero 10+ authenticated Local API or Web commands may mutate items.",
         "Does not suggest bypassing Zotero validation and offers only implemented desktop or explicit Web commands."
       ]
     },
@@ -384,6 +384,127 @@
         "Does not trigger the zot skill for a standalone non-Zotero PDF.",
         "Does not import the PDF into Zotero or create a workspace without a request.",
         "Uses the ordinary PDF reading workflow for the local file."
+      ]
+    },
+    {
+      "id": 36,
+      "prompt": "没有 Web API key，把本机 Zotero 条目 ITEMABCD 从分类 A 移到 B，保留它在 C 的归属。",
+      "expected_output": "先 doctor 检查 local_api_write，解析同库真实 keys，local move-item 预览，确认同一 server/version 后单次 PATCH 并回读。",
+      "files": [],
+      "expectations": [
+        "Chooses explicit local backend with no Web credential prerequisite.",
+        "Preserves unrelated collection C and uses item keys resolved from the library.",
+        "Previews before confirmation; uses the preview Server ID and local version; no backend fallback."
+      ]
+    },
+    {
+      "id": 37,
+      "prompt": "补充这篇的 DOI 和作者；保留已有内容，作者既有人名也有机构名。",
+      "expected_output": "按当前 schema 填空，结构化 creators-file 保留顺序/角色，不默认 overwrite。",
+      "files": [],
+      "expectations": [
+        "Validates itemType fields and creator types using the same Local API.",
+        "Uses structured creators, preserving name forms and order.",
+        "Reports skipped nonempty fields and never infers overwrite permission."
+      ]
+    },
+    {
+      "id": 38,
+      "prompt": "本地修改返回 unknown，observed_expected_state=true，可以说已经成功然后再试一次吗？",
+      "expected_output": "说明未知提交不能证明此次操作成功，不盲重试；检查当前状态和版本，必要时重新预览。",
+      "files": [],
+      "expectations": [
+        "Does not report unknown as applied.",
+        "Does not blindly resubmit the write.",
+        "Distinguishes verification-failed after accepted writes from unknown submissions."
+      ]
+    },
+    {
+      "id": 39,
+      "prompt": "SQLite snapshot busy，但 Zotero 10 的 local_api_write supported=true；先预览补充会议名。",
+      "expected_output": "直接用 local API 读取 item/schema 做预览，不依赖 SQLite/Web key，不弹授权框。",
+      "files": [],
+      "expectations": [
+        "Uses Local API item data and versions even when SQLite snapshots fail.",
+        "Does not request authorization during preview.",
+        "Does not switch to Web or connector writes."
+      ]
+    },
+    {
+      "id": 40,
+      "prompt": "没有 Web API key，给本机条目 ITEMABCD 加上“待读”和“C++/安全”，并去掉“过期”；已有自动标签和未点名的标签都要保留。",
+      "expected_output": "doctor 后分别预览 local item tag add 与 item tag remove，确认同一 server/version 后再写入；不走 batch，不改其他标签类型。",
+      "files": [],
+      "expectations": [
+        "Uses explicit --write-backend local on item tag add and item tag remove, not item tag batch or Web.",
+        "Preserves automatic tag type and unmentioned tag objects; matches names exactly, including spaces and symbols.",
+        "Previews before confirmation and does not treat unknown or verification-failed as success."
+      ]
+    },
+    {
+      "id": 41,
+      "prompt": "没有 Web API key，在本机 Zotero 根下创建一个叫“待读”的分类；如果同级已经有同名分类，不要复用，告诉我已有 key。",
+      "expected_output": "doctor 后用 collection create --write-backend local 预览，确认库版本后再创建；同级同名拒绝并列出候选 key。",
+      "files": [],
+      "expectations": [
+        "Uses collection create with explicit --write-backend local, not Web, connector, or a multi-level path.",
+        "Confirms with the preview Server ID and library version, not an item version or a synthetic 0.",
+        "Rejects an exact same-parent name and lists candidate keys; does not reuse, rename, or claim unknown as applied."
+      ]
+    },
+    {
+      "id": 42,
+      "prompt": "没有 Web API key。给 ITEMABCD 加待读并挂到 COLL0001，给 ITEMBCDE 去掉过期并移出 COLL0002；先给我完整差异，不要用同一套标签套所有命中。",
+      "expected_output": "用 library organize plan --write-backend local 生成显式计划，审阅 SHA-256 后再 apply；不用 item tag batch，不在批次里创建分类。",
+      "files": [],
+      "expectations": [
+        "Uses library organize plan/apply with explicit local backend and explicit item keys, not item tag batch or a query apply.",
+        "Reviews the full before/after plan and passes its exact SHA-256; does not raise the 50-item ceiling silently.",
+        "Stops after the first failed or unknown item, leaves later items not-attempted, and does not treat partial or in-flight as full success."
+      ]
+    },
+    {
+      "id": 43,
+      "prompt": "Zotero 开着，SQLite 被锁住了。按标题帮我找到 Attention Is All You Need，然后读本地 PDF。不要因为 snapshot busy 就停。",
+      "expected_output": "继续做标题查找和 PDF 读取。说明 meta.read_source 是 desktop。探针可达不算已经读到条目或 PDF。",
+      "files": [],
+      "expectations": [
+        "Does not abort a supported desktop read when only the SQLite snapshot is busy.",
+        "Uses title lookup then item pdf, and reports read_source desktop.",
+        "Does not treat a reachable Local API probe as the completed item or PDF read."
+      ]
+    },
+    {
+      "id": 44,
+      "prompt": "citation key 是 Smith2024。帮我精确找到那一篇。如果有好几条共用这个 key，先问我选哪条。不要把 Smith 或 smith2024 当成命中。",
+      "expected_output": "精确匹配 Smith2024。前缀和大小写不同都不是命中。多条同 key 时给出标题、作者、年份和 item key 让用户选。",
+      "files": [],
+      "expectations": [
+        "Uses library citekey for an exact, case-sensitive key.",
+        "Rejects prefix similarity and case mismatch.",
+        "Asks the user to choose when several items share the citation key."
+      ]
+    },
+    {
+      "id": 45,
+      "prompt": "帮我找期刊是 Nature 的文献。摘要里提到 Nature 不算。缩写也要认。",
+      "expected_output": "用 library search --journal。只匹配 publicationTitle 或 journalAbbreviation，不把摘要提及当期刊命中。",
+      "files": [],
+      "expectations": [
+        "Uses --journal rather than a generic full-text query.",
+        "Matches publicationTitle or journalAbbreviation, including an abbreviation.",
+        "Does not treat an abstract mention of the journal name as a journal hit."
+      ]
+    },
+    {
+      "id": 46,
+      "prompt": "在库里找主题是 transformer 的论文。不要做语义召回，也不要靠 PDF 正文。如果 SQLite 被锁，就读正在运行的 Zotero，并说明全文索引不可用。",
+      "expected_output": "用 library search --topic。这是标题、摘要或标签的词匹配。库锁着时走桌面读，fulltext_index 为 unavailable，不声称查过正文。",
+      "files": [],
+      "expectations": [
+        "Uses --topic as title, abstract, or tag term match, not semantic search and not PDF body search.",
+        "Continues with a desktop read when SQLite is busy and reports fulltext_index unavailable.",
+        "Keeps writes on their existing separate flow."
       ]
     }
   ]

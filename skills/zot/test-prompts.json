@@ -2,12 +2,12 @@
   {
     "id": 1,
     "prompt": "帮我在 Zotero 里找跟 reward hacking 相关的论文，挑一篇最相关的给我看详情，然后给我一个 APA 格式引用。",
-    "expected": "先做库内搜索，再读取单条目，最后给出引用，而不是只贴命令。"
+    "expected": "先做库内搜索并列出候选，再读取选中的单条目，最后给出引用。这是词匹配，不是语义召回。"
   },
   {
     "id": 2,
     "prompt": "我只有一个 citation key：Smith2024。帮我把对应文献找出来，如果能找到就给我元数据和 Nature 风格引用。",
-    "expected": "优先走 citation key 工作流，并在需要时说明 Better BibTeX / Extra fallback。"
+    "expected": "按精确 citation key 查找。原生 citationKey 和 Extra 都查。多条同 key 先问用户。插件不可达且库内未存储时说明来源限制。"
   },
   {
     "id": 3,
@@ -17,7 +17,7 @@
   {
     "id": 4,
     "prompt": "把 Zotero 里 ATTN001 这个条目标上 priority 标签；如果当前环境没有写权限，就先告诉我缺什么，不要假装成功。",
-    "expected": "先检查 doctor/写权限，再决定执行写入或停在缺失凭据说明。"
+    "expected": "先检查 doctor。单条已知 key 优先走 item tag add --write-backend local 预览；Local API 与 Web 都不可用时说明缺什么，不假装成功。"
   },
   {
     "id": 5,
@@ -173,5 +173,60 @@
     "id": 35,
     "prompt": "总结当前目录里的 report.pdf；它不是 Zotero 附件，也不需要建 workspace 或写回 Zotero。",
     "expected": "这是非 Zotero PDF 处理请求，不应触发 zot skill，应直接使用普通 PDF 工作流。"
+  },
+  {
+    "id": 36,
+    "prompt": "没有 Web API key，把本机 Zotero 条目 ITEMABCD 从分类 A 移到 B，保留它在 C 的归属。",
+    "expected": "先 doctor 检查 local_api_write，解析同库真实 keys，local move-item 预览，确认同一 server/version 后单次 PATCH 并回读。"
+  },
+  {
+    "id": 37,
+    "prompt": "补充这篇的 DOI 和作者；保留已有内容，作者既有人名也有机构名。",
+    "expected": "按当前 schema 填空，结构化 creators-file 保留顺序/角色，不默认 overwrite。"
+  },
+  {
+    "id": 38,
+    "prompt": "本地修改返回 unknown，observed_expected_state=true，可以说已经成功然后再试一次吗？",
+    "expected": "说明未知提交不能证明此次操作成功，不盲重试；检查当前状态和版本，必要时重新预览。"
+  },
+  {
+    "id": 39,
+    "prompt": "SQLite snapshot busy，但 Zotero 10 的 local_api_write supported=true；先预览补充会议名。",
+    "expected": "直接用 local API 读取 item/schema 做预览，不依赖 SQLite/Web key，不弹授权框。"
+  },
+  {
+    "id": 40,
+    "prompt": "没有 Web API key，给本机条目 ITEMABCD 加上“待读”和“C++/安全”，并去掉“过期”；已有自动标签和未点名的标签都要保留。",
+    "expected": "doctor 后分别预览 local item tag add 与 item tag remove，确认同一 server/version 后再写入；不走 batch，不改其他标签类型。"
+  },
+  {
+    "id": 41,
+    "prompt": "没有 Web API key，在本机 Zotero 根下创建一个叫“待读”的分类；如果同级已经有同名分类，不要复用，告诉我已有 key。",
+    "expected": "doctor 后用 collection create --write-backend local 预览，确认库版本后再创建；同级同名拒绝并列出候选 key。"
+  },
+  {
+    "id": 42,
+    "prompt": "没有 Web API key。给 ITEMABCD 加待读并挂到 COLL0001，给 ITEMBCDE 去掉过期并移出 COLL0002；先给我完整差异，不要用同一套标签套所有命中。",
+    "expected": "用 library organize plan --write-backend local 生成显式计划，审阅 SHA-256 后再 apply；不用 item tag batch，不在批次里创建分类。"
+  },
+  {
+    "id": 43,
+    "prompt": "Zotero 开着，SQLite 被锁住了。按标题帮我找到 Attention Is All You Need，然后读本地 PDF。不要因为 snapshot busy 就停。",
+    "expected": "继续做标题查找和 PDF 读取。说明 read_source 是 desktop。探针可达不算已经读到条目或 PDF。"
+  },
+  {
+    "id": 44,
+    "prompt": "citation key 是 Smith2024。帮我精确找到那一篇。如果有好几条共用这个 key，先问我选哪条。不要把 Smith 或 smith2024 当成命中。",
+    "expected": "精确匹配 Smith2024。前缀和大小写不同都不是命中。多条同 key 时给出标题、作者、年份和 item key 让用户选。"
+  },
+  {
+    "id": 45,
+    "prompt": "帮我找期刊是 Nature 的文献。摘要里提到 Nature 不算。缩写也要认。",
+    "expected": "用 library search --journal。只匹配 publicationTitle 或 journalAbbreviation，不把摘要提及当期刊命中。"
+  },
+  {
+    "id": 46,
+    "prompt": "在库里找主题是 transformer 的论文。不要做语义召回，也不要靠 PDF 正文。如果 SQLite 被锁，就读正在运行的 Zotero，并说明全文索引不可用。",
+    "expected": "用 library search --topic。这是标题、摘要或标签的词匹配。库锁着时走桌面读，fulltext_index 为 unavailable，不声称查过正文。"
   }
 ]

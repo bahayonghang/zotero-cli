@@ -1,0 +1,18 @@
+[
+  {
+    "repo": "bnjbvr/cargo-machete",
+    "tag": "v0.9.2",
+    "url": "https://github.com/bnjbvr/cargo-machete/releases/download/v0.9.2/cargo-machete-v0.9.2-x86_64-pc-windows-msvc.tar.gz",
+    "digest": "sha256:996120ac70afe405c58fce508a476f25bb71032c6fb8013aa0123bba36429c76",
+    "path": "target\\audit-tools\\downloads\\cargo-machete-v0.9.2-x86_64-pc-windows-msvc.tar.gz",
+    "verified_utc": "2026-09-28T06:39:51.9006759Z"
+  },
+  {
+    "repo": "est31/cargo-udeps",
+    "tag": "v0.1.61",
+    "url": "https://github.com/est31/cargo-udeps/releases/download/v0.1.61/cargo-udeps-v0.1.61-x86_64-pc-windows-msvc.zip",
+    "digest": "sha256:6920b6f493f0c13a28e32522ccb7efffcc57c8849d887366b19c599dc2238cc0",
+    "path": "target\\audit-tools\\downloads\\cargo-udeps-v0.1.61-x86_64-pc-windows-msvc.zip",
+    "verified_utc": "2026-09-28T06:39:54.7865102Z"
+  }
+]

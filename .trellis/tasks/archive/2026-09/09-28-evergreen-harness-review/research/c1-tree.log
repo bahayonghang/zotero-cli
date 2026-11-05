@@ -1,0 +1,19 @@
+rustls v0.23.45
+├── hyper-rustls v0.27.9
+│   └── reqwest v0.13.2
+│       ├── zot-desktop v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-desktop)
+│       │   └── zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+│       │   [dev-dependencies]
+│       │   └── zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+│       ├── zot-local v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-local)
+│       │   └── zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+│       └── zot-remote v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-remote)
+│           └── zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+│           [dev-dependencies]
+│           └── zot-cli v1.0.1 (D:\Documents\Code\CLI\zotero-cli\src\zot-cli)
+├── reqwest v0.13.2 (*)
+├── rustls-platform-verifier v0.6.2
+│   └── reqwest v0.13.2 (*)
+└── tokio-rustls v0.26.4
+    ├── hyper-rustls v0.27.9 (*)
+    └── reqwest v0.13.2 (*)

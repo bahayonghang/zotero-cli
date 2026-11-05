@@ -248,7 +248,7 @@ impl AppConfig {
             path: dir.to_path_buf(),
             source,
         })?;
-        write_config_atomically(path, encoded.as_bytes())
+        write_secret_atomically(path, encoded.as_bytes())
     }
 
     fn validate(&self) -> ZotResult<()> {
@@ -483,7 +483,8 @@ fn config_dir_from(base: Option<PathBuf>) -> ZotResult<PathBuf> {
         })
 }
 
-fn write_config_atomically(path: &Path, contents: &[u8]) -> ZotResult<()> {
+/// Atomically replace a credential file in an existing directory, with private Unix permissions.
+pub fn write_secret_atomically(path: &Path, contents: &[u8]) -> ZotResult<()> {
     let dir = path.parent().ok_or_else(|| ZotError::InvalidInput {
         code: "config-dir-unavailable".to_string(),
         message: "Config file has no parent directory".to_string(),

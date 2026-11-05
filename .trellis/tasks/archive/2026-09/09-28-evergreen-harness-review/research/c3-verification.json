@@ -1,0 +1,80 @@
+{
+  "recorded_at_utc": "2026-09-28T06:49:09.451916+00:00",
+  "head_before_commit": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+  "scope": "C3 working-tree verification; HEAD excludes these uncommitted edits",
+  "effective_platform": "codex-inline",
+  "checks": [
+    {
+      "name": "codex-2.1",
+      "args": [
+        "C:\\Program Files\\Python314\\python.exe",
+        "-B",
+        ".trellis/scripts/get_context.py",
+        "--mode",
+        "phase",
+        "--step",
+        "2.1",
+        "--platform",
+        "codex"
+      ],
+      "exit_code": 0,
+      "semantic_assertions": "PASS"
+    },
+    {
+      "name": "codex-2.2",
+      "args": [
+        "C:\\Program Files\\Python314\\python.exe",
+        "-B",
+        ".trellis/scripts/get_context.py",
+        "--mode",
+        "phase",
+        "--step",
+        "2.2",
+        "--platform",
+        "codex"
+      ],
+      "exit_code": 0,
+      "semantic_assertions": "PASS"
+    },
+    {
+      "name": "scoped-diff-check",
+      "args": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "AGENTS.md",
+        "docs/agents/harnesses.md",
+        ".trellis/config.yaml",
+        "README.md",
+        "README.zh-CN.md"
+      ],
+      "exit_code": 0
+    },
+    {
+      "name": "protected-files",
+      "args": [
+        "git",
+        "diff",
+        "--exit-code",
+        "HEAD",
+        "--",
+        "CLAUDE.md",
+        "skills",
+        ".trellis/.template-hashes.json"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "source_hashes_sha256": {
+    "AGENTS.md": "53a73ed4c9564a8cfa7625378f579eac0f974a6df7adaf8920a92018cb2a93ef",
+    "docs/agents/harnesses.md": "ac76e7e0838da6ae091f033d9326e553191aeb78353f5d0e66d621aacb26deab",
+    ".trellis/config.yaml": "bd9e0a1e9b11c8c134a3414376eab0a06ba55b3af34bcba4621b198024e3dfa1",
+    "README.md": "808c7c0bb25a6534a0f75fae5b2ec7931ec3daaac57810fcf9e250edfa6dade2",
+    "README.zh-CN.md": "ecf69e971047b871d45854851fd8dd190d59b3f8975f0531c6be1ff31f4a4754"
+  },
+  "omitted": [
+    "just ci and docs build delegated to parent final gate",
+    "fresh-start/hook/model/sandbox runtime trials not authorized"
+  ]
+}

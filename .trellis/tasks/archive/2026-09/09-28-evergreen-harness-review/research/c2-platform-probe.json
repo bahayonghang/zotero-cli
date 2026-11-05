@@ -1,0 +1,111 @@
+{
+  "date": "2026-09-28",
+  "scope": "Actual get_context.py output; no native harness session executed.",
+  "rows": [
+    {
+      "platform": "claude",
+      "step": "2.1",
+      "exit_code": 0,
+      "rendered_chars": 851,
+      "has_implementation": true,
+      "has_quality_check": false,
+      "body_file": "c2-phase-2.1-claude.txt"
+    },
+    {
+      "platform": "claude",
+      "step": "2.2",
+      "exit_code": 0,
+      "rendered_chars": 1074,
+      "has_implementation": false,
+      "has_quality_check": true,
+      "body_file": "c2-phase-2.2-claude.txt"
+    },
+    {
+      "platform": "codex",
+      "step": "2.1",
+      "exit_code": 0,
+      "rendered_chars": 851,
+      "has_implementation": true,
+      "has_quality_check": false,
+      "body_file": "c2-phase-2.1-codex.txt"
+    },
+    {
+      "platform": "codex",
+      "step": "2.2",
+      "exit_code": 0,
+      "rendered_chars": 1074,
+      "has_implementation": false,
+      "has_quality_check": true,
+      "body_file": "c2-phase-2.2-codex.txt"
+    },
+    {
+      "platform": "grok",
+      "step": "2.1",
+      "exit_code": 0,
+      "rendered_chars": 843,
+      "has_implementation": true,
+      "has_quality_check": false,
+      "body_file": "c2-phase-2.1-grok.txt"
+    },
+    {
+      "platform": "grok",
+      "step": "2.2",
+      "exit_code": 0,
+      "rendered_chars": 1074,
+      "has_implementation": false,
+      "has_quality_check": true,
+      "body_file": "c2-phase-2.2-grok.txt"
+    },
+    {
+      "platform": "kimi",
+      "step": "2.1",
+      "exit_code": 0,
+      "rendered_chars": 843,
+      "has_implementation": true,
+      "has_quality_check": false,
+      "body_file": "c2-phase-2.1-kimi.txt"
+    },
+    {
+      "platform": "kimi",
+      "step": "2.2",
+      "exit_code": 0,
+      "rendered_chars": 1074,
+      "has_implementation": false,
+      "has_quality_check": true,
+      "body_file": "c2-phase-2.2-kimi.txt"
+    },
+    {
+      "platform": "omp",
+      "step": "2.1",
+      "exit_code": 0,
+      "rendered_chars": 851,
+      "has_implementation": true,
+      "has_quality_check": false,
+      "body_file": "c2-phase-2.1-omp.txt"
+    },
+    {
+      "platform": "omp",
+      "step": "2.2",
+      "exit_code": 0,
+      "rendered_chars": 1074,
+      "has_implementation": false,
+      "has_quality_check": true,
+      "body_file": "c2-phase-2.2-omp.txt"
+    }
+  ],
+  "hashes_before": {
+    ".trellis/scripts/common/workflow_phase.py": "0a60e1e6411ca539899a03e1780eaad869650e4bda0b5cc65acdf5b5e8ba897a",
+    "scripts/tests/test_harness_platform_routing.py": "c1aab50f7f03771fde529c7227fbc021b783e7871f9acb80d1061d2377e755ed",
+    ".trellis/config.yaml": "eaba56c36fb07483fcbc96d74c4da0ab33b9739fb9ff10ea4cc1e1cd32bf23b2",
+    ".trellis/workflow.md": "4a56817231bc3e71534b2b21ffaefa41a9dc07a5d2348460fb97554199c57895",
+    ".trellis/tasks/09-28-harness-platform-routing/task.json": "9fb127a98f4235676140ea3875ac71bad9fb95a687076697ede9b9f4415901bb"
+  },
+  "hashes_after": {
+    ".trellis/scripts/common/workflow_phase.py": "0a60e1e6411ca539899a03e1780eaad869650e4bda0b5cc65acdf5b5e8ba897a",
+    "scripts/tests/test_harness_platform_routing.py": "c1aab50f7f03771fde529c7227fbc021b783e7871f9acb80d1061d2377e755ed",
+    ".trellis/config.yaml": "eaba56c36fb07483fcbc96d74c4da0ab33b9739fb9ff10ea4cc1e1cd32bf23b2",
+    ".trellis/workflow.md": "4a56817231bc3e71534b2b21ffaefa41a9dc07a5d2348460fb97554199c57895",
+    ".trellis/tasks/09-28-harness-platform-routing/task.json": "9fb127a98f4235676140ea3875ac71bad9fb95a687076697ede9b9f4415901bb"
+  },
+  "files_unchanged": true
+}

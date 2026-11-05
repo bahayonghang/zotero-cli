@@ -7,7 +7,7 @@ use zot_local::SearchOptions;
 use zot_remote::ZoteroRemote;
 
 use crate::app_error::AppError;
-use crate::cli::{ItemTagBatchArgs, ItemTagCommand};
+use crate::cli::{ItemTagBatchArgs, ItemTagCommand, ItemTagUpdateArgs, WriteBackendArg};
 use crate::context::AppContext;
 use crate::output::CommandOutput;
 use crate::util::require_item;
@@ -24,16 +24,8 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<
                 }
             })
         }
-        ItemTagCommand::Add(args) => {
-            ctx.remote()?.add_tags(&args.key, &args.tags).await?;
-            let payload = serde_json::json!({ "key": args.key, "added": args.tags });
-            CommandOutput::new(ctx, payload, None, |_| println!("Tags added."))
-        }
-        ItemTagCommand::Remove(args) => {
-            ctx.remote()?.remove_tags(&args.key, &args.tags).await?;
-            let payload = serde_json::json!({ "key": args.key, "removed": args.tags });
-            CommandOutput::new(ctx, payload, None, |_| println!("Tags removed."))
-        }
+        ItemTagCommand::Add(args) => apply_tag_update(ctx, args, false).await,
+        ItemTagCommand::Remove(args) => apply_tag_update(ctx, args, true).await,
         ItemTagCommand::Batch(args) => {
             let payload = batch_update_tags(ctx, args).await?;
             CommandOutput::new(ctx, payload, None, |payload| {
@@ -43,6 +35,34 @@ pub(crate) async fn handle(ctx: &AppContext, command: ItemTagCommand) -> Result<
                 );
             })
         }
+    }
+}
+
+async fn apply_tag_update(
+    ctx: &AppContext,
+    args: ItemTagUpdateArgs,
+    remove: bool,
+) -> Result<CommandOutput> {
+    // Local tags read and write only through LocalApiClient. Do not open SQLite or Web here.
+    if args.write.write_backend == WriteBackendArg::Local {
+        return crate::commands::local_write::update_tags(
+            ctx,
+            &args.key,
+            &args.tags,
+            remove,
+            &args.write,
+        )
+        .await;
+    }
+    crate::commands::local_write::validate_web_options(&args.write)?;
+    if remove {
+        ctx.remote()?.remove_tags(&args.key, &args.tags).await?;
+        let payload = serde_json::json!({ "key": args.key, "removed": args.tags });
+        CommandOutput::new(ctx, payload, None, |_| println!("Tags removed."))
+    } else {
+        ctx.remote()?.add_tags(&args.key, &args.tags).await?;
+        let payload = serde_json::json!({ "key": args.key, "added": args.tags });
+        CommandOutput::new(ctx, payload, None, |_| println!("Tags added."))
     }
 }
 

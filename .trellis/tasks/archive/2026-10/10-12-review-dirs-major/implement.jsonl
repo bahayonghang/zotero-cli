@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/tasks/10-12-review-dirs-major/research/dirs-7-paths.md", "reason": "dirs 7 唯一的 Windows 路径差异"}
+{"file": ".trellis/spec/zot-core/backend/quality-guidelines.md", "reason": "配置路径所属 crate 的依赖约定"}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "workspace 依赖声明约定"}

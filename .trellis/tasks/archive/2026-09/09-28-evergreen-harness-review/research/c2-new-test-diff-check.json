@@ -1,0 +1,4 @@
+{
+  "command": "git diff --no-index --check -- /dev/null scripts/tests/test_harness_platform_routing.py",
+  "exit_code": 1
+}

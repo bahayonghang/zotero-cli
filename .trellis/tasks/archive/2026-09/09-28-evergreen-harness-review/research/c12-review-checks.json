@@ -1,0 +1,42 @@
+{
+  "results": [
+    {
+      "command": [
+        "C:\\Program Files\\Python314\\python.exe",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts/tests",
+        "-p",
+        "test_*.py"
+      ],
+      "start_utc": "2026-09-28T06:43:03.506158+00:00",
+      "end_utc": "2026-09-28T06:43:07.259148+00:00",
+      "exit_code": 0,
+      "log": "c12-python-tests.log"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "Cargo.lock",
+        ".trellis/scripts/common/workflow_phase.py",
+        "scripts/tests/test_harness_platform_routing.py"
+      ],
+      "start_utc": "2026-09-28T06:43:07.259201+00:00",
+      "end_utc": "2026-09-28T06:43:07.302818+00:00",
+      "exit_code": 0,
+      "log": "c12-diff-check.log"
+    }
+  ],
+  "baseline_head": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+  "reviewed_hashes_after_checks": {
+    "Cargo.lock": "857974bce8e060ed25212b68463e2bd1e0c42be3dce908517d001428d93e706f",
+    ".trellis/scripts/common/workflow_phase.py": "0a60e1e6411ca539899a03e1780eaad869650e4bda0b5cc65acdf5b5e8ba897a",
+    "scripts/tests/test_harness_platform_routing.py": "c1aab50f7f03771fde529c7227fbc021b783e7871f9acb80d1061d2377e755ed"
+  }
+}

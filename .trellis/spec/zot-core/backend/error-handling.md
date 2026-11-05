@@ -17,6 +17,7 @@ machine-readable codes.
 - `ZotError::Connector` is for Zotero's built-in unauthenticated connector
   server transport (import-only plus the adjacent read-only local API probe,
   no plugin) from `zot-desktop`. See `zot-cli/backend/connector.md`.
+- `ZotError::LocalApi` is for authenticated Zotero 10+ Local API transport. Its status is internal; code/message/hint form the public payload. Never expose response bodies or local authorization keys.
 - `ZotError::Pdf` is for PDF extraction, Pdfium setup, and annotation geometry.
 - `ZotError::Unsupported` is for deliberately unavailable features such as
   command surfaces that are scaffolded but not implemented.

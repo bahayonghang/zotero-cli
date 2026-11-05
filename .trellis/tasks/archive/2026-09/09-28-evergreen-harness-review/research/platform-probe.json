@@ -1,0 +1,52 @@
+[
+  {
+    "platform": "claude",
+    "effective": "claude",
+    "workflow_label": "Claude Code",
+    "label_matches": false,
+    "exit_code": 0,
+    "rendered_chars": 45,
+    "has_implement_agent": false,
+    "has_no_direct_code_rule": false
+  },
+  {
+    "platform": "codex",
+    "effective": "codex-sub-agent",
+    "workflow_label": "codex-sub-agent",
+    "label_matches": true,
+    "exit_code": 0,
+    "rendered_chars": 851,
+    "has_implement_agent": true,
+    "has_no_direct_code_rule": false
+  },
+  {
+    "platform": "grok",
+    "effective": "grok",
+    "workflow_label": "Grok",
+    "label_matches": true,
+    "exit_code": 0,
+    "rendered_chars": 843,
+    "has_implement_agent": true,
+    "has_no_direct_code_rule": false
+  },
+  {
+    "platform": "kimi",
+    "effective": "kimi",
+    "workflow_label": "Kimi Code",
+    "label_matches": false,
+    "exit_code": 0,
+    "rendered_chars": 45,
+    "has_implement_agent": false,
+    "has_no_direct_code_rule": false
+  },
+  {
+    "platform": "omp",
+    "effective": "omp",
+    "workflow_label": "Oh My Pi",
+    "label_matches": false,
+    "exit_code": 0,
+    "rendered_chars": 45,
+    "has_implement_agent": false,
+    "has_no_direct_code_rule": false
+  }
+]

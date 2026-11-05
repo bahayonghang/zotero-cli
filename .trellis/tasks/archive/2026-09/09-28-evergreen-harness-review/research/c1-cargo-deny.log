@@ -1,0 +1,642 @@
+warning[duplicate]: found 3 duplicate entries for crate 'getrandom'
+   ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:68:1
+   │  
+68 │ ╭ getrandom 0.2.17 registry+https://github.com/rust-lang/crates.io-index
+69 │ │ getrandom 0.3.4 registry+https://github.com/rust-lang/crates.io-index
+70 │ │ getrandom 0.4.3 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰─────────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ getrandom v0.2.17
+     └── redox_users v0.5.2
+         └── dirs-sys v0.5.0
+             └── dirs v6.0.0
+                 ├── zot-core v1.0.1
+                 │   ├── zot-cli v1.0.1
+                 │   ├── zot-desktop v1.0.1
+                 │   │   └── zot-cli v1.0.1 (*)
+                 │   ├── zot-local v1.0.1
+                 │   │   └── zot-cli v1.0.1 (*)
+                 │   └── zot-remote v1.0.1
+                 │       └── zot-cli v1.0.1 (*)
+                 └── zot-local v1.0.1 (*)
+   ├ getrandom v0.3.4
+     └── jobserver v0.1.34
+         └── cc v1.2.60
+             ├── (build) aws-lc-sys v0.45.0
+             │   └── aws-lc-rs v1.18.1
+             │       ├── rustls v0.23.45
+             │       │   ├── hyper-rustls v0.27.9
+             │       │   │   └── reqwest v0.13.2
+             │       │   │       ├── zot-desktop v1.0.1
+             │       │   │       │   └── zot-cli v1.0.1
+             │       │   │       ├── zot-local v1.0.1
+             │       │   │       │   └── zot-cli v1.0.1 (*)
+             │       │   │       └── zot-remote v1.0.1
+             │       │   │           └── zot-cli v1.0.1 (*)
+             │       │   ├── reqwest v0.13.2 (*)
+             │       │   ├── rustls-platform-verifier v0.6.2
+             │       │   │   └── reqwest v0.13.2 (*)
+             │       │   └── tokio-rustls v0.26.4
+             │       │       ├── hyper-rustls v0.27.9 (*)
+             │       │       └── reqwest v0.13.2 (*)
+             │       └── rustls-webpki v0.103.15
+             │           ├── rustls v0.23.45 (*)
+             │           └── rustls-platform-verifier v0.6.2 (*)
+             ├── cmake v0.1.58
+             │   └── (build) aws-lc-sys v0.45.0 (*)
+             ├── (build) iana-time-zone-haiku v0.1.2
+             │   └── iana-time-zone v0.1.65
+             │       └── chrono v0.4.44
+             │           ├── pdfium-render v0.9.0
+             │           │   └── zot-local v1.0.1 (*)
+             │           ├── rusqlite v0.39.0
+             │           │   └── zot-local v1.0.1 (*)
+             │           ├── zot-cli v1.0.1 (*)
+             │           ├── zot-local v1.0.1 (*)
+             │           └── zot-remote v1.0.1 (*)
+             ├── (build) libsqlite3-sys v0.37.0
+             │   └── rusqlite v0.39.0 (*)
+             └── (build) sqlite-wasm-rs v0.5.3
+                 └── rusqlite v0.39.0 (*)
+   ├ getrandom v0.4.3
+     ├── tempfile v3.27.0
+     │   ├── zot-cli v1.0.1
+     │   ├── zot-core v1.0.1
+     │   │   ├── zot-cli v1.0.1 (*)
+     │   │   ├── zot-desktop v1.0.1
+     │   │   │   └── zot-cli v1.0.1 (*)
+     │   │   ├── zot-local v1.0.1
+     │   │   │   └── zot-cli v1.0.1 (*)
+     │   │   └── zot-remote v1.0.1
+     │   │       └── zot-cli v1.0.1 (*)
+     │   ├── zot-local v1.0.1 (*)
+     │   └── (dev) zot-remote v1.0.1 (*)
+     └── uuid v1.23.1
+         ├── zot-cli v1.0.1 (*)
+         └── zot-remote v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'r-efi'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:138:1
+    │  
+138 │ ╭ r-efi 5.3.0 registry+https://github.com/rust-lang/crates.io-index
+139 │ │ r-efi 6.0.0 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰─────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ r-efi v5.3.0
+      └── getrandom v0.3.4
+          └── jobserver v0.1.34
+              └── cc v1.2.60
+                  ├── (build) aws-lc-sys v0.45.0
+                  │   └── aws-lc-rs v1.18.1
+                  │       ├── rustls v0.23.45
+                  │       │   ├── hyper-rustls v0.27.9
+                  │       │   │   └── reqwest v0.13.2
+                  │       │   │       ├── zot-desktop v1.0.1
+                  │       │   │       │   └── zot-cli v1.0.1
+                  │       │   │       ├── zot-local v1.0.1
+                  │       │   │       │   └── zot-cli v1.0.1 (*)
+                  │       │   │       └── zot-remote v1.0.1
+                  │       │   │           └── zot-cli v1.0.1 (*)
+                  │       │   ├── reqwest v0.13.2 (*)
+                  │       │   ├── rustls-platform-verifier v0.6.2
+                  │       │   │   └── reqwest v0.13.2 (*)
+                  │       │   └── tokio-rustls v0.26.4
+                  │       │       ├── hyper-rustls v0.27.9 (*)
+                  │       │       └── reqwest v0.13.2 (*)
+                  │       └── rustls-webpki v0.103.15
+                  │           ├── rustls v0.23.45 (*)
+                  │           └── rustls-platform-verifier v0.6.2 (*)
+                  ├── cmake v0.1.58
+                  │   └── (build) aws-lc-sys v0.45.0 (*)
+                  ├── (build) iana-time-zone-haiku v0.1.2
+                  │   └── iana-time-zone v0.1.65
+                  │       └── chrono v0.4.44
+                  │           ├── pdfium-render v0.9.0
+                  │           │   └── zot-local v1.0.1 (*)
+                  │           ├── rusqlite v0.39.0
+                  │           │   └── zot-local v1.0.1 (*)
+                  │           ├── zot-cli v1.0.1 (*)
+                  │           ├── zot-local v1.0.1 (*)
+                  │           └── zot-remote v1.0.1 (*)
+                  ├── (build) libsqlite3-sys v0.37.0
+                  │   └── rusqlite v0.39.0 (*)
+                  └── (build) sqlite-wasm-rs v0.5.3
+                      └── rusqlite v0.39.0 (*)
+    ├ r-efi v6.0.0
+      └── getrandom v0.4.3
+          ├── tempfile v3.27.0
+          │   ├── zot-cli v1.0.1
+          │   ├── zot-core v1.0.1
+          │   │   ├── zot-cli v1.0.1 (*)
+          │   │   ├── zot-desktop v1.0.1
+          │   │   │   └── zot-cli v1.0.1 (*)
+          │   │   ├── zot-local v1.0.1
+          │   │   │   └── zot-cli v1.0.1 (*)
+          │   │   └── zot-remote v1.0.1
+          │   │       └── zot-cli v1.0.1 (*)
+          │   ├── zot-local v1.0.1 (*)
+          │   └── (dev) zot-remote v1.0.1 (*)
+          └── uuid v1.23.1
+              ├── zot-cli v1.0.1 (*)
+              └── zot-remote v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'redox_syscall'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:140:1
+    │  
+140 │ ╭ redox_syscall 0.5.18 registry+https://github.com/rust-lang/crates.io-index
+141 │ │ redox_syscall 0.7.4 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰─────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ redox_syscall v0.5.18
+      └── parking_lot_core v0.9.12
+          └── parking_lot v0.12.5
+              └── tokio v1.52.1
+                  ├── hyper v1.9.0
+                  │   ├── hyper-rustls v0.27.9
+                  │   │   └── reqwest v0.13.2
+                  │   │       ├── zot-desktop v1.0.1
+                  │   │       │   └── zot-cli v1.0.1
+                  │   │       ├── zot-local v1.0.1
+                  │   │       │   └── zot-cli v1.0.1 (*)
+                  │   │       └── zot-remote v1.0.1
+                  │   │           └── zot-cli v1.0.1 (*)
+                  │   ├── hyper-util v0.1.20
+                  │   │   ├── hyper-rustls v0.27.9 (*)
+                  │   │   └── reqwest v0.13.2 (*)
+                  │   └── reqwest v0.13.2 (*)
+                  ├── hyper-rustls v0.27.9 (*)
+                  ├── hyper-util v0.1.20 (*)
+                  ├── reqwest v0.13.2 (*)
+                  ├── tokio-rustls v0.26.4
+                  │   ├── hyper-rustls v0.27.9 (*)
+                  │   └── reqwest v0.13.2 (*)
+                  ├── tokio-util v0.7.18
+                  │   └── reqwest v0.13.2 (*)
+                  ├── tower v0.5.3
+                  │   ├── reqwest v0.13.2 (*)
+                  │   └── tower-http v0.6.8
+                  │       └── reqwest v0.13.2 (*)
+                  ├── zot-cli v1.0.1 (*)
+                  ├── (dev) zot-desktop v1.0.1 (*)
+                  └── zot-remote v1.0.1 (*)
+    ├ redox_syscall v0.7.4
+      └── libredox v0.1.16
+          ├── filetime v0.2.27
+          │   └── tar v0.4.45
+          │       └── zot-local v1.0.1
+          │           └── zot-cli v1.0.1
+          └── redox_users v0.5.2
+              └── dirs-sys v0.5.0
+                  └── dirs v6.0.0
+                      ├── zot-core v1.0.1
+                      │   ├── zot-cli v1.0.1 (*)
+                      │   ├── zot-desktop v1.0.1
+                      │   │   └── zot-cli v1.0.1 (*)
+                      │   ├── zot-local v1.0.1 (*)
+                      │   └── zot-remote v1.0.1
+                      │       └── zot-cli v1.0.1 (*)
+                      └── zot-local v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'thiserror'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:183:1
+    │  
+183 │ ╭ thiserror 1.0.69 registry+https://github.com/rust-lang/crates.io-index
+184 │ │ thiserror 2.0.18 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰──────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ thiserror v1.0.69
+      └── jni v0.21.1
+          └── rustls-platform-verifier v0.6.2
+              └── reqwest v0.13.2
+                  ├── zot-desktop v1.0.1
+                  │   └── zot-cli v1.0.1
+                  ├── zot-local v1.0.1
+                  │   └── zot-cli v1.0.1 (*)
+                  └── zot-remote v1.0.1
+                      └── zot-cli v1.0.1 (*)
+    ├ thiserror v2.0.18
+      ├── redox_users v0.5.2
+      │   └── dirs-sys v0.5.0
+      │       └── dirs v6.0.0
+      │           ├── zot-core v1.0.1
+      │           │   ├── zot-cli v1.0.1
+      │           │   ├── zot-desktop v1.0.1
+      │           │   │   └── zot-cli v1.0.1 (*)
+      │           │   ├── zot-local v1.0.1
+      │           │   │   └── zot-cli v1.0.1 (*)
+      │           │   └── zot-remote v1.0.1
+      │           │       └── zot-cli v1.0.1 (*)
+      │           └── zot-local v1.0.1 (*)
+      ├── rsqlite-vfs v0.1.0
+      │   └── sqlite-wasm-rs v0.5.3
+      │       └── rusqlite v0.39.0
+      │           └── zot-local v1.0.1 (*)
+      └── zot-core v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'thiserror-impl'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:185:1
+    │  
+185 │ ╭ thiserror-impl 1.0.69 registry+https://github.com/rust-lang/crates.io-index
+186 │ │ thiserror-impl 2.0.18 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰───────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ thiserror-impl v1.0.69
+      └── thiserror v1.0.69
+          └── jni v0.21.1
+              └── rustls-platform-verifier v0.6.2
+                  └── reqwest v0.13.2
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+    ├ thiserror-impl v2.0.18
+      └── thiserror v2.0.18
+          ├── redox_users v0.5.2
+          │   └── dirs-sys v0.5.0
+          │       └── dirs v6.0.0
+          │           ├── zot-core v1.0.1
+          │           │   ├── zot-cli v1.0.1
+          │           │   ├── zot-desktop v1.0.1
+          │           │   │   └── zot-cli v1.0.1 (*)
+          │           │   ├── zot-local v1.0.1
+          │           │   │   └── zot-cli v1.0.1 (*)
+          │           │   └── zot-remote v1.0.1
+          │           │       └── zot-cli v1.0.1 (*)
+          │           └── zot-local v1.0.1 (*)
+          ├── rsqlite-vfs v0.1.0
+          │   └── sqlite-wasm-rs v0.5.3
+          │       └── rusqlite v0.39.0
+          │           └── zot-local v1.0.1 (*)
+          └── zot-core v1.0.1 (*)
+
+warning[duplicate]: found 3 duplicate entries for crate 'windows-sys'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:237:1
+    │  
+237 │ ╭ windows-sys 0.45.0 registry+https://github.com/rust-lang/crates.io-index
+238 │ │ windows-sys 0.59.0 registry+https://github.com/rust-lang/crates.io-index
+239 │ │ windows-sys 0.61.2 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows-sys v0.45.0
+      └── jni v0.21.1
+          └── rustls-platform-verifier v0.6.2
+              └── reqwest v0.13.2
+                  ├── zot-desktop v1.0.1
+                  │   └── zot-cli v1.0.1
+                  ├── zot-local v1.0.1
+                  │   └── zot-cli v1.0.1 (*)
+                  └── zot-remote v1.0.1
+                      └── zot-cli v1.0.1 (*)
+    ├ windows-sys v0.59.0
+      └── winreg v0.55.0
+          └── zot-core v1.0.1
+              ├── zot-cli v1.0.1
+              ├── zot-desktop v1.0.1
+              │   └── zot-cli v1.0.1 (*)
+              ├── zot-local v1.0.1
+              │   └── zot-cli v1.0.1 (*)
+              └── zot-remote v1.0.1
+                  └── zot-cli v1.0.1 (*)
+    ├ windows-sys v0.61.2
+      ├── anstyle-query v1.1.5
+      │   └── anstream v1.0.0
+      │       └── clap_builder v4.6.0
+      │           └── clap v4.6.1
+      │               ├── clap_complete v4.6.2
+      │               │   └── zot-cli v1.0.1
+      │               └── zot-cli v1.0.1 (*)
+      ├── anstyle-wincon v3.0.11
+      │   └── anstream v1.0.0 (*)
+      ├── dirs-sys v0.5.0
+      │   └── dirs v6.0.0
+      │       ├── zot-core v1.0.1
+      │       │   ├── zot-cli v1.0.1 (*)
+      │       │   ├── zot-desktop v1.0.1
+      │       │   │   └── zot-cli v1.0.1 (*)
+      │       │   ├── zot-local v1.0.1
+      │       │   │   └── zot-cli v1.0.1 (*)
+      │       │   └── zot-remote v1.0.1
+      │       │       └── zot-cli v1.0.1 (*)
+      │       └── zot-local v1.0.1 (*)
+      ├── errno v0.3.14
+      │   ├── rustix v1.1.4
+      │   │   ├── fs4 v1.1.0
+      │   │   │   └── zot-local v1.0.1 (*)
+      │   │   ├── tempfile v3.27.0
+      │   │   │   ├── zot-cli v1.0.1 (*)
+      │   │   │   ├── zot-core v1.0.1 (*)
+      │   │   │   ├── zot-local v1.0.1 (*)
+      │   │   │   └── (dev) zot-remote v1.0.1 (*)
+      │   │   └── xattr v1.6.1
+      │   │       └── tar v0.4.45
+      │   │           └── zot-local v1.0.1 (*)
+      │   └── signal-hook-registry v1.4.8
+      │       └── tokio v1.52.1
+      │           ├── hyper v1.9.0
+      │           │   ├── hyper-rustls v0.27.9
+      │           │   │   └── reqwest v0.13.2
+      │           │   │       ├── zot-desktop v1.0.1 (*)
+      │           │   │       ├── zot-local v1.0.1 (*)
+      │           │   │       └── zot-remote v1.0.1 (*)
+      │           │   ├── hyper-util v0.1.20
+      │           │   │   ├── hyper-rustls v0.27.9 (*)
+      │           │   │   └── reqwest v0.13.2 (*)
+      │           │   └── reqwest v0.13.2 (*)
+      │           ├── hyper-rustls v0.27.9 (*)
+      │           ├── hyper-util v0.1.20 (*)
+      │           ├── reqwest v0.13.2 (*)
+      │           ├── tokio-rustls v0.26.4
+      │           │   ├── hyper-rustls v0.27.9 (*)
+      │           │   └── reqwest v0.13.2 (*)
+      │           ├── tokio-util v0.7.18
+      │           │   └── reqwest v0.13.2 (*)
+      │           ├── tower v0.5.3
+      │           │   ├── reqwest v0.13.2 (*)
+      │           │   └── tower-http v0.6.8
+      │           │       └── reqwest v0.13.2 (*)
+      │           ├── zot-cli v1.0.1 (*)
+      │           ├── (dev) zot-desktop v1.0.1 (*)
+      │           └── zot-remote v1.0.1 (*)
+      ├── fs4 v1.1.0 (*)
+      ├── mio v1.2.0
+      │   └── tokio v1.52.1 (*)
+      ├── normpath v1.5.0
+      │   └── opener v0.8.4
+      │       └── zot-cli v1.0.1 (*)
+      ├── opener v0.8.4 (*)
+      ├── rustix v1.1.4 (*)
+      ├── rustls-platform-verifier v0.6.2
+      │   └── reqwest v0.13.2 (*)
+      ├── schannel v0.1.29
+      │   └── rustls-native-certs v0.8.3
+      │       └── rustls-platform-verifier v0.6.2 (*)
+      ├── socket2 v0.6.3
+      │   ├── hyper-util v0.1.20 (*)
+      │   └── tokio v1.52.1 (*)
+      ├── tempfile v3.27.0 (*)
+      ├── tokio v1.52.1 (*)
+      └── winapi-util v0.1.11
+          ├── same-file v1.0.6
+          │   └── walkdir v2.5.0
+          │       └── (build) jni v0.21.1
+          │           └── rustls-platform-verifier v0.6.2 (*)
+          └── walkdir v2.5.0 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows-targets'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:240:1
+    │  
+240 │ ╭ windows-targets 0.42.2 registry+https://github.com/rust-lang/crates.io-index
+241 │ │ windows-targets 0.52.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰────────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows-targets v0.42.2
+      └── windows-sys v0.45.0
+          └── jni v0.21.1
+              └── rustls-platform-verifier v0.6.2
+                  └── reqwest v0.13.2
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+    ├ windows-targets v0.52.6
+      └── windows-sys v0.59.0
+          └── winreg v0.55.0
+              └── zot-core v1.0.1
+                  ├── zot-cli v1.0.1
+                  ├── zot-desktop v1.0.1
+                  │   └── zot-cli v1.0.1 (*)
+                  ├── zot-local v1.0.1
+                  │   └── zot-cli v1.0.1 (*)
+                  └── zot-remote v1.0.1
+                      └── zot-cli v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows_aarch64_gnullvm'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:242:1
+    │  
+242 │ ╭ windows_aarch64_gnullvm 0.42.2 registry+https://github.com/rust-lang/crates.io-index
+243 │ │ windows_aarch64_gnullvm 0.52.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰────────────────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows_aarch64_gnullvm v0.42.2
+      └── windows-targets v0.42.2
+          └── windows-sys v0.45.0
+              └── jni v0.21.1
+                  └── rustls-platform-verifier v0.6.2
+                      └── reqwest v0.13.2
+                          ├── zot-desktop v1.0.1
+                          │   └── zot-cli v1.0.1
+                          ├── zot-local v1.0.1
+                          │   └── zot-cli v1.0.1 (*)
+                          └── zot-remote v1.0.1
+                              └── zot-cli v1.0.1 (*)
+    ├ windows_aarch64_gnullvm v0.52.6
+      └── windows-targets v0.52.6
+          └── windows-sys v0.59.0
+              └── winreg v0.55.0
+                  └── zot-core v1.0.1
+                      ├── zot-cli v1.0.1
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows_aarch64_msvc'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:244:1
+    │  
+244 │ ╭ windows_aarch64_msvc 0.42.2 registry+https://github.com/rust-lang/crates.io-index
+245 │ │ windows_aarch64_msvc 0.52.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰─────────────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows_aarch64_msvc v0.42.2
+      └── windows-targets v0.42.2
+          └── windows-sys v0.45.0
+              └── jni v0.21.1
+                  └── rustls-platform-verifier v0.6.2
+                      └── reqwest v0.13.2
+                          ├── zot-desktop v1.0.1
+                          │   └── zot-cli v1.0.1
+                          ├── zot-local v1.0.1
+                          │   └── zot-cli v1.0.1 (*)
+                          └── zot-remote v1.0.1
+                              └── zot-cli v1.0.1 (*)
+    ├ windows_aarch64_msvc v0.52.6
+      └── windows-targets v0.52.6
+          └── windows-sys v0.59.0
+              └── winreg v0.55.0
+                  └── zot-core v1.0.1
+                      ├── zot-cli v1.0.1
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows_i686_gnu'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:246:1
+    │  
+246 │ ╭ windows_i686_gnu 0.42.2 registry+https://github.com/rust-lang/crates.io-index
+247 │ │ windows_i686_gnu 0.52.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰─────────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows_i686_gnu v0.42.2
+      └── windows-targets v0.42.2
+          └── windows-sys v0.45.0
+              └── jni v0.21.1
+                  └── rustls-platform-verifier v0.6.2
+                      └── reqwest v0.13.2
+                          ├── zot-desktop v1.0.1
+                          │   └── zot-cli v1.0.1
+                          ├── zot-local v1.0.1
+                          │   └── zot-cli v1.0.1 (*)
+                          └── zot-remote v1.0.1
+                              └── zot-cli v1.0.1 (*)
+    ├ windows_i686_gnu v0.52.6
+      └── windows-targets v0.52.6
+          └── windows-sys v0.59.0
+              └── winreg v0.55.0
+                  └── zot-core v1.0.1
+                      ├── zot-cli v1.0.1
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows_i686_msvc'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:249:1
+    │  
+249 │ ╭ windows_i686_msvc 0.42.2 registry+https://github.com/rust-lang/crates.io-index
+250 │ │ windows_i686_msvc 0.52.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰──────────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows_i686_msvc v0.42.2
+      └── windows-targets v0.42.2
+          └── windows-sys v0.45.0
+              └── jni v0.21.1
+                  └── rustls-platform-verifier v0.6.2
+                      └── reqwest v0.13.2
+                          ├── zot-desktop v1.0.1
+                          │   └── zot-cli v1.0.1
+                          ├── zot-local v1.0.1
+                          │   └── zot-cli v1.0.1 (*)
+                          └── zot-remote v1.0.1
+                              └── zot-cli v1.0.1 (*)
+    ├ windows_i686_msvc v0.52.6
+      └── windows-targets v0.52.6
+          └── windows-sys v0.59.0
+              └── winreg v0.55.0
+                  └── zot-core v1.0.1
+                      ├── zot-cli v1.0.1
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows_x86_64_gnu'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:251:1
+    │  
+251 │ ╭ windows_x86_64_gnu 0.42.2 registry+https://github.com/rust-lang/crates.io-index
+252 │ │ windows_x86_64_gnu 0.52.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰───────────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows_x86_64_gnu v0.42.2
+      └── windows-targets v0.42.2
+          └── windows-sys v0.45.0
+              └── jni v0.21.1
+                  └── rustls-platform-verifier v0.6.2
+                      └── reqwest v0.13.2
+                          ├── zot-desktop v1.0.1
+                          │   └── zot-cli v1.0.1
+                          ├── zot-local v1.0.1
+                          │   └── zot-cli v1.0.1 (*)
+                          └── zot-remote v1.0.1
+                              └── zot-cli v1.0.1 (*)
+    ├ windows_x86_64_gnu v0.52.6
+      └── windows-targets v0.52.6
+          └── windows-sys v0.59.0
+              └── winreg v0.55.0
+                  └── zot-core v1.0.1
+                      ├── zot-cli v1.0.1
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows_x86_64_gnullvm'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:253:1
+    │  
+253 │ ╭ windows_x86_64_gnullvm 0.42.2 registry+https://github.com/rust-lang/crates.io-index
+254 │ │ windows_x86_64_gnullvm 0.52.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰───────────────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows_x86_64_gnullvm v0.42.2
+      └── windows-targets v0.42.2
+          └── windows-sys v0.45.0
+              └── jni v0.21.1
+                  └── rustls-platform-verifier v0.6.2
+                      └── reqwest v0.13.2
+                          ├── zot-desktop v1.0.1
+                          │   └── zot-cli v1.0.1
+                          ├── zot-local v1.0.1
+                          │   └── zot-cli v1.0.1 (*)
+                          └── zot-remote v1.0.1
+                              └── zot-cli v1.0.1 (*)
+    ├ windows_x86_64_gnullvm v0.52.6
+      └── windows-targets v0.52.6
+          └── windows-sys v0.59.0
+              └── winreg v0.55.0
+                  └── zot-core v1.0.1
+                      ├── zot-cli v1.0.1
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows_x86_64_msvc'
+    ┌─ D:\Documents\Code\CLI\zotero-cli/Cargo.lock:255:1
+    │  
+255 │ ╭ windows_x86_64_msvc 0.42.2 registry+https://github.com/rust-lang/crates.io-index
+256 │ │ windows_x86_64_msvc 0.52.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰────────────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows_x86_64_msvc v0.42.2
+      └── windows-targets v0.42.2
+          └── windows-sys v0.45.0
+              └── jni v0.21.1
+                  └── rustls-platform-verifier v0.6.2
+                      └── reqwest v0.13.2
+                          ├── zot-desktop v1.0.1
+                          │   └── zot-cli v1.0.1
+                          ├── zot-local v1.0.1
+                          │   └── zot-cli v1.0.1 (*)
+                          └── zot-remote v1.0.1
+                              └── zot-cli v1.0.1 (*)
+    ├ windows_x86_64_msvc v0.52.6
+      └── windows-targets v0.52.6
+          └── windows-sys v0.59.0
+              └── winreg v0.55.0
+                  └── zot-core v1.0.1
+                      ├── zot-cli v1.0.1
+                      ├── zot-desktop v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      ├── zot-local v1.0.1
+                      │   └── zot-cli v1.0.1 (*)
+                      └── zot-remote v1.0.1
+                          └── zot-cli v1.0.1 (*)
+
+advisories ok, bans ok, licenses ok, sources ok
+mbx[savings]: 843 compilations. rustc did each once; mbx did the rest of the showing up.

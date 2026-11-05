@@ -69,7 +69,7 @@ the write and aborts without importing if its identity or writability changed.
 
 If you plan to:
 
-- write notes, tags, or collection membership
+- write notes, batch tags, or collection changes that are not using the local backend
 - create or delete saved searches
 - run publication-status sync
 
@@ -132,6 +132,7 @@ Pay special attention to:
 
 - `db_exists`
 - `capabilities.local_sqlite_read`
+- `capabilities.local_api_write`
 - `capabilities.local_http_read`
 - `capabilities.connector_write`
 - `capabilities.web_write`

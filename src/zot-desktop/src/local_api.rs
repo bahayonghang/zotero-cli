@@ -1,0 +1,919 @@
+//! Authenticated Zotero 10+ Local API. Never shares Web API credentials or versions.
+use std::time::Duration;
+
+use reqwest::{Method, Response, StatusCode, Url};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::{Map, Value, json};
+use zot_core::{LibraryScope, SecretString, ZotError, ZotResult};
+
+use crate::CONNECTOR_BASE_URL;
+
+const SERVER_ID: &str = "Zotero-Server-ID";
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocalApiProbe {
+    pub zotero_version: Option<String>,
+    pub api_version: Option<String>,
+    pub schema_version: Option<String>,
+    pub server_id: Option<String>,
+    pub supported: bool,
+}
+
+impl LocalApiProbe {
+    pub fn writable_server_id(&self) -> ZotResult<&str> {
+        if !self.supported {
+            return Err(error(
+                "local-api-unsupported",
+                "Local writes require Zotero 10+, API v3 and a Server ID",
+                None,
+            ));
+        }
+        self.server_id
+            .as_deref()
+            .ok_or_else(|| error("local-api-protocol", "Missing Server ID", None))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LocalAuthorization {
+    pub key: SecretString,
+    pub remember: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LocalObject {
+    pub key: String,
+    pub version: u64,
+    pub data: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatchReceipt {
+    Accepted,
+    /// A request may have committed, but no reliable response was received.
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalCollection {
+    pub key: String,
+    pub version: u64,
+    pub name: String,
+    pub parent: Option<String>,
+    pub deleted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalCollectionSnapshot {
+    pub library_version: u64,
+    pub collections: Vec<LocalCollection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CreateReceipt {
+    Accepted {
+        key: String,
+    },
+    /// A request may have committed, but no reliable object result was received.
+    Unknown,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalApiClient {
+    client: reqwest::Client,
+    base: Url,
+    timeout: Duration,
+}
+
+impl LocalApiClient {
+    pub fn new() -> ZotResult<Self> {
+        Self::build(CONNECTOR_BASE_URL, Duration::from_secs(30))
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn with_base_url_for_tests(base: &str, timeout: Duration) -> ZotResult<Self> {
+        Self::build(base, timeout)
+    }
+
+    fn build(base: &str, timeout: Duration) -> ZotResult<Self> {
+        let base =
+            Url::parse(base).map_err(|_| error("local-api-url", "Invalid Local API URL", None))?;
+        if base.scheme() != "http"
+            || !matches!(base.host_str(), Some("127.0.0.1" | "localhost" | "[::1]"))
+            || !base.username().is_empty()
+            || base.password().is_some()
+            || base.query().is_some()
+            || base.fragment().is_some()
+            || base.path() != "/"
+        {
+            return Err(error(
+                "local-api-url",
+                "Local API requires an HTTP loopback origin",
+                None,
+            ));
+        }
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .connect_timeout(Duration::from_secs(5))
+            .user_agent(concat!("zot/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .map_err(|_| {
+                error(
+                    "local-api-client",
+                    "Cannot initialize Local API client",
+                    None,
+                )
+            })?;
+        Ok(Self {
+            client,
+            base,
+            timeout,
+        })
+    }
+
+    fn request(
+        &self,
+        method: Method,
+        path: &str,
+        server: Option<&str>,
+    ) -> ZotResult<reqwest::RequestBuilder> {
+        let url = self
+            .base
+            .join(&format!("api/{path}"))
+            .map_err(|_| error("local-api-url", "Invalid Local API endpoint", None))?;
+        let mut request = self
+            .client
+            .request(method, url)
+            .header("Zotero-API-Version", "3")
+            .timeout(self.timeout);
+        if let Some(server) = server {
+            request = request.header(SERVER_ID, server);
+        }
+        Ok(request)
+    }
+
+    pub async fn probe(&self) -> ZotResult<LocalApiProbe> {
+        self.probe_with_timeout(self.timeout).await
+    }
+
+    /// Fast read-only probe. Does not change the write client's timeout.
+    pub async fn probe_for_read(&self) -> ZotResult<LocalApiProbe> {
+        self.probe_with_timeout(Duration::from_secs(2)).await
+    }
+
+    async fn probe_with_timeout(&self, timeout: Duration) -> ZotResult<LocalApiProbe> {
+        let response = self
+            .request(Method::GET, "", None)?
+            .timeout(timeout)
+            .send()
+            .await
+            .map_err(read_error)?;
+        check_status(&response)?;
+        let zotero_version = header(&response, "X-Zotero-Version");
+        let api_version = header(&response, "Zotero-API-Version");
+        let schema_version = header(&response, "Zotero-Schema-Version");
+        let server_id = header(&response, SERVER_ID).filter(|value| !value.is_empty());
+        let supported = zotero_version
+            .as_deref()
+            .and_then(|version| version.split('.').next())
+            .and_then(|version| version.parse::<u32>().ok())
+            .is_some_and(|version| version >= 10)
+            && api_version.as_deref() == Some("3")
+            && server_id.is_some();
+        Ok(LocalApiProbe {
+            zotero_version,
+            api_version,
+            schema_version,
+            server_id,
+            supported,
+        })
+    }
+
+    /// Ordinary read GET. Never calls authorize and never sends a write key.
+    pub(crate) async fn read_exchange(
+        &self,
+        path: &str,
+        server: Option<&str>,
+    ) -> ZotResult<LocalReadExchange> {
+        let response = self
+            .request(Method::GET, path, server)?
+            .send()
+            .await
+            .map_err(read_error)?;
+        if response.status().is_redirection() {
+            return Err(error(
+                "local-api-redirect",
+                "Local API refused to follow a redirect",
+                Some(response.status().as_u16()),
+            ));
+        }
+        if response.status().as_u16() == 412 {
+            return Err(error(
+                "local-api-conflict",
+                "Zotero instance or object version changed; preview again",
+                Some(412),
+            ));
+        }
+        let status = response.status();
+        if let Some(expected) = server {
+            if status.is_success() && header(&response, SERVER_ID).as_deref() != Some(expected) {
+                return Err(error(
+                    "local-api-conflict",
+                    "Zotero instance changed; preview again",
+                    None,
+                ));
+            }
+        }
+        let allowed = status.is_success() || matches!(status.as_u16(), 404 | 405 | 501);
+        if !allowed {
+            check_status(&response)?;
+            return Err(error(
+                "local-api-http",
+                "Local API rejected the read",
+                Some(status.as_u16()),
+            ));
+        }
+        let server_id = header(&response, SERVER_ID).filter(|value| !value.is_empty());
+        let library_version = optional_u64_header(&response, "Last-Modified-Version")?;
+        let total = optional_u64_header(&response, "Total-Results")?;
+        let link = header(&response, "Link");
+        let body = response.text().await.map_err(|_| {
+            error(
+                "local-api-protocol",
+                "Invalid Local API response body",
+                None,
+            )
+        })?;
+        Ok(LocalReadExchange {
+            status,
+            server_id,
+            library_version,
+            total,
+            link,
+            body,
+        })
+    }
+
+    pub async fn authorize(&self, server: &str) -> ZotResult<LocalAuthorization> {
+        let response = self
+            .request(Method::POST, "local/authorize", Some(server))?
+            .timeout(Duration::from_secs(120))
+            .json(&json!({"appName": "zot CLI"}))
+            .send()
+            .await
+            .map_err(read_error)?;
+        check_response(&response, server)?;
+        let authorization: LocalAuthorization = decode(response).await?;
+        if authorization.key.is_empty() {
+            return Err(error(
+                "local-api-protocol",
+                "Authorization returned no key",
+                None,
+            ));
+        }
+        Ok(authorization)
+    }
+
+    async fn get<T: DeserializeOwned>(&self, server: &str, path: &str) -> ZotResult<T> {
+        let response = self
+            .request(Method::GET, path, Some(server))?
+            .send()
+            .await
+            .map_err(read_error)?;
+        check_response(&response, server)?;
+        decode(response).await
+    }
+
+    pub async fn item(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+        key: &str,
+    ) -> ZotResult<LocalObject> {
+        self.object(server, scope, "items", key).await
+    }
+
+    pub async fn collection(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+        key: &str,
+    ) -> ZotResult<LocalObject> {
+        self.object(server, scope, "collections", key).await
+    }
+
+    async fn object(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+        kind: &str,
+        key: &str,
+    ) -> ZotResult<LocalObject> {
+        validate_key(key)?;
+        let object: LocalObject = self
+            .get(server, &format!("{}/{kind}/{key}", prefix(scope)))
+            .await?;
+        if object.key != key
+            || object.data.get("key").and_then(Value::as_str) != Some(key)
+            || object.data.get("version").and_then(Value::as_u64) != Some(object.version)
+        {
+            return Err(error(
+                "local-api-protocol",
+                "Object identity or version is inconsistent",
+                None,
+            ));
+        }
+        Ok(object)
+    }
+
+    pub async fn fields(&self, server: &str, item_type: &str) -> ZotResult<Vec<String>> {
+        self.schema_names(server, "itemTypeFields", item_type, "field")
+            .await
+    }
+
+    pub async fn creator_types(&self, server: &str, item_type: &str) -> ZotResult<Vec<String>> {
+        self.schema_names(server, "itemTypeCreatorTypes", item_type, "creatorType")
+            .await
+    }
+
+    async fn schema_names(
+        &self,
+        server: &str,
+        endpoint: &str,
+        item_type: &str,
+        field: &str,
+    ) -> ZotResult<Vec<String>> {
+        let mut query = self.base.clone();
+        query.query_pairs_mut().append_pair("itemType", item_type);
+        let path = format!("{endpoint}?{}", query.query().unwrap_or_default());
+        let response = self
+            .request(Method::GET, &path, Some(server))?
+            .send()
+            .await
+            .map_err(read_error)?;
+        check_response(&response, server)?;
+        let entries: Vec<Value> = decode(response).await?;
+        entries
+            .into_iter()
+            .map(|entry| {
+                entry
+                    .get(field)
+                    .and_then(Value::as_str)
+                    .map(ToOwned::to_owned)
+                    .ok_or_else(|| error("local-api-protocol", "Invalid schema response", None))
+            })
+            .collect()
+    }
+
+    pub async fn patch_item(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+        key: &str,
+        version: u64,
+        patch: &Map<String, Value>,
+        authorization: &SecretString,
+    ) -> ZotResult<PatchReceipt> {
+        validate_key(key)?;
+        let mut body = patch.clone();
+        body.insert("version".to_string(), version.into());
+        let response = self
+            .request(
+                Method::PATCH,
+                &format!("{}/items/{key}", prefix(scope)),
+                Some(server),
+            )?
+            .header("Zotero-API-Key", authorization.expose_secret())
+            .header("If-Unmodified-Since-Version", version.to_string())
+            .json(&body)
+            .send()
+            .await;
+        let response = match response {
+            Ok(response) => response,
+            Err(_) => return Ok(PatchReceipt::Unknown),
+        };
+        // Server failures can occur after saving; never retry them as a rejected write.
+        if response.status().is_server_error() {
+            return Ok(PatchReceipt::Unknown);
+        }
+        check_status(&response)?;
+        if header(&response, SERVER_ID).as_deref() != Some(server)
+            || response.status() != StatusCode::NO_CONTENT
+        {
+            return Ok(PatchReceipt::Unknown);
+        }
+        Ok(PatchReceipt::Accepted)
+    }
+
+    pub async fn collection_snapshot(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+    ) -> ZotResult<LocalCollectionSnapshot> {
+        let mut collections = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        let mut library_version = None;
+        let mut expected_total = None;
+        let mut start = 0u64;
+        for _ in 0..100 {
+            let path = if start == 0 {
+                format!("{}/collections", prefix(scope))
+            } else {
+                format!("{}/collections?start={start}", prefix(scope))
+            };
+            let response = self
+                .request(Method::GET, &path, Some(server))?
+                .send()
+                .await
+                .map_err(read_error)?;
+            check_response(&response, server)?;
+            let version = header(&response, "Last-Modified-Version")
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| {
+                    error(
+                        "local-api-protocol",
+                        "Collection list is missing a local library version",
+                        None,
+                    )
+                })?
+                .parse::<u64>()
+                .map_err(|_| {
+                    error(
+                        "local-api-protocol",
+                        "Collection list library version is invalid",
+                        None,
+                    )
+                })?;
+            if let Some(seen_version) = library_version {
+                if seen_version != version {
+                    return Err(error(
+                        "local-api-conflict",
+                        "Library version changed while reading collections; preview again",
+                        None,
+                    ));
+                }
+            } else {
+                library_version = Some(version);
+            }
+            let total = optional_u64_header(&response, "Total-Results")?;
+            if let Some(total) = total {
+                if let Some(expected) = expected_total {
+                    if expected != total {
+                        return Err(error(
+                            "local-api-protocol",
+                            "Collection list total changed while reading",
+                            None,
+                        ));
+                    }
+                } else {
+                    expected_total = Some(total);
+                }
+            }
+            let next = next_start(header_all(&response, "Link").as_deref(), start)?;
+            let page: Vec<LocalObject> = match decode(response).await {
+                Ok(page) => page,
+                Err(error) => return Err(error),
+            };
+            if page.is_empty() && next.is_some() {
+                return Err(error(
+                    "local-api-protocol",
+                    "Collection list pagination did not advance",
+                    None,
+                ));
+            }
+            for object in page {
+                let record = collection_record(object)?;
+                if !seen.insert(record.key.clone()) {
+                    return Err(error(
+                        "local-api-protocol",
+                        "Collection list pagination repeated an object",
+                        None,
+                    ));
+                }
+                collections.push(record);
+            }
+            match next {
+                None => {
+                    if let Some(total) = expected_total {
+                        if collections.len() != usize::try_from(total).unwrap_or(usize::MAX) {
+                            return Err(error(
+                                "local-api-protocol",
+                                "Collection list is incomplete",
+                                None,
+                            ));
+                        }
+                    }
+                    return Ok(LocalCollectionSnapshot {
+                        library_version: library_version.unwrap_or(version),
+                        collections,
+                    });
+                }
+                Some(next_start) => start = next_start,
+            }
+        }
+        Err(error(
+            "local-api-protocol",
+            "Collection list pagination did not close",
+            None,
+        ))
+    }
+
+    pub async fn create_collection(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+        library_version: u64,
+        name: &str,
+        parent: Option<&str>,
+        authorization: &SecretString,
+    ) -> ZotResult<CreateReceipt> {
+        if name.trim().is_empty() {
+            return Err(error(
+                "local-write-collection",
+                "Collection name must not be blank",
+                None,
+            ));
+        }
+        let parent_value = match parent {
+            Some(key) => {
+                validate_key(key)?;
+                Value::String(key.to_string())
+            }
+            None => Value::Bool(false),
+        };
+        let response = self
+            .request(
+                Method::POST,
+                &format!("{}/collections", prefix(scope)),
+                Some(server),
+            )?
+            .header("Zotero-API-Key", authorization.expose_secret())
+            .header("If-Unmodified-Since-Version", library_version.to_string())
+            .json(&json!([{
+                "name": name,
+                "parentCollection": parent_value,
+            }]))
+            .send()
+            .await;
+        let response = match response {
+            Ok(response) => response,
+            Err(_) => return Ok(CreateReceipt::Unknown),
+        };
+        if response.status().is_server_error() || response.status() == StatusCode::NO_CONTENT {
+            return Ok(CreateReceipt::Unknown);
+        }
+        if !response.status().is_success() {
+            check_status(&response)?;
+            return Ok(CreateReceipt::Unknown);
+        }
+        if header(&response, SERVER_ID).as_deref() != Some(server)
+            || response.status() != StatusCode::OK
+        {
+            return Ok(CreateReceipt::Unknown);
+        }
+        let body = match response.json::<Value>().await {
+            Ok(body) => body,
+            Err(_) => return Ok(CreateReceipt::Unknown),
+        };
+        interpret_create_body(&body)
+    }
+}
+
+pub(crate) struct LocalReadExchange {
+    pub status: StatusCode,
+    /// Present for callers that want the response instance id. Reads compare it
+    /// only when a server id was sent.
+    #[allow(dead_code)]
+    pub server_id: Option<String>,
+    pub library_version: Option<u64>,
+    pub total: Option<u64>,
+    pub link: Option<String>,
+    pub body: String,
+}
+
+pub(crate) fn prefix(scope: &LibraryScope) -> String {
+    match scope {
+        LibraryScope::User => "users/0".to_string(),
+        LibraryScope::Group { group_id } => format!("groups/{group_id}"),
+    }
+}
+
+fn validate_key(key: &str) -> ZotResult<()> {
+    if key.len() != 8
+        || !key
+            .bytes()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+    {
+        return Err(error(
+            "local-api-key",
+            "Expected an eight-character Zotero object key",
+            None,
+        ));
+    }
+    Ok(())
+}
+
+fn header_all(response: &Response, name: &str) -> Option<String> {
+    let values = response
+        .headers()
+        .get_all(name)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>();
+    if values.is_empty() {
+        None
+    } else {
+        Some(values.join(","))
+    }
+}
+
+fn optional_u64_header(response: &Response, name: &str) -> ZotResult<Option<u64>> {
+    match header(response, name).as_deref().map(str::trim) {
+        None | Some("") => Ok(None),
+        Some(value) => value.parse::<u64>().map(Some).map_err(|_| {
+            error(
+                "local-api-protocol",
+                "Local API numeric header is invalid",
+                None,
+            )
+        }),
+    }
+}
+
+pub(crate) fn next_start(link: Option<&str>, current_start: u64) -> ZotResult<Option<u64>> {
+    let Some(link) = link else {
+        return Ok(None);
+    };
+    for part in link.split(',') {
+        let lower = part.to_ascii_lowercase();
+        if !lower.contains("rel=\"next\"") && !lower.contains("rel=next") {
+            continue;
+        }
+        let url = part
+            .split_once('<')
+            .and_then(|(_, rest)| rest.split_once('>'))
+            .map(|(url, _)| url)
+            .ok_or_else(|| {
+                error(
+                    "local-api-protocol",
+                    "Collection list next link is invalid",
+                    None,
+                )
+            })?;
+        let start = url
+            .split("start=")
+            .nth(1)
+            .and_then(|value| value.split(['&', '#', ' ']).next())
+            .and_then(|value| value.parse::<u64>().ok())
+            .ok_or_else(|| {
+                error(
+                    "local-api-protocol",
+                    "Collection list next link has no start",
+                    None,
+                )
+            })?;
+        if start <= current_start {
+            return Err(error(
+                "local-api-protocol",
+                "Collection list pagination did not advance",
+                None,
+            ));
+        }
+        return Ok(Some(start));
+    }
+    Ok(None)
+}
+
+fn collection_record(object: LocalObject) -> ZotResult<LocalCollection> {
+    let data_key = object.data.get("key").and_then(Value::as_str);
+    let data_version = object.data.get("version").and_then(Value::as_u64);
+    if data_key != Some(object.key.as_str()) || data_version != Some(object.version) {
+        return Err(error(
+            "local-api-protocol",
+            "Collection identity or version is inconsistent",
+            None,
+        ));
+    }
+    validate_key(&object.key)?;
+    let name = object
+        .data
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| error("local-api-protocol", "Collection name is missing", None))?;
+    let parent = match object.data.get("parentCollection") {
+        None | Some(Value::Null) | Some(Value::Bool(false)) => None,
+        Some(Value::String(parent)) if parent.is_empty() => None,
+        Some(Value::String(parent)) => {
+            validate_key(parent)?;
+            Some(parent.clone())
+        }
+        Some(_) => {
+            return Err(error(
+                "local-api-protocol",
+                "Collection parentCollection is invalid",
+                None,
+            ));
+        }
+    };
+    Ok(LocalCollection {
+        key: object.key,
+        version: object.version,
+        name: name.to_string(),
+        parent,
+        deleted: object
+            .data
+            .get("deleted")
+            .is_some_and(|value| value == &json!(1) || value == &json!(true)),
+    })
+}
+
+fn interpret_create_body(body: &Value) -> ZotResult<CreateReceipt> {
+    let Some(object) = body.as_object() else {
+        return Ok(CreateReceipt::Unknown);
+    };
+    let successful = match object.get("successful") {
+        Some(Value::Object(entries)) => entries,
+        Some(_) => return Ok(CreateReceipt::Unknown),
+        None => return Ok(CreateReceipt::Unknown),
+    };
+    let failed = match object.get("failed") {
+        Some(Value::Object(entries)) => Some(entries),
+        Some(_) => return Ok(CreateReceipt::Unknown),
+        None => None,
+    };
+    let unchanged = match object.get("unchanged") {
+        Some(Value::Object(entries)) => Some(entries),
+        Some(_) => return Ok(CreateReceipt::Unknown),
+        None => None,
+    };
+    let unchanged_zero = unchanged.is_some_and(|entries| entries.contains_key("0"));
+    let failed_has_other = failed.is_some_and(|entries| entries.keys().any(|key| key != "0"));
+    let failed_zero = failed.and_then(|entries| entries.get("0"));
+    if successful.keys().any(|key| key != "0")
+        || failed_has_other
+        || unchanged.is_some_and(|entries| entries.keys().any(|key| key != "0"))
+        || (successful.contains_key("0") && failed_zero.is_some())
+        || (unchanged_zero && (successful.contains_key("0") || failed_zero.is_some()))
+    {
+        return Ok(CreateReceipt::Unknown);
+    }
+    if let Some(failure) = failed_zero {
+        if !failure.is_object() {
+            return Ok(CreateReceipt::Unknown);
+        }
+        let message = failure
+            .get("message")
+            .and_then(Value::as_str)
+            .unwrap_or("Collection create was rejected");
+        let status = failure
+            .get("code")
+            .and_then(Value::as_u64)
+            .and_then(|code| u16::try_from(code).ok());
+        return Err(error("local-api-http", message, status));
+    }
+    let Some(created) = successful.get("0") else {
+        if unchanged_zero {
+            return Err(error(
+                "local-api-protocol",
+                "Collection create did not return a new object",
+                None,
+            ));
+        }
+        return Ok(CreateReceipt::Unknown);
+    };
+    let Some(key) = create_object_key(created) else {
+        return Ok(CreateReceipt::Unknown);
+    };
+    if validate_key(&key).is_err() {
+        return Ok(CreateReceipt::Unknown);
+    }
+    Ok(CreateReceipt::Accepted { key })
+}
+
+fn create_object_key(value: &Value) -> Option<String> {
+    if let Some(key) = value.as_str() {
+        return Some(key.to_string());
+    }
+    let object = value.as_object()?;
+    let top = object.get("key").and_then(Value::as_str);
+    let nested = object
+        .get("data")
+        .and_then(Value::as_object)
+        .and_then(|data| data.get("key"))
+        .and_then(Value::as_str);
+    match (top, nested) {
+        (Some(top), Some(nested)) if top == nested => Some(top.to_string()),
+        (Some(top), None) => Some(top.to_string()),
+        (None, Some(nested)) => Some(nested.to_string()),
+        _ => None,
+    }
+}
+
+fn header(response: &Response, name: &str) -> Option<String> {
+    response
+        .headers()
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .map(ToOwned::to_owned)
+}
+
+fn check_response(response: &Response, server: &str) -> ZotResult<()> {
+    check_status(response)?;
+    if header(response, SERVER_ID).as_deref() != Some(server) {
+        return Err(error(
+            "local-api-conflict",
+            "Zotero instance changed; preview again",
+            None,
+        ));
+    }
+    Ok(())
+}
+
+fn check_status(response: &Response) -> ZotResult<()> {
+    if response.status().is_success() {
+        return Ok(());
+    }
+    let (code, message) = if response.status().is_redirection() {
+        (
+            "local-api-redirect",
+            "Local API refused to follow a redirect",
+        )
+    } else {
+        match response.status().as_u16() {
+            401 => (
+                "local-api-unauthorized",
+                "Local authorization is missing or expired",
+            ),
+            403 => (
+                "local-api-forbidden",
+                "Local API disabled, authorization denied, or target not writable",
+            ),
+            404 => (
+                "local-api-not-found",
+                "Target not found in the selected local library",
+            ),
+            412 => (
+                "local-api-conflict",
+                "Zotero instance or object version changed; preview again",
+            ),
+            428 => (
+                "local-api-precondition",
+                "Local API requires instance and version preconditions",
+            ),
+            429 => (
+                "local-api-rate-limit",
+                "Authorization rate limited; retry after the indicated delay",
+            ),
+            _ => ("local-api-http", "Local API rejected the request"),
+        }
+    };
+    let mut result = error(code, message, Some(response.status().as_u16()));
+    if let ZotError::LocalApi { hint, .. } = &mut result {
+        if let Some(delay) = header(response, "Retry-After") {
+            *hint = Some(format!("Retry-After: {delay}"));
+        }
+    }
+    Err(result)
+}
+
+async fn decode<T: DeserializeOwned>(response: Response) -> ZotResult<T> {
+    response.json().await.map_err(|_| {
+        error(
+            "local-api-protocol",
+            "Invalid Local API JSON response",
+            None,
+        )
+    })
+}
+
+fn read_error(err: reqwest::Error) -> ZotError {
+    let code = if err.is_timeout() {
+        "local-api-timeout"
+    } else {
+        "local-api-unreachable"
+    };
+    error(
+        code,
+        "Cannot read Zotero Local API; check that Zotero is running and local communication is enabled",
+        None,
+    )
+}
+
+pub(crate) fn error(code: &str, message: &str, status: Option<u16>) -> ZotError {
+    ZotError::LocalApi {
+        code: code.to_string(),
+        message: message.to_string(),
+        hint: None,
+        status,
+    }
+}
+
+#[cfg(test)]
+#[path = "local_api_tests.rs"]
+mod tests;

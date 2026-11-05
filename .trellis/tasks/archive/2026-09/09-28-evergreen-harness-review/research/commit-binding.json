@@ -1,0 +1,14 @@
+{
+  "checked_utc": "2026-09-28T07:03:32.145595+00:00",
+  "tested_baseline": "ba4e10e987e7afe65dccb8450445d41bc9e08d79",
+  "product_commit": "2b93e1b0eeffcd9078f83432cd2c9e2269205e2f",
+  "work_commits": {
+    "C1": "a2120b3af11dca51c0399b02192d6ed7de43a946",
+    "C2": "d2ab47c61e7a1e6db98d09dd60ebc23323e57620",
+    "C34": "2b93e1b0eeffcd9078f83432cd2c9e2269205e2f"
+  },
+  "verified_product_files": 10,
+  "content_matches_passed_gates": true,
+  "new_test_run": false,
+  "hosted": "UNVERIFIED"
+}

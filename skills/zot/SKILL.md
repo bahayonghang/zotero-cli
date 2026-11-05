@@ -1,6 +1,6 @@
 ---
 name: zot
-description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v1.0.1)
+description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查询、提取、整理或安全更新本机已有的 Zotero 内容时，必须使用这个 skill。重点是 Zotero 里的 metadata、notes、tags、attachments、PDF fulltext、outline、annotations、collections、saved searches、feeds 和 reading workspace，而不是教人背 CLI。Rust `zot` CLI 只是执行层。适用于库内搜索、citation key 查询、批注与 PDF 提取、workspace 建立与检索、saved search 保存、附件下载、semantic index/search、Scite 检查、配置排障、通过 Zotero 10+ Local API 补充字段/作者、整理分类和单条增删标签、通过 connector 本机导入 BibTeX/RIS，以及明确授权并具备凭据的 Zotero Web API 写操作。不要把它用于泛化找论文、普通总结、引用格式教学、或不落到 Zotero / workspace 的 PDF 处理。 (v1.1.0)
 ---
 
 # zot
@@ -12,7 +12,8 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 - 只要任务的真实目标是操作**已有的本地 Zotero 库**或**已有/将创建的 reading workspace**，就用本 skill，即使用户没说 `zot`。
 - 用户在 Claude Code、Codex 里应该直接说需求，不应该先背命令。skill 负责把需求翻成运行时动作。
 - `zot` 是唯一执行面。`ref/` 里的旧 Python 参考实现和 `zot mcp serve` 都不是当前主路径。
-- 本地 SQLite 和 Zotero Local HTTP 都是只读路径；connector 只负责向 Zotero UI 当前选中的目标新增 BibTeX/RIS 条目；其他 mutation 全部走 Zotero Web API。三个边界不能混用。
+- 本地 SQLite 只读；Zotero 10+ Local API 支持显式 local 后端的字段/作者和分类成员操作；connector 仅新增导入；其他 mutation 走 Web API。各路径不能混用。
+- Zotero 打开并锁住 `zotero.sqlite` 时，`item get`、`item children`、`item pdf` / `fulltext`、`library search`、`library citekey` 可以读正在运行的桌面。其它读取和全部写入仍走原来的路径。一次命令只用一个来源，不把桌面结果和快照拼成一份。不自动改走 Web API。
 - 每条写路径拥有本次操作的成功和失败；connector 或 Web API 出错时不能自动 fallback 到另一条路径。
 - 回答先给结论、证据、变更或失败原因。不要先把 raw JSON 倒给用户。
 
@@ -35,9 +36,18 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 
 - 普通库内检索：`library search`
   - 非空 search 的 `meta.fulltext_index` 为 `legacy-tables` / `fts5-sidecar` / `unavailable`。`unavailable` 表示本次未查附件全文，标题/作者/标签仍可能命中。不要把 `no such table: fulltextItemWords` 当成 SQLite 不可读。
+  - 标题、期刊、主题是字段条件：`--title`、`--journal`（只匹配 `publicationTitle` 或 `journalAbbreviation`）、`--topic`（标题、摘要或标签的词匹配）。主题检索不是语义召回，也不读 PDF 正文。
+  - 默认位置参数仍会查附件全文。Zotero 占着库锁时，这条查询改读正在运行的桌面，并用 `meta.fulltext_index=unavailable` 说明没查正文。空结果不表示正文里没有这个词。
+  - 唯一标题才直接读单条。多条候选先列出来让用户选，不要把第一页第一条当成那一篇。
+  - 成功时 `meta.read_source` 为 `desktop`、`desktop-unbound` 或 `snapshot`。回答要说明这次用的来源。
+  - 配置了 profile 或明确数据目录、又还没证明和正在运行的 Zotero 是同一个库时，读运行中的实例要加 `--running-zotero`。默认不要换成另一套库。
 - 纯列表 / 翻页：`library list --collection ... --limit ... --offset ...`
 - 整库统计：`library stats`
 - citation key 直达：`library citekey`
+  - 精确匹配，区分大小写。前缀相似不是命中。
+  - 关闭的库同时查原生 `citationKey` 和 Extra 里的 `Citation Key:` / `CitationKey:`。
+  - 打开的库先用 Local API 字段和 Extra。插件候选只有在同一库条目上核对到这个 key 时才接受。插件不可达、而且库里没存过这个 key 时，说明来源限制，不要说成确定没有。
+  - 多条条目共用同一个 key 时停下来让用户选，并给出标题、作者、年份和 item key。
 - 最近入库条目：`library recent --count`
 - collection 细粒度读取：`collection get` / `subcollections` / `items` / `item-count` / `tags`
 - collection 名内检索：`collection search`
@@ -162,23 +172,73 @@ description: 当用户在 Claude Code、Codex 或类似 agent 里，想直接查
 
 | 路径 | 当前能力 | 凭据 / 运行条件 |
 | --- | --- | --- |
-| local SQLite / Local HTTP | 只读查询、提取和 dedupe planning | 本地 Zotero 数据；不能写 |
+| local SQLite / Local HTTP reads | 查询、提取和 dedupe planning | SQLite 永远不能写 |
+| Zotero 10+ Local API | item update、collection create/add-item/remove-item/move-item、item tag add/remove | 显式 local 后端、预览/确认、Zotero 桌面授权；无需 Web key |
 | connector 本机导入 | 仅 `item import` 新增 BibTeX/RIS 条目 | Zotero 正在运行、connector 可达、UI 当前目标可写 |
-| Zotero Web API | 除 connector 导入外的全部 mutation，含 merge/dedupe | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
+| Zotero Web API | 既有 mutation 默认后端，含 merge/dedupe 与 item tag batch；不含 move-item。item tag add/remove 未指定 local 时仍走这里 | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
 
 写入决策顺序：
 
-1. 先跑 `zot --json doctor`，读取 `capabilities.connector_write`、`capabilities.web_write` 和 `write_credentials`。
+1. 先跑 `zot --json doctor`，读取 `capabilities.local_api_write`、`capabilities.connector_write`、`capabilities.web_write` 和 `write_credentials`。
 2. BibTeX/RIS 新增导入只走 connector：先不带 `--confirm` 预览目标、可写性、记录数和格式，复述后取得确认，再执行 `item import ... --confirm`。
-3. 其他 mutation 全部走 Web API。缺少 `ZOT_LIBRARY_ID` 或 `ZOT_API_KEY` 时停止并点名缺失凭据；不要尝试 connector。
+3. 本地字段/作者、分类创建/成员或单条标签操作优先评估 `local_api_write` 并按下一节显式选择 local；其他 mutation 走 Web API。Web 凭据缺失时停止对应 Web 操作；不要切换到 connector。
 4. 对 merge/dedupe 先跑不带 `--confirm` 的本地 preview，复述 keeper、sources、confidence 和跳过项；执行 `--confirm` 前再检查 Web 凭据。
 
 命令路由：
 
 - connector 写：仅 `item import`。
-- Web API 写：`item create/add-doi/add-url/add-file/update/trash/restore/attach`、`item note add/update/delete`、`item tag add/remove/batch`、collection mutation、saved-search mutation、annotation creation、`sync update-status --apply` 和 merge/dedupe。
+- Web API 写：`item create/add-doi/add-url/add-file/update/trash/restore/attach`、`item note add/update/delete`、未指定 local 的 `item tag add/remove`、`item tag batch`、未指定 local 的 collection mutation、saved-search mutation、annotation creation、`sync update-status --apply` 和 merge/dedupe。
+- Local API 写：`item update`、`collection create/add-item/remove-item/move-item`、`item tag add/remove`，都必须显式带 `--write-backend local`。
 - `library dedupe --confirm` 默认只执行 normal-confidence 组；low-confidence 组保留在 `skipped_low_confidence`。普通 confirm 不等于 low-confidence 授权；只有用户看过 preview 后另行、明确接受这部分风险，才可追加 `--include-low-confidence`。
 - 不要宣称 connector 能执行 tag、note、collection、attachment、annotation、saved-search、status-sync 或 merge/dedupe mutation。
+
+### 7a. 本地字段、作者与分类成员（Zotero 10+）
+
+自然语言“把条目从 A 移到 B”“补上这篇的 DOI/作者”可使用官方 Local API，不要求 Web 凭据。
+
+1. 先 doctor：`local_api_write.supported` 仅证明版本/协议支持，`credential_present` 仅表示缓存授权，`verified=false` 不能解读成真实写入通过。Zotero 必须运行并启用本地通信。
+2. 用 item key 与 collection key 确定同一 library 的目标；不要把 citation key 或 UI 当前选中分类当作 API 身份。必要时先检索解析，不能猜 key。
+3. `item update K --write-backend local --field DOI=...` 或 `collection move-item K --from A --to B --write-backend local` 默认只预览。add-item/remove-item 保留 `<collection-key> <item-key>` 参数顺序，同样可选择 local。
+4. 展示 before/after/skipped_fields；默认仅填空，覆盖非空字段需显式 `--overwrite`。`--creators-file` 为有序 JSON 数组，含 creatorType 与个人 firstName/lastName 或机构 name；已有作者列表需显式覆盖。
+5. 用户认可具体修改后，保持原参数并增加 `--confirm --expected-server-id <预览值> --expected-version <预览值>`。Zotero 自身会在需要时显示授权框，不能替用户点击 Always Allow。
+6. applied 且 verified 才表示确认成功；unknown 表示结果未知，verification-failed 表示写被接受但回读未验证，不能称为全部成功或盲重试。冲突须重新预览。
+
+移动仅改变指定分类归属，保留其他分类、item key 和 children。不支持跨库移动、itemType 转换、批量修改、自动联网补全或本地 notes/merge。单条本地标签见下一节；`item tag batch` 仍走 Web。local 失败不自动换 Web/Connector/SQLite。
+
+本地 key 仅在 Zotero 返回 remember=true 时按 profile + Server ID 缓存；不进入输出。不要主动读取或展示授权文件。
+
+### 7b. 本地单条标签（Zotero 10+）
+
+单条 `item tag add/remove` 可显式走 Local API。不带 `--write-backend local` 时仍立即走 Web，不是预览。`item tag batch` 仍只走 Web，不要用它代替一条已知 item key 的本地标签。
+
+1. 先 doctor。`local_api_write.supported` 只说明协议，`verified=false` 不是写入通过。用八位 item key，不要猜 key，也不要读 Web 凭据来完成本地路径。
+2. `item tag add KEY --tag NAME --write-backend local` 或 `item tag remove KEY --tag NAME --write-backend local` 默认只预览。可重复 `--tag`。
+3. 新标签是手工标签（type 0）。精确同名已存在则 unchanged，不改变原 type，包括自动标签。移除按精确名称移除该名称的全部关联，包括同名不同 type；其他标签对象和未知属性保留。
+4. 不做大小写、Unicode 或同义词折叠，不修剪非空名称。纯空白拒绝。中文、空格和特殊字符按输入保留。
+5. 用户认可具体 before/after 后，保持原参数并增加 `--confirm --expected-server-id <预览值> --expected-version <预览值>`。预览和无变化不授权、不 PATCH。不要替用户点击授权框。
+6. 只有 applied 且 verified 才表示确认成功。unknown 或 verification-failed 不能称为成功，也不能盲重试。冲突须重新预览。
+7. 只作用于同库、非回收站的顶层普通条目。不支持标签颜色、类型转换、重命名，也不通过 `--field tags` 绕过。
+
+### 7c. 本地分类创建（Zotero 10+）
+
+`collection create NAME [--parent KEY] --write-backend local` 默认只预览。不带 local 时仍立即走 Web。重命名、删除和重挂父级仍只走 Web。
+
+1. 先 doctor。用完整分类列表确认父分类属于同一库；不要猜 key，也不要一次创建多层路径。
+2. 预览展示名称、父级和库版本。确认使用 `--confirm --expected-server-id <预览值> --expected-library-version <预览值>`。不要把不存在对象的 version 填 0，也不要复用条目的 `--expected-version`。
+3. 同一父级精确同名则拒绝并列出候选 key。不复用、不合并、不重命名。不同父级可以同名。纯空白名称拒绝。
+4. HTTP 200 不等于成功。只有对象级成功且回读 name、parent、server 一致才是 applied。unknown 不自动重发，也不把事后同名分类认作这次创建。
+5. 创建不改成员、children 或附件。得到的 key 只作为现有 `collection add-item --write-backend local` 的输入。
+
+### 7d. 本地批量整理（Zotero 10+）
+
+不同条目的不同标签/分类决策走 `library organize plan/apply --write-backend local`，不要用 `item tag batch`，也不要在批次里创建分类。
+
+1. 先用只读命令解析八位 item key 和已有 collection key。reason 只给人看，不执行其中的路径、URL 或脚本。
+2. `library organize plan --file requests.json --output plan.json --write-backend local` 只读预览。核对完整 before/after、版本和分类名称。SHA-256 在命令 JSON 里，不在计划文件里。
+3. 默认最多改变 50 条。超限零写入。要扩大必须 plan 与 apply 使用同一个显式 `--max-affected` 并重新审阅。
+4. 用户认可后，`apply --plan plan.json --confirm --expected-plan-sha256 <命令输出> --report report.json --write-backend local`。hash、scope、profile 或版本不符时不要写入。
+5. 每条目最多一次条件 PATCH。首次 failed、conflict、unknown 或 verification-failed 即停止，后续是 not-attempted。不自动回滚，不盲重试，不自动 resume。
+6. 只有全部 applied 或 unchanged 且报告成功落盘才算批次成功。partial、failed、unknown 即使 envelope `ok: true` 也不是全成功，退出码非 0。落盘失败时 stdout 保留已知结果及报告错误；磁盘 in-flight 是待核查，不得重放。
 
 ### 8. 配置排障
 
@@ -259,6 +319,8 @@ cargo run -q -p zot-cli -- ...
 - saved search / 配置排障 / profile 切换
 - 用户说“为什么不工作”
 
+`item get`、`item children`、`item pdf`、`library search`、`library citekey` 不必先跑完整 doctor 就能读。doctor 仍用于第一次接触环境、写操作、PDF 排障和“为什么不工作”。SQLite snapshot 单独失败（库被 Zotero 锁住）不要中止上述读取：看 `capabilities.sqlite_snapshot` 和 `capabilities.desktop_read` 的 `next`，再执行读命令。探针可达不是条目或 PDF 已经读成功。`desktop_read.item_read_verified` 和 `pdf_read_verified` 恒为 false。
+
 首选：
 
 ```bash
@@ -275,8 +337,11 @@ cargo run -q -p zot-cli -- --json doctor
 
 - `db_exists`
 - `capabilities.local_sqlite_read`
+- `capabilities.sqlite_snapshot`（快照能不能打开，以及这条 CLI 下一步能做什么）
+- `capabilities.desktop_read`（运行中的桌面读能不能走；探针成功不是条目或 PDF 已读）
 - `capabilities.local_sqlite_read.fulltext.legacy_tables`
 - `capabilities.local_sqlite_read.fulltext.sidecar_present`
+- `capabilities.local_api_write`（版本/可达/凭据存在分别报告，`verified: false` 不表示已验证可写）
 - `capabilities.local_http_read`
 - `capabilities.connector_write`（仅表示本机 BibTeX/RIS import 能力）
 - `capabilities.web_write.configured`（只表示凭据存在）
@@ -304,7 +369,7 @@ cargo run -q -p zot-cli -- --json doctor
 - `library saved-search create --conditions` 必须是 JSON 数组，每项形如 `{"condition": "...", "operator": "...", "value": "..."}`，至少一条；空数组直接报 `saved-search-conditions`
 - Pdfium 路径覆盖：`ZOT_PDFIUM_LIB_PATH` / `PDFIUM_LIB_PATH` 指向 lib，`ZOT_PDFIUM_CACHE_DIR` 覆盖自动下载缓存目录
 - 永远不要直接修改 `zotero.sqlite`
-- Zotero Local HTTP API 只读；本机唯一写路径是 connector 的 `item import`
+- Zotero 10+ 的本地内容操作走授权 Local API；旧版 Local HTTP 只读。Connector 仍仅支持 item import。
 - connector 无鉴权但仅监听 loopback，只支持向 Zotero UI 当前选中目标新增 BibTeX/RIS 条目；不能用于 merge/dedupe 或其他 mutation
 - API key 和 raw merge plan token 不得进入输出、日志、fixture、文档示例或 eval
 
@@ -378,6 +443,7 @@ cargo run -q -p zot-cli -- --json doctor
 8. 写权限缺失或目标路径不支持该 mutation 时停在只读分析，不要假装成功。
 9. `item tag batch --confirm` 返回 `state: applied|partial|failed` 和逐操作结果。只要
    `failed_operations > 0` 就必须明确报告失败项；不能因命令返回了 envelope 就称为全部成功。
+10. `item tag add/remove` 不带 `--write-backend local` 时立即走 Web API。显式 local 时默认只预览；确认必须带预览中的 Server ID 和条目 version。`item tag batch` 不因单条 local 标签或 `library organize` 而改变，仍是 Web 批量命令。
 
 ## 常见语义差异
 
@@ -396,7 +462,16 @@ cargo run -q -p zot-cli -- --json doctor
 ## 自然语言到动作的典型映射
 
 - “找我库里 reward hacking 相关的论文，再挑一篇最相关的给我引用”  
-  先 `library search`，再 `item get` / `item cite`
+  先 `library search`。多条候选先列出再选一篇，然后 `item get` / `item cite`。这是库内词匹配，不是语义召回
+
+- “Zotero 开着，按标题找这篇再读 PDF”  
+  `library search --title`，唯一命中后再 `item get` / `item pdf`。SQLite busy 不要停。看 `meta.read_source`。探针成功不算已经读到正文
+
+- “按期刊 Nature 找”  
+  `library search --journal Nature`。只认 `publicationTitle` 或 `journalAbbreviation`，摘要里提到 Nature 不算
+
+- “主题是 transformer”  
+  `library search --topic transformer`。这是标题、摘要或标签的词匹配。语义召回另走 `library semantic-search`。库锁着时桌面结果的 `fulltext_index` 是 `unavailable`，不要声称查过 PDF 正文
 
 - “给我看最近 10 条刚进库的文献”  
   走 `library recent --count 10`
@@ -438,7 +513,7 @@ cargo run -q -p zot-cli -- --json doctor
   先生成 merge preview，再确认 `capabilities.web_write` 和 Web 凭据；用户确认后执行 `--confirm`，Web 失败不 fallback 到 connector
 
 - “帮我直接 UPDATE zotero.sqlite”
-  拒绝直接 SQLite 写；说明 local SQLite / Local HTTP 只读。BibTeX/RIS 新增导入可走 connector，其他 mutation 只能转到已实现的 Web 命令
+  拒绝直接 SQLite 写；字段/作者和分类成员可评估授权 Local API，BibTeX/RIS 新增导入可走 connector，其他操作使用已实现的 Web 命令
 
 - “我库里这些跟 attention 有关的条目，挨个查一下 Scite 报告”  
   走 `item scite search "attention"`
@@ -507,7 +582,7 @@ cargo run -q -p zot-cli -- --json doctor
 遇到这些请求时怎么处理：
 
 - `search-in` / `expand`：明确说当前没有等价命令，只能先 `item fulltext` / `item pdf` 拉文本，再做 agent 侧二次定位
-- `metadata`：说明当前没有 field-scoped metadata search；最多退到 `library search` 加已有 filter
+- `metadata`：标题用 `library search --title`，期刊用 `--journal`（`publicationTitle` 或 `journalAbbreviation`），主题词用 `--topic`（标题、摘要或标签，不是语义，也不是 PDF 正文）。桌面读做不到的条件组合要说明，不要丢掉过滤条件
 - `status`：用 `doctor` + `library semantic-status` 组合回答，不要把 `sync update-status` 说成索引状态
 - `s2` / `--s2-paper-id`：直接说明当前未实现，不要伪造替代命令
 - zotagent `sync`：说明当前只能用 `library semantic-index --fulltext` 或 `workspace index` 做部分替代，而且范围主要是 metadata + PDF
@@ -519,7 +594,7 @@ cargo run -q -p zot-cli -- --json doctor
 - connector 目标只读：点名当前目标不可写，请用户在 Zotero UI 选择可写 collection/library 后重新 dry-run；不改走 Web
 - Web 写不可用：明确告诉用户缺 `ZOT_API_KEY` / `ZOT_LIBRARY_ID`；connector 不能替代其他 mutation
 - 目标路径不支持该 mutation：说明能力边界并停止，不要暗示 connector 可以 merge、dedupe、tag 或 update
-- 没有 Better BibTeX：`library citekey` 只走 Extra fallback
+- 没有 Better BibTeX：`library citekey` 仍查原生 `citationKey` 和 Extra。插件没把 key 存进库、插件也不可达时，报告来源限制。前缀和大小写不一致都不是命中
 - 没有 Pdfium：不要承诺 fulltext / outline / annotation / PDF 下载后的文本处理
 - 没有 embedding：semantic 检索说明会降级；workspace 问答改用 `--mode bm25`
 - `attach-mode auto` 没找到 OA PDF：条目仍可能创建成功
