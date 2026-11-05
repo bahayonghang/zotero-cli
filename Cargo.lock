@@ -2812,6 +2812,7 @@ dependencies = [
  "clap_complete",
  "opener",
  "regex",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",

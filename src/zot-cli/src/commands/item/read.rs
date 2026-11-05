@@ -3,33 +3,21 @@ use std::io;
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::Result;
-use zot_local::{PdfBackend, PdfCache};
 
 use crate::cli::{
-    ItemChildrenArgs, ItemCiteArgs, ItemDeletedArgs, ItemDownloadArgs, ItemExportArgs, ItemKeyArgs,
+    ItemChildrenArgs, ItemCiteArgs, ItemDeletedArgs, ItemDownloadArgs, ItemExportArgs, ItemGetArgs,
     ItemOpenArgs, ItemPdfArgs, ItemRelatedArgs, ItemVersionsArgs, resolved_output_limit,
 };
 use crate::context::AppContext;
-use crate::format::{print_item, print_items};
+use crate::format::print_items;
 use crate::output::CommandOutput;
 use crate::util::{
-    item_not_found, open_target, parse_page_range, print_outline_entries, require_item,
-    require_item_pdf, run_pdf,
+    item_not_found, open_target, print_outline_entries, require_item, require_item_pdf, run_pdf,
 };
 
-pub(crate) async fn handle_get(ctx: &AppContext, args: ItemKeyArgs) -> Result<CommandOutput> {
-    let library = ctx.local_library()?;
-    let item = require_item(&library, &args.key)?;
-    let notes = library.get_notes(&args.key)?;
-    let attachments = library.get_attachments(&args.key)?;
-    let payload = serde_json::json!({
-        "item": item,
-        "notes": notes,
-        "attachments": attachments,
-    });
-    CommandOutput::new(ctx, payload, None, move |_| {
-        print_item(&item, &notes, &attachments)
-    })
+pub(crate) async fn handle_get(ctx: &AppContext, args: ItemGetArgs) -> Result<CommandOutput> {
+    let io = crate::commands::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
+    crate::commands::desktop_read::read_item(ctx, &io, &args.key).await
 }
 
 pub(crate) async fn handle_related(
@@ -67,58 +55,23 @@ pub(crate) async fn handle_open(ctx: &AppContext, args: ItemOpenArgs) -> Result<
 }
 
 pub(crate) async fn handle_pdf(ctx: &AppContext, args: ItemPdfArgs) -> Result<CommandOutput> {
-    let library = ctx.local_library()?;
-    let attachment = require_item_pdf(&library, &args.key)?;
-    let pdf_path = library.pdf_path(&attachment);
-    let backend = ctx.pdf_backend();
-    let cache = PdfCache::new(None)?;
-    if args.annotations {
-        let annotations = {
-            let pdf_path = pdf_path.clone();
-            run_pdf(move || backend.extract_annotations(&pdf_path)).await?
-        };
-        return CommandOutput::new(ctx, annotations, None, |annotations| {
-            for annotation in annotations {
-                println!(
-                    "[p.{}] {} {}",
-                    annotation.page, annotation.annotation_type, annotation.content
-                );
-            }
-        });
-    }
-    let page_range = parse_page_range(args.pages.as_deref())?;
-    let text = if page_range.is_none() {
-        if let Some(cached) = cache.get(&pdf_path)? {
-            cached
-        } else {
-            let extracted = {
-                let pdf_path = pdf_path.clone();
-                run_pdf(move || backend.extract_text(&pdf_path, None)).await?
-            };
-            cache.put(&pdf_path, &extracted)?;
-            extracted
-        }
-    } else {
-        let pdf_path = pdf_path.clone();
-        run_pdf(move || backend.extract_text(&pdf_path, page_range)).await?
-    };
-    let payload = serde_json::json!({ "text": text });
-    CommandOutput::new(ctx, payload, None, move |_| println!("{text}"))
+    let io = crate::commands::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
+    crate::commands::desktop_read::read_pdf(
+        ctx,
+        &io,
+        &args.key,
+        args.pages.as_deref(),
+        args.annotations,
+    )
+    .await
 }
 
 pub(crate) async fn handle_children(
     ctx: &AppContext,
     args: ItemChildrenArgs,
 ) -> Result<CommandOutput> {
-    let children = ctx.local_library()?.get_items_children(&args.keys)?;
-    CommandOutput::new(ctx, children, None, |children| {
-        for (key, values) in children {
-            println!("{key}");
-            for value in values {
-                println!("  - {} [{}]", value.key(), value.kind_label());
-            }
-        }
-    })
+    let io = crate::commands::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
+    crate::commands::desktop_read::read_children(ctx, &io, &args.keys).await
 }
 
 pub(crate) async fn handle_download(

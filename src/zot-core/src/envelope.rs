@@ -14,6 +14,10 @@ pub struct EnvelopeMeta {
     pub trash_policy: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fulltext_index: Option<String>,
+    /// `desktop`, `desktop-unbound`, or `snapshot` for an open-library read.
+    /// Omitted for every other command.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_source: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<u32>,
 }
@@ -105,6 +109,7 @@ mod tests {
                 profile: Some("work".to_string()),
                 trash_policy: Some("excluded".to_string()),
                 fulltext_index: None,
+                read_source: None,
                 api_version: Some(1),
             },
         );
@@ -126,6 +131,7 @@ mod tests {
             profile: None,
             trash_policy: None,
             fulltext_index: None,
+            read_source: None,
             api_version: Some(1),
         })
         .expect("serialize omitted fulltext_index");
@@ -137,6 +143,7 @@ mod tests {
             profile: None,
             trash_policy: None,
             fulltext_index: Some("fts5-sidecar".to_string()),
+            read_source: None,
             api_version: Some(1),
         })
         .expect("serialize fulltext_index");

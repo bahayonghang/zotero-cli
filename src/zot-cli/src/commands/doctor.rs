@@ -51,7 +51,20 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
     let connector = ctx.connector()?;
     let local_http = connector.probe_local_http().await;
     let connector_ping = connector.ping().await;
-    let local_write = local_write_capability(ctx).await;
+    let local_probe = match ctx.local_api() {
+        Ok(client) => client.probe().await,
+        Err(error) => Err(error),
+    };
+    let local_write = local_write_capability(ctx, &local_probe);
+    let (sqlite_snapshot, desktop_read) = read_route_rows(&library, &local_probe);
+    let sqlite_next = sqlite_snapshot["next"]
+        .as_str()
+        .unwrap_or("unavailable")
+        .to_string();
+    let desktop_next = desktop_read["next"]
+        .as_str()
+        .unwrap_or("unavailable")
+        .to_string();
     let config_file = AppConfig::config_file()?;
     let migration_hint = legacy_bridge_config_present(&config_file).then_some(LEGACY_BRIDGE_HINT);
     let local_sqlite_available = library.is_ok();
@@ -76,6 +89,8 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
             "connector_write": connector_write_capability(&connector_ping),
             "web_write": web_write_capability(&ctx.config),
             "local_api_write": local_write,
+            "sqlite_snapshot": sqlite_snapshot,
+            "desktop_read": desktop_read,
         },
         "embedding": {
             "configured": ctx.config.embedding.is_configured(),
@@ -119,6 +134,8 @@ pub(crate) async fn handle(ctx: &AppContext) -> Result<CommandOutput> {
         );
         println!("Local HTTP read: {local_http_label}");
         println!("Connector write: {connector_write_label}");
+        println!("SQLite snapshot: {sqlite_next}");
+        println!("Desktop read: {desktop_next}");
         println!(
             "Local API write: {} (authorization and actual writes not verified)",
             if local_write["supported"].as_bool() == Some(true) {
@@ -205,6 +222,70 @@ fn local_sqlite_available_payload(
     })
 }
 
+fn read_route_rows(
+    library: &zot_core::ZotResult<zot_local::LocalLibrary>,
+    probe: &zot_core::ZotResult<zot_desktop::LocalApiProbe>,
+) -> (serde_json::Value, serde_json::Value) {
+    let sqlite_snapshot = match library {
+        Ok(_) => serde_json::json!({
+            "available": true,
+            "item_read_verified": false,
+            "pdf_read_verified": false,
+            "next": "Reads can use the configured snapshot. Start Zotero and enable local communication to read while the database is locked.",
+        }),
+        Err(error) => {
+            let next = if error.payload().code == "zotero-db-busy" {
+                "Close Zotero before a snapshot read."
+            } else {
+                "The snapshot could not be opened. Close Zotero and retry, or read the running Zotero when that library is proved."
+            };
+            serde_json::json!({
+                "available": false,
+                "item_read_verified": false,
+                "pdf_read_verified": false,
+                "error": error.payload(),
+                "next": next,
+            })
+        }
+    };
+    let desktop_read = match probe {
+        Ok(probe) if probe.supported => serde_json::json!({
+            "reachable": true,
+            "available": true,
+            "item_read_verified": false,
+            "pdf_read_verified": false,
+            "zotero_version": probe.zotero_version,
+            "api_version": probe.api_version,
+            "next": "item get, item children, item pdf, library search, and library citekey can read the running Zotero. A reachable probe is not an item or PDF read. Pass --running-zotero when a profile or explicit data directory is not proved.",
+        }),
+        Ok(probe) => serde_json::json!({
+            "reachable": true,
+            "available": false,
+            "item_read_verified": false,
+            "pdf_read_verified": false,
+            "zotero_version": probe.zotero_version,
+            "api_version": probe.api_version,
+            "next": "This Zotero version has no instance id for automatic binding. Close Zotero for a snapshot read, or pass --running-zotero to read the running instance.",
+        }),
+        Err(error) => {
+            let next = if error.payload().code == "local-api-forbidden" {
+                "Enable local communication in Zotero. Do not treat this probe as a successful item or PDF read."
+            } else {
+                "Start Zotero and enable local communication to read while the library is locked. A failed probe is not an item or PDF read."
+            };
+            serde_json::json!({
+                "reachable": false,
+                "available": false,
+                "item_read_verified": false,
+                "pdf_read_verified": false,
+                "error": error.payload(),
+                "next": next,
+            })
+        }
+    };
+    (sqlite_snapshot, desktop_read)
+}
+
 fn local_http_capability(status: &zot_core::ZotResult<LocalHttpStatus>) -> serde_json::Value {
     match status {
         Ok(status) => serde_json::json!({
@@ -238,11 +319,10 @@ fn connector_write_capability(ping: &zot_core::ZotResult<ConnectorPing>) -> serd
     }
 }
 
-async fn local_write_capability(ctx: &AppContext) -> serde_json::Value {
-    let result = match ctx.local_api() {
-        Ok(client) => client.probe().await,
-        Err(error) => Err(error),
-    };
+fn local_write_capability(
+    ctx: &AppContext,
+    result: &zot_core::ZotResult<zot_desktop::LocalApiProbe>,
+) -> serde_json::Value {
     match result {
         Ok(probe) => {
             let credential = probe
@@ -404,6 +484,58 @@ mod tests {
         assert_eq!(payload["error"]["code"], "zotero-db-busy");
         assert_eq!(payload["error"]["hint"], "Close Zotero and retry");
         assert!(payload.get("snapshot").is_none());
+    }
+
+    #[test]
+    fn read_rows_keep_original_errors_and_do_not_claim_an_item_read() {
+        let busy: zot_core::ZotResult<zot_local::LocalLibrary> = Err(ZotError::Database {
+            code: "zotero-db-busy".to_string(),
+            message: "snapshot timed out".to_string(),
+            hint: Some("Close Zotero and retry".to_string()),
+        });
+        let forbidden = Err(ZotError::LocalApi {
+            code: "local-api-forbidden".to_string(),
+            message: "Local API is disabled".to_string(),
+            hint: None,
+            status: Some(403),
+        });
+        let (sqlite_row, desktop_row) = read_route_rows(&busy, &forbidden);
+        assert_eq!(sqlite_row["available"], false);
+        assert_eq!(sqlite_row["error"]["code"], "zotero-db-busy");
+        assert_eq!(sqlite_row["next"], "Close Zotero before a snapshot read.");
+        assert_eq!(sqlite_row["item_read_verified"], false);
+        assert_eq!(desktop_row["reachable"], false);
+        assert_eq!(desktop_row["error"]["code"], "local-api-forbidden");
+        assert_eq!(desktop_row["pdf_read_verified"], false);
+        assert!(
+            desktop_row["next"]
+                .as_str()
+                .is_some_and(|next| next.contains("Enable local communication"))
+        );
+        assert!(desktop_row.get("server_id").is_none());
+
+        let supported = Ok(zot_desktop::LocalApiProbe {
+            zotero_version: Some("10.0.7".to_string()),
+            api_version: Some("3".to_string()),
+            schema_version: Some("36".to_string()),
+            server_id: Some("server-abc".to_string()),
+            supported: true,
+        });
+        let open_library: zot_core::ZotResult<zot_local::LocalLibrary> = Err(ZotError::Database {
+            code: "db-not-found".to_string(),
+            message: "missing".to_string(),
+            hint: None,
+        });
+        let (_, desktop_row) = read_route_rows(&open_library, &supported);
+        assert_eq!(desktop_row["available"], true);
+        assert_eq!(desktop_row["item_read_verified"], false);
+        assert_eq!(desktop_row["pdf_read_verified"], false);
+        assert!(desktop_row.get("server_id").is_none());
+        assert!(
+            desktop_row["next"]
+                .as_str()
+                .is_some_and(|next| next.contains("not an item or PDF read"))
+        );
     }
 
     #[test]

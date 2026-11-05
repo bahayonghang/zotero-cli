@@ -5,7 +5,7 @@ use zot_core::{
     ZotResult,
 };
 use zot_local::{HybridMode, LocalLibrary, ReindexOpts, SearchOptions, SemanticStore};
-use zot_remote::{BetterBibTexClient, EmbeddingClient};
+use zot_remote::EmbeddingClient;
 
 use crate::cli::{
     LibraryCommand, LibrarySavedSearchCommand, LibrarySavedSearchCreateArgs,
@@ -60,6 +60,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
         }
         LibraryCommand::Search(args) => {
             let include_trashed = args.include_trashed;
+            let io = super::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
             let options = SearchOptions {
                 query: args.query,
                 collection: args.collection,
@@ -67,23 +68,16 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 tag: args.tag,
                 creator: args.creator,
                 year: args.year,
+                title: args.title,
+                journal: args.journal,
+                topic: args.topic,
                 sort: args.sort.map(Into::into),
                 direction: args.direction.into(),
                 limit: resolved_output_limit(args.limit),
                 offset: args.offset,
                 exclude_trashed: !include_trashed,
             };
-            let result = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
-                library.search(options)
-            })
-            .await?;
-            let seed = Some(EnvelopeMetaSeed {
-                count: Some(result.items.len()),
-                total: Some(result.total),
-                trash_policy: Some(trash_policy(include_trashed)),
-                fulltext_index: result.fulltext_index,
-            });
-            CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
+            super::desktop_read::read_search(ctx, &io, options).await
         }
         LibraryCommand::List(args) => {
             let include_trashed = args.include_trashed;
@@ -103,6 +97,7 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 total: Some(result.total),
                 trash_policy: Some(trash_policy(include_trashed)),
                 fulltext_index: None,
+                read_source: None,
             });
             CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
         }
@@ -132,44 +127,13 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
                 total: Some(stats.total_items),
                 trash_policy: Some(trash_policy(include_trashed)),
                 fulltext_index: None,
+                read_source: None,
             });
             CommandOutput::new(ctx, stats, seed, print_stats)
         }
         LibraryCommand::Citekey(args) => {
-            let library = ctx.local_library()?;
-            let match_opt = match library.search_by_citation_key(&args.citekey)? {
-                Some(result) => Some(result),
-                None => {
-                    let bbt = BetterBibTexClient::new(ctx.http());
-                    if bbt.probe().await {
-                        let candidate = bbt
-                            .search(&args.citekey)
-                            .await?
-                            .into_iter()
-                            .find(|candidate| candidate.citekey == args.citekey);
-                        match candidate {
-                            Some(candidate) => library.get_item(&candidate.item_key)?.map(|item| {
-                                zot_core::CitationKeyMatch {
-                                    citekey: args.citekey.clone(),
-                                    source: "better-bibtex".to_string(),
-                                    item,
-                                }
-                            }),
-                            None => None,
-                        }
-                    } else {
-                        None
-                    }
-                }
-            };
-            let item = match_opt.ok_or_else(|| zot_core::ZotError::InvalidInput {
-                code: "citation-key-not-found".to_string(),
-                message: format!("Citation key '{}' not found", args.citekey),
-                hint: None,
-            })?;
-            CommandOutput::new(ctx, item, None, |item| {
-                print_items(std::slice::from_ref(&item.item))
-            })
+            let io = super::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
+            super::desktop_read::read_citekey(ctx, &io, &args.citekey).await
         }
         LibraryCommand::Tags => {
             let library = ctx.local_library()?;
@@ -340,6 +304,7 @@ async fn handle_saved_search(
                 total: Some(searches.len()),
                 trash_policy: None,
                 fulltext_index: None,
+                read_source: None,
             });
             CommandOutput::new(ctx, searches, seed, |searches| {
                 if searches.is_empty() {

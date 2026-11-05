@@ -1,5 +1,6 @@
 pub(crate) mod collection;
 pub(crate) mod config;
+mod desktop_read;
 pub(crate) mod doctor;
 pub(crate) mod graph;
 pub(crate) mod item;

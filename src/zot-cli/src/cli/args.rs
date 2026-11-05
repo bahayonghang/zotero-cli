@@ -50,7 +50,7 @@ pub(crate) enum LibraryOrganizeCommand {
 
 #[derive(Subcommand)]
 pub(crate) enum ItemCommand {
-    Get(ItemKeyArgs),
+    Get(ItemGetArgs),
     Related(ItemRelatedArgs),
     Open(ItemOpenArgs),
     Pdf(ItemPdfArgs),
@@ -226,7 +226,20 @@ pub(crate) struct ConfigProfilesUseArgs {
 
 #[derive(Args)]
 pub(crate) struct LibrarySearchArgs {
+    #[arg(default_value = "")]
     pub(crate) query: String,
+    /// Substring of the title. Blank is ignored. Applied before the result page.
+    #[arg(long)]
+    pub(crate) title: Option<String>,
+    /// Substring of publicationTitle or journalAbbreviation.
+    #[arg(long)]
+    pub(crate) journal: Option<String>,
+    /// Substring of the title, abstract, or tag. Not attachment full text.
+    #[arg(long)]
+    pub(crate) topic: Option<String>,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
     #[arg(long)]
     pub(crate) collection: Option<String>,
     #[arg(long = "type")]
@@ -281,6 +294,9 @@ pub(crate) struct LibraryRecentArgs {
 #[derive(Args)]
 pub(crate) struct LibraryCiteKeyArgs {
     pub(crate) citekey: String,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
@@ -370,6 +386,14 @@ pub(crate) struct ItemKeyArgs {
 }
 
 #[derive(Args)]
+pub(crate) struct ItemGetArgs {
+    pub(crate) key: String,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
+}
+
+#[derive(Args)]
 pub(crate) struct GraphArgs {
     #[command(subcommand)]
     pub(crate) command: Option<GraphCommand>,
@@ -424,11 +448,17 @@ pub(crate) struct ItemPdfArgs {
     pub(crate) pages: Option<String>,
     #[arg(long)]
     pub(crate) annotations: bool,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
 pub(crate) struct ItemChildrenArgs {
     pub(crate) keys: Vec<String>,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
