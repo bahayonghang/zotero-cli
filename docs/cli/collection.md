@@ -23,6 +23,8 @@ zot --json collection add-item COLL001 ATTN001
 zot --json collection remove-item COLL001 ATTN001
 ```
 
+`list`、`get`、`subcollections`、`search`、`items`、`item-count`、`tags` 在 Zotero 打开且本机通信可用时直接读桌面。数据目录还不能证明是同一个库时加 `--running-zotero`。成功时 `meta.read_source` 为 `desktop` 或 `desktop-unbound`，人类输出不另起来源行。`items`、`item-count` 和 `tags` 来自同一组直接成员（`/items/top`）；子笔记不算成员。桌面分类树省略回收站分类（`meta.trashed_collections` 为 `omitted`），桌面成员省略直接注释（`meta.direct_annotations` 为 `omitted`）。Zotero 关闭时仍走原来的 SQLite 结果。
+
 ## 什么时候使用 collection
 
 `create`、`add-item` / `remove-item` 默认使用 Web API，也可显式指定 `--write-backend local`。本地创建的确认参数是 `--expected-library-version`，不是条目 version。详见[本地内容操作](./local-write.md)。

@@ -55,6 +55,21 @@ zot --json library search "alignment" --sort date-added --direction desc
 - 非空 `library search` 的 JSON `meta.fulltext_index` 为 `legacy-tables`、`fts5-sidecar` 或 `unavailable`。`library list` 和空 query 不输出该字段。
 - Zotero userdata ≥127 后，附件全文在 `data_dir/fulltext.sqlite`。缺少主库词表时 search 仍应成功；`unavailable` 只表示本次未使用附件全文。
 
+## list、stats、tags
+
+```bash
+zot --json library list --limit 50 --offset 0
+zot --json library list --collection "Machine Learning"
+zot --json library stats
+zot --json library tags
+```
+
+这三条在 Zotero 打开且本机通信可用时走桌面。数据目录还不能证明是同一个库时加 `--running-zotero`。成功时 `meta.read_source` 为 `desktop` 或 `desktop-unbound`，人类输出不另起来源行。
+
+`library list` 排除附件、笔记和注释。它先取完整过滤结果，在本地按条目 key 降序，再应用 `--offset` / `--limit`，不向 Zotero 发送 `sort=key`。`--collection` 接受 key 或唯一名称；重名返回 `collection-ambiguous`。`--include-trashed` 与 `meta.trash_policy` 不变。
+
+`library stats` 的 `top_tags` 只统计书目条目。`pdf_attachments` 是拥有 `application/pdf` 的不同书目父项数。`notes` 是书目父项下的笔记行数。`library tags` 统计全部条目标签，包含笔记、附件、注释和回收站。
+
 ## recent
 
 `library recent` 现在有两种模式：

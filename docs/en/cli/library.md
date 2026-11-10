@@ -60,6 +60,21 @@ Notes:
   tables are gone; `unavailable` means this query did not search attachment
   content.
 
+## list, stats, and tags
+
+```bash
+zot --json library list --limit 50 --offset 0
+zot --json library list --collection "Machine Learning"
+zot --json library stats
+zot --json library tags
+```
+
+These three read the running Zotero when local communication is available. Pass `--running-zotero` when the data directory is not proved to be that library. Success sets `meta.read_source` to `desktop` or `desktop-unbound` and does not print a human source line.
+
+`library list` excludes attachments, notes, and annotations. It fetches the filtered set, sorts by item key descending locally, then applies `--offset` / `--limit`. It does not send `sort=key`. `--collection` accepts a key or a unique name; duplicate names return `collection-ambiguous`. `--include-trashed` and `meta.trash_policy` stay as they are.
+
+`library stats` counts `top_tags` on bibliographic items only. `pdf_attachments` is the number of distinct bibliographic parents that have an `application/pdf`. `notes` is the number of note rows under bibliographic parents. `library tags` counts every item tag, including notes, attachments, annotations, and trash.
+
 ## recent
 
 `library recent` now supports two modes:
