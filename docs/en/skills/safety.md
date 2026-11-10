@@ -37,7 +37,7 @@
 
 1. In a new environment or before any write, run `zot --json doctor` and inspect each capability, including `local_api_write`
 2. If the user only wants inspection or analysis, do not mutate the library
-3. Zotero 10+ field/creator edits, collection create/membership, and single-item tag add/remove can explicitly use the local backend; BibTeX/RIS imports use the connector; other mutations, including `item tag batch`, use the Web API
+3. Zotero 10+ field/creator edits, collection create/membership, single-key collection delete, and single-item tag add/remove can explicitly use the local backend; BibTeX/RIS imports use the connector; other mutations, including `item tag batch`, collection rename, and reparent, use the Web API
 4. Confirm intent for these actions before proceeding:
    - `item trash`
    - `item note delete`
@@ -58,11 +58,11 @@
 ## Read/write boundary
 
 - Local reads: `zotero.sqlite`, Zotero Local HTTP, attachment storage, and local index sidecars
-- Local API writes: fields/creators, collection create/membership, and single-item `item tag add/remove`; only `--write-backend local --confirm` mutates the library
+- Local API writes: fields/creators, collection create/membership, single-key `collection delete`, and single-item `item tag add/remove`; only `--write-backend local --confirm` mutates the library. Local delete confirmation also requires that preview's Server ID, collection object version, and descendant SHA-256. Descendant collections are permanently erased; items stay in the library and only lose those memberships. Zotero 10.0.8's collection list omits trashed subcollections, so the hash does not cover them, but delete still erases them. Do not click the authorization dialog for the user
 - Connector writes: only new BibTeX/RIS imports, with the selected Zotero UI target rechecked for writability immediately before confirmation
-- Web writes: merge/dedupe, notes, tag add/remove without an explicit local backend, `item tag batch`, collection changes without an explicit local backend, Web import, annotation, saved-search, and status-sync
+- Web writes: merge/dedupe, notes, tag add/remove without an explicit local backend, `item tag batch`, collection changes without an explicit local backend (including rename, reparent, and delete without `--write-backend local`), Web import, annotation, saved-search, and status-sync
 
-**Never write directly to `zotero.sqlite`.** [Local API writes](../cli/local-write.md) require Zotero 10+, preview by default, and bind confirmation to the Server ID and local version. `unknown` and `verification-failed` are not success.
+**Never write directly to `zotero.sqlite`.** [Local API writes](../cli/local-write.md) require Zotero 10+, preview by default, and bind confirmation to the Server ID and local version. Single-key collection delete also binds the descendant SHA-256. `unknown`, `verification-failed`, and `absent` are not success.
 
 ## What to do when write access is missing
 

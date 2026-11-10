@@ -471,6 +471,182 @@ fn rejects_external_origins_credentials_and_path_overrides() {
 }
 
 #[tokio::test]
+async fn delete_collection_sends_one_object_without_write_token() {
+    let (client, handle) = server(vec![(204, Value::Null, vec![(SERVER_ID, "server")])]);
+    assert_eq!(
+        client
+            .delete_collection(
+                "server",
+                &LibraryScope::User,
+                "COLL0001",
+                4,
+                &"local-secret".into(),
+            )
+            .await
+            .expect("delete"),
+        DeleteReceipt::Accepted
+    );
+    let (method, url, headers, body) = &handle.join().expect("join")[0];
+    assert_eq!(method, "DELETE");
+    assert_eq!(url, "/api/users/0/collections/COLL0001");
+    assert!(!url.contains('?'));
+    assert_eq!(body, &Value::Null);
+    for (key, value) in [
+        ("zotero-server-id", "server"),
+        ("zotero-api-key", "local-secret"),
+        ("if-unmodified-since-version", "4"),
+    ] {
+        assert!(headers.contains(&(key.to_string(), value.to_string())));
+    }
+    assert!(!headers.iter().any(|(key, _)| key == "zotero-write-token"));
+
+    let (client, handle) = server(vec![(204, Value::Null, vec![(SERVER_ID, "server")])]);
+    assert_eq!(
+        client
+            .delete_collection(
+                "server",
+                &LibraryScope::Group { group_id: 42 },
+                "COLL0001",
+                0,
+                &"local-secret".into(),
+            )
+            .await
+            .expect("group"),
+        DeleteReceipt::Accepted
+    );
+    let (method, url, headers, _) = &handle.join().expect("join")[0];
+    assert_eq!(method, "DELETE");
+    assert_eq!(url, "/api/groups/42/collections/COLL0001");
+    assert!(headers.contains(&("if-unmodified-since-version".to_string(), "0".to_string())));
+
+    for (status, id, expected) in [
+        (500, "server", DeleteReceipt::Unknown),
+        (200, "server", DeleteReceipt::Unknown),
+        (204, "other", DeleteReceipt::Unknown),
+    ] {
+        let (client, handle) = server(vec![(
+            status,
+            json!({"successful": {"0": "COLL0001"}}),
+            vec![(SERVER_ID, id)],
+        )]);
+        assert_eq!(
+            client
+                .delete_collection(
+                    "server",
+                    &LibraryScope::User,
+                    "COLL0001",
+                    4,
+                    &"secret".into(),
+                )
+                .await
+                .expect("receipt"),
+            expected
+        );
+        assert_eq!(handle.join().expect("join").len(), 1);
+    }
+
+    let (client, handle) = server(vec![(204, Value::Null, vec![])]);
+    assert_eq!(
+        client
+            .delete_collection(
+                "server",
+                &LibraryScope::User,
+                "COLL0001",
+                4,
+                &"secret".into(),
+            )
+            .await
+            .expect("missing server"),
+        DeleteReceipt::Unknown
+    );
+    handle.join().expect("join");
+
+    let (client, handle) = server(vec![(404, Value::Null, vec![(SERVER_ID, "server")])]);
+    assert_eq!(
+        client
+            .delete_collection(
+                "server",
+                &LibraryScope::User,
+                "COLL0001",
+                4,
+                &"secret".into(),
+            )
+            .await
+            .expect("absent"),
+        DeleteReceipt::Absent
+    );
+    handle.join().expect("join");
+
+    let (client, handle) = server(vec![(
+        412,
+        json!({"message": "stale"}),
+        vec![(SERVER_ID, "server")],
+    )]);
+    let error = client
+        .delete_collection(
+            "server",
+            &LibraryScope::User,
+            "COLL0001",
+            4,
+            &"secret".into(),
+        )
+        .await
+        .expect_err("conflict");
+    assert_eq!(error.payload().code, "local-api-conflict");
+    handle.join().expect("join");
+
+    let (client, handle) = server(vec![(401, Value::Null, vec![(SERVER_ID, "server")])]);
+    let error = client
+        .delete_collection(
+            "server",
+            &LibraryScope::User,
+            "COLL0001",
+            4,
+            &"secret".into(),
+        )
+        .await
+        .expect_err("unauthorized");
+    assert_eq!(error.payload().code, "local-api-unauthorized");
+    handle.join().expect("join");
+}
+
+#[tokio::test]
+async fn timed_out_delete_is_unknown_and_is_never_retried() {
+    let server = Server::http("127.0.0.1:0").expect("server");
+    let client = LocalApiClient::with_base_url_for_tests(
+        &format!("http://{}/", server.server_addr()),
+        Duration::from_millis(100),
+    )
+    .expect("client");
+    let handle = std::thread::spawn(move || {
+        let request = server
+            .recv_timeout(Duration::from_secs(3))
+            .expect("recv")
+            .expect("request");
+        assert_eq!(request.method().as_str(), "DELETE");
+        assert!(
+            server
+                .recv_timeout(Duration::from_millis(300))
+                .expect("recv")
+                .is_none()
+        );
+        drop(request);
+    });
+    let receipt = client
+        .delete_collection(
+            "server",
+            &LibraryScope::User,
+            "COLL0001",
+            0,
+            &"test-key".into(),
+        )
+        .await
+        .expect("receipt");
+    assert_eq!(receipt, DeleteReceipt::Unknown);
+    handle.join().expect("join");
+}
+
+#[tokio::test]
 async fn timed_out_submission_is_unknown_and_is_never_retried() {
     let server = Server::http("127.0.0.1:0").expect("server");
     let client = LocalApiClient::with_base_url_for_tests(

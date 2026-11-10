@@ -463,6 +463,22 @@ mod tests {
                 "12",
             ]
             .as_slice(),
+            [
+                "zot",
+                "collection",
+                "delete",
+                "COLL0001",
+                "--write-backend",
+                "local",
+                "--confirm",
+                "--expected-server-id",
+                "server",
+                "--expected-version",
+                "0",
+                "--expected-descendants-sha256",
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ]
+            .as_slice(),
             ["zot", "collection", "search", "Transform"].as_slice(),
             ["zot", "collection", "get", "COLTR02"].as_slice(),
             ["zot", "collection", "subcollections", "COLTR02"].as_slice(),

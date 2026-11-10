@@ -233,5 +233,10 @@
     "id": 47,
     "prompt": "基于我 Zotero 里 LLM Safety 这个 collection，分析这些论文的共同缺陷和下一步创新点，并生成本地 Markdown/HTML brainstorm 报告。不要改库。",
     "expected": "这是文献综合，交给 zot-brainstorm。不要把它展开成普通 library search、单篇摘要或 Zotero 写入。"
+  },
+  {
+    "id": 48,
+    "prompt": "没有 Web API key。删除已知分类 COLL0001。它下面还有子分类。先告诉我会删掉什么，我确认后再删。文献不要删。",
+    "expected": "先预览 collection delete --write-backend local 的子孙集合；有子分类时说明会永久删除子分类且文献仍在。再用预览中的 Server ID、分类对象 version 和子孙 SHA-256 确认。不走 Web。"
   }
 ]

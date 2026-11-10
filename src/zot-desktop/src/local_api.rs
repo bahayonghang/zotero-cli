@@ -78,6 +78,16 @@ pub enum CreateReceipt {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeleteReceipt {
+    /// HTTP 204 from the same Zotero instance. Absence still has to be read back.
+    Accepted,
+    /// The DELETE may have committed, but this response does not prove it.
+    Unknown,
+    /// The object was already gone. This call did not delete it.
+    Absent,
+}
+
 #[derive(Debug, Clone)]
 pub struct LocalApiClient {
     client: reqwest::Client,
@@ -580,6 +590,46 @@ impl LocalApiClient {
             Err(_) => return Ok(CreateReceipt::Unknown),
         };
         interpret_create_body(&body)
+    }
+
+    pub async fn delete_collection(
+        &self,
+        server: &str,
+        scope: &LibraryScope,
+        key: &str,
+        version: u64,
+        authorization: &SecretString,
+    ) -> ZotResult<DeleteReceipt> {
+        validate_key(key)?;
+        let response = self
+            .request(
+                Method::DELETE,
+                &format!("{}/collections/{key}", prefix(scope)),
+                Some(server),
+            )?
+            .header("Zotero-API-Key", authorization.expose_secret())
+            .header("If-Unmodified-Since-Version", version.to_string())
+            .send()
+            .await;
+        let response = match response {
+            Ok(response) => response,
+            Err(_) => return Ok(DeleteReceipt::Unknown),
+        };
+        // Delete success is 204. Unlike create, 204 is not an unknown outcome.
+        if response.status().is_server_error() || response.status() == StatusCode::OK {
+            return Ok(DeleteReceipt::Unknown);
+        }
+        if response.status() == StatusCode::NOT_FOUND {
+            return Ok(DeleteReceipt::Absent);
+        }
+        if response.status() == StatusCode::NO_CONTENT {
+            if header(&response, SERVER_ID).as_deref() == Some(server) {
+                return Ok(DeleteReceipt::Accepted);
+            }
+            return Ok(DeleteReceipt::Unknown);
+        }
+        check_status(&response)?;
+        Ok(DeleteReceipt::Unknown)
     }
 }
 

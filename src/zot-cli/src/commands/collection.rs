@@ -31,6 +31,11 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
             CommandOutput::new(ctx, payload, None, |_| println!("Collection renamed."))
         }
         CollectionCommand::Delete(args) => {
+            if args.write.write_backend == crate::cli::WriteBackendArg::Local {
+                // Keep the local delete future off the Windows main-thread stack.
+                return Box::pin(super::local_delete::delete(ctx, args)).await;
+            }
+            super::local_delete::validate_web_options(&args.write)?;
             ctx.remote()?.delete_collection(&args.key).await?;
             let payload = serde_json::json!({ "deleted": args.key });
             CommandOutput::new(ctx, payload, None, |_| println!("Collection deleted."))

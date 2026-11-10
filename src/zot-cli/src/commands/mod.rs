@@ -8,6 +8,7 @@ pub(crate) mod library;
 pub(crate) mod library_dedupe;
 mod local_create;
 mod local_credentials;
+mod local_delete;
 pub(crate) mod local_write;
 pub(crate) mod mcp;
 mod organize;
