@@ -62,8 +62,26 @@ libraries. Keep it accurate as the implementation evolves.
   from Zotero UI.
 - Search computes `total` with SQL and applies deterministic SQL
   `ORDER BY/LIMIT/OFFSET` before hydrating item fields, creators, tags, and
-  collections. Memory use therefore follows the requested page size rather
-  than the full number of matches.
+  collections. Memory use for that search page therefore follows the requested
+  page size rather than the full number of matches.
+- Desktop inventory reads (`collection list`, `get`, `subcollections`,
+  `search`, `items`, `item-count`, `tags`, and `library list`, `stats`,
+  `tags`) send `limit=100` and `start`. They stop at 100 pages, which is
+  10,000 rows. Exactly 10,000 rows succeeds. A 10,001st row fails with
+  `desktop-read-incomplete` and reports no `total` and no partial list.
+  `library list` applies that cap after `itemType=-attachment`,
+  `itemType=-note`, `itemType=-annotation`, and an optional collection. An
+  attachment outside that candidate set does not consume the cap.
+  Exploratory `library search` still stops at 20 pages with
+  `desktop-search-incomplete`. Version or `Total-Results` drift retries the
+  whole inventory read up to 3 times, then `desktop-read-inconsistent`.
+- Desktop `library list` materializes the filtered set, sorts by item key
+  descending locally, then applies `offset` / `limit`. It never sends
+  `sort=key`. Memory follows that filtered set, up to 10,000 rows, not only
+  the requested page. Collection membership for `collection items`,
+  `item-count`, and `collection tags` is the direct `/items/top` set:
+  a child note is not a member, and a parentless attachment in the collection
+  is.
 - Collection arguments resolve an exact key first. A non-key display name is
   accepted only when unique; duplicate names return `collection-ambiguous`
   with sorted candidate keys.
