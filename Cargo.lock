@@ -2783,8 +2783,11 @@ dependencies = [
  "strsim",
  "tar",
  "tempfile",
+ "tiny_http",
+ "tokio",
  "toml",
  "zot-core",
+ "zot-desktop",
 ]
 
 [[package]]

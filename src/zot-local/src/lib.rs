@@ -10,8 +10,9 @@ pub mod workspace_rag;
 
 pub use citation::{CitationStyle, export_item, format_citation};
 pub use db::{
-    DuplicateMatchMethod, LibrarySnapshotMeta, LocalLibrary, SearchOptions, SortDirection,
-    SortField, reset_snapshot_open_attempts, snapshot_open_attempts,
+    DuplicateMatchMethod, LibrarySnapshotMeta, LocalLibrary, SearchOptions, SnapshotOpenMeasure,
+    SnapshotOpenTokenGuard, SortDirection, SortField, inherit_snapshot_open_token,
+    reset_snapshot_open_attempts, snapshot_open_attempts, snapshot_open_token,
 };
 pub use library_traits::{
     AttachmentSource, CollectionContent, CollectionNav, ItemReader, NoteReader,

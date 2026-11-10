@@ -1,8 +1,10 @@
+use std::cell::Cell;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -52,8 +54,117 @@ pub fn reset_snapshot_open_attempts() {
     SNAPSHOT_OPEN_ATTEMPTS.store(0, Ordering::Relaxed);
 }
 
+struct SnapshotMeasureGate {
+    active: bool,
+    token: u64,
+    measured: usize,
+}
+
+static SNAPSHOT_MEASURE: Mutex<SnapshotMeasureGate> = Mutex::new(SnapshotMeasureGate {
+    active: false,
+    token: 0,
+    measured: 0,
+});
+static SNAPSHOT_MEASURE_CV: Condvar = Condvar::new();
+
+thread_local! {
+    static SNAPSHOT_OPEN_TOKEN: Cell<u64> = const { Cell::new(0) };
+}
+
+/// Holds other snapshot opens until dropped so one test can read an exact delta.
+pub struct SnapshotOpenMeasure {
+    token: u64,
+    before: usize,
+}
+
+/// Copies a measure token into a worker that opens `zotero.sqlite`.
+pub struct SnapshotOpenTokenGuard;
+
+impl SnapshotOpenTokenGuard {
+    pub fn inherit(token: u64) -> Self {
+        inherit_snapshot_open_token(token);
+        Self
+    }
+}
+
+impl Drop for SnapshotOpenTokenGuard {
+    fn drop(&mut self) {
+        inherit_snapshot_open_token(0);
+    }
+}
+
+fn measure_lock() -> std::sync::MutexGuard<'static, SnapshotMeasureGate> {
+    SNAPSHOT_MEASURE
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+}
+
+pub fn snapshot_open_token() -> u64 {
+    SNAPSHOT_OPEN_TOKEN.with(Cell::get)
+}
+
+pub fn inherit_snapshot_open_token(token: u64) {
+    SNAPSHOT_OPEN_TOKEN.set(token);
+}
+
+impl SnapshotOpenMeasure {
+    pub fn begin() -> Self {
+        let mut gate = measure_lock();
+        while gate.active {
+            gate = SNAPSHOT_MEASURE_CV
+                .wait(gate)
+                .unwrap_or_else(|poison| poison.into_inner());
+        }
+        gate.active = true;
+        gate.token = gate.token.wrapping_add(1).max(1);
+        gate.measured = 0;
+        let token = gate.token;
+        let before = SNAPSHOT_OPEN_ATTEMPTS.load(Ordering::Relaxed);
+        drop(gate);
+        inherit_snapshot_open_token(token);
+        Self { token, before }
+    }
+
+    pub fn measured(&self) -> usize {
+        let gate = measure_lock();
+        if gate.token == self.token {
+            gate.measured
+        } else {
+            0
+        }
+    }
+
+    pub fn delta(&self) -> usize {
+        snapshot_open_attempts().saturating_sub(self.before)
+    }
+}
+
+impl Drop for SnapshotOpenMeasure {
+    fn drop(&mut self) {
+        let mut gate = measure_lock();
+        if gate.active && gate.token == self.token {
+            gate.active = false;
+            inherit_snapshot_open_token(0);
+            SNAPSHOT_MEASURE_CV.notify_all();
+        }
+    }
+}
+
 fn record_snapshot_open_attempt() {
-    SNAPSHOT_OPEN_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
+    let token = snapshot_open_token();
+    let mut gate = measure_lock();
+    loop {
+        if !gate.active || token == gate.token {
+            SNAPSHOT_OPEN_ATTEMPTS.fetch_add(1, Ordering::Relaxed);
+            if gate.active && token == gate.token {
+                gate.measured += 1;
+            }
+            return;
+        }
+        gate = SNAPSHOT_MEASURE_CV
+            .wait(gate)
+            .unwrap_or_else(|poison| poison.into_inner());
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -1104,6 +1215,18 @@ impl LocalLibrary {
     }
 
     pub fn get_collection_items(&self, collection_key: &str) -> ZotResult<Vec<Item>> {
+        self.collect_item_batch(&self.collection_member_ids(collection_key)?, true)
+    }
+
+    /// Direct `collectionItems` rows, including parentless notes and attachments.
+    ///
+    /// Collection inventory commands use this. Workspace import, semantic
+    /// indexing, and Scite keep the bibliographic filter in `get_collection_items`.
+    pub fn get_collection_direct_items(&self, collection_key: &str) -> ZotResult<Vec<Item>> {
+        self.collect_item_batch(&self.collection_member_ids(collection_key)?, false)
+    }
+
+    fn collection_member_ids(&self, collection_key: &str) -> ZotResult<Vec<i64>> {
         let collection_id = self.resolve_collection_id(collection_key)?;
         let mut stmt = self
             .conn
@@ -1112,10 +1235,8 @@ impl LocalLibrary {
         let rows = stmt
             .query_map(params![collection_id], |row| row.get::<_, i64>(0))
             .map_err(sql_err("get-collection-items"))?;
-        let item_ids = rows
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(sql_err("get-collection-items"))?;
-        self.get_items_batch(&item_ids)
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(sql_err("get-collection-items"))
     }
 
     pub fn get_collection_item_count(&self, collection_key: &str) -> ZotResult<usize> {
@@ -2120,6 +2241,14 @@ impl LocalLibrary {
     }
 
     fn get_items_batch(&self, item_ids: &[i64]) -> ZotResult<Vec<Item>> {
+        self.collect_item_batch(item_ids, true)
+    }
+
+    fn collect_item_batch(
+        &self,
+        item_ids: &[i64],
+        bibliographic_only: bool,
+    ) -> ZotResult<Vec<Item>> {
         if item_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -2128,7 +2257,7 @@ impl LocalLibrary {
 
         let mut items_by_id = HashMap::new();
         for chunk in item_ids.chunks(CHUNK) {
-            let base_rows = self.load_item_rows_batch(chunk)?;
+            let base_rows = self.load_item_rows_batch(chunk, bibliographic_only)?;
             let chunk_ids = base_rows.keys().copied().collect::<Vec<_>>();
             let fields_by_id = self.load_item_fields_batch(&chunk_ids)?;
             let creators_by_id = self.load_item_creators_batch(&chunk_ids)?;
@@ -2182,7 +2311,11 @@ impl LocalLibrary {
         Ok(items)
     }
 
-    fn load_item_rows_batch(&self, item_ids: &[i64]) -> ZotResult<HashMap<i64, BatchItemRow>> {
+    fn load_item_rows_batch(
+        &self,
+        item_ids: &[i64],
+        bibliographic_only: bool,
+    ) -> ZotResult<HashMap<i64, BatchItemRow>> {
         if item_ids.is_empty() {
             return Ok(HashMap::new());
         }
@@ -2219,7 +2352,7 @@ impl LocalLibrary {
         let mut batch = HashMap::new();
         for row in rows {
             let (item_id, entry) = row.map_err(sql_err("item-rows-batch"))?;
-            if EXCLUDED_TYPE_NAMES.contains(&entry.item_type.as_str()) {
+            if bibliographic_only && EXCLUDED_TYPE_NAMES.contains(&entry.item_type.as_str()) {
                 continue;
             }
             batch.insert(item_id, entry);
@@ -3062,7 +3195,10 @@ fn zotero_db_busy_error(message: &str) -> ZotError {
     ZotError::Database {
         code: "zotero-db-busy".to_string(),
         message: message.to_string(),
-        hint: Some("Close Zotero or wait for its database write to finish, then retry".to_string()),
+        hint: Some(
+            "The snapshot is locked. collection list, get, subcollections, search, items, item-count, tags and library list, stats, and tags can use desktop read when local communication is available."
+                .to_string(),
+        ),
     }
 }
 
@@ -3187,12 +3323,9 @@ mod tests {
         };
         let payload = error.payload();
         assert_eq!(payload.code, "zotero-db-busy");
-        assert!(
-            payload
-                .hint
-                .as_deref()
-                .is_some_and(|hint| hint.contains("Close Zotero"))
-        );
+        assert!(payload.hint.as_deref().is_some_and(|hint| {
+            hint.contains("desktop read") && !hint.contains("Close Zotero")
+        }));
     }
 
     #[test]
@@ -4728,6 +4861,351 @@ Original Date: 2017');
                 .expect("fallback")
                 .as_deref(),
             Some("fallback-id")
+        );
+    }
+
+    #[test]
+    fn collection_members_keep_the_article_and_parentless_attachment() {
+        let fixture = rich_fixture_library_with_extra_sql(
+            "
+            INSERT INTO items VALUES (19, 2, '2024-01-01', '2024-01-01', '2024-01-01', 1, 'ART00019');
+            INSERT INTO itemDataValues VALUES (40, 'Member Article');
+            INSERT INTO itemData VALUES (19, 4, 40);
+            INSERT INTO tags VALUES (7, 'member-article');
+            INSERT INTO itemTags VALUES (19, 7, 0);
+            INSERT INTO items VALUES (20, 26, '2024-01-01', '2024-01-01', '2024-01-01', 1, 'NOTE0020');
+            INSERT INTO itemNotes VALUES (20, 19, '<p>child</p>', NULL);
+            INSERT INTO tags VALUES (8, 'note-only');
+            INSERT INTO itemTags VALUES (20, 8, 0);
+            INSERT INTO items VALUES (21, 14, '2024-01-01', '2024-01-01', '2024-01-01', 1, 'ATT00021');
+            INSERT INTO itemAttachments VALUES (21, NULL, 0, 'application/pdf', NULL, 'storage:loose.pdf');
+            INSERT INTO collections VALUES (9, 'Direct Members', NULL, 1, 'COLDIR09');
+            INSERT INTO collectionItems VALUES (9, 19, 0);
+            INSERT INTO collectionItems VALUES (9, 21, 1);
+            ",
+        );
+        let direct = fixture
+            .lib
+            .get_collection_direct_items("COLDIR09")
+            .expect("direct members");
+        let keys = direct
+            .iter()
+            .map(|item| item.key.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            keys,
+            std::collections::BTreeSet::from(["ART00019", "ATT00021"])
+        );
+        let bibliographic = fixture
+            .lib
+            .get_collection_items("COLDIR09")
+            .expect("bibliographic callers");
+        assert_eq!(
+            bibliographic
+                .iter()
+                .map(|item| item.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ART00019"]
+        );
+        assert_eq!(
+            fixture
+                .lib
+                .get_collection_item_count("COLDIR09")
+                .expect("count"),
+            2
+        );
+        let tags = fixture.lib.get_collection_tags("COLDIR09").expect("tags");
+        assert!(tags.iter().all(|tag| tag.name != "note-only"));
+        assert!(
+            tags.iter()
+                .any(|tag| tag.name == "member-article" && tag.count == 1)
+        );
+    }
+
+    fn parent_key_of(conn: &Connection, item_id: i64) -> Option<String> {
+        for sql in [
+            "SELECT p.key FROM itemAttachments ia JOIN items p ON ia.parentItemID = p.itemID WHERE ia.itemID = ?1",
+            "SELECT p.key FROM itemNotes n JOIN items p ON n.parentItemID = p.itemID WHERE n.itemID = ?1",
+            "SELECT p.key FROM itemAnnotations a JOIN items p ON a.parentItemID = p.itemID WHERE a.itemID = ?1",
+        ] {
+            if let Ok(key) = conn.query_row(sql, [item_id], |row| row.get::<_, String>(0)) {
+                return Some(key);
+            }
+        }
+        None
+    }
+
+    fn project_user_inventory(conn: &Connection) -> Vec<serde_json::Value> {
+        let mut items = conn
+            .prepare(
+                "SELECT i.itemID, i.key, it.typeName,
+                        EXISTS(SELECT 1 FROM deletedItems d WHERE d.itemID = i.itemID)
+                 FROM items i
+                 JOIN itemTypes it ON i.itemTypeID = it.itemTypeID
+                 WHERE i.libraryID = 1
+                 ORDER BY i.itemID",
+            )
+            .expect("items");
+        let rows = items
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                ))
+            })
+            .expect("query");
+        let mut payload = Vec::new();
+        for row in rows {
+            let (item_id, key, item_type, deleted) = row.expect("row");
+            let tags = {
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT t.name FROM itemTags it JOIN tags t ON it.tagID = t.tagID WHERE it.itemID = ?1",
+                    )
+                    .expect("tags");
+                stmt.query_map([item_id], |tag| tag.get::<_, String>(0))
+                    .expect("tag rows")
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("tag names")
+            };
+            let collections = {
+                let mut stmt = conn
+                    .prepare(
+                        "SELECT c.key FROM collectionItems ci JOIN collections c ON ci.collectionID = c.collectionID WHERE ci.itemID = ?1",
+                    )
+                    .expect("collections");
+                stmt.query_map([item_id], |collection| collection.get::<_, String>(0))
+                    .expect("collection rows")
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("collection keys")
+            };
+            let content_type: Option<String> = conn
+                .query_row(
+                    "SELECT contentType FROM itemAttachments WHERE itemID = ?1",
+                    [item_id],
+                    |content| content.get(0),
+                )
+                .ok();
+            let mut data = serde_json::Map::new();
+            data.insert("key".to_string(), serde_json::json!(key));
+            data.insert("itemType".to_string(), serde_json::json!(item_type));
+            data.insert("title".to_string(), serde_json::json!(""));
+            data.insert(
+                "tags".to_string(),
+                serde_json::json!(
+                    tags.into_iter()
+                        .map(|name| serde_json::json!({"tag": name}))
+                        .collect::<Vec<_>>()
+                ),
+            );
+            data.insert("collections".to_string(), serde_json::json!(collections));
+            if let Some(parent) = parent_key_of(conn, item_id) {
+                data.insert("parentItem".to_string(), serde_json::json!(parent));
+            }
+            if let Some(content_type) = content_type.filter(|value| !value.is_empty()) {
+                data.insert("contentType".to_string(), serde_json::json!(content_type));
+            }
+            if deleted != 0 {
+                data.insert("deleted".to_string(), serde_json::json!(true));
+            }
+            payload.push(serde_json::json!({"key": key, "data": data}));
+        }
+        payload
+    }
+
+    #[tokio::test]
+    async fn desktop_inventory_matches_snapshot_stats_and_tags() {
+        let fixture = rich_fixture_library_with_extra_sql(
+            "
+            INSERT INTO items VALUES (19, 14, '2024-07-01', '2024-07-01', '2024-07-01', 1, 'PDF00019');
+            INSERT INTO itemAttachments VALUES (19, 1, 0, 'application/pdf', NULL, 'storage:second.pdf');
+            INSERT INTO items VALUES (20, 26, '2024-07-02', '2024-07-02', '2024-07-02', 1, 'NOTE0020');
+            INSERT INTO itemNotes VALUES (20, 1, '<p>second</p>', NULL);
+            INSERT INTO items VALUES (21, 26, '2024-07-03', '2024-07-03', '2024-07-03', 1, 'NOTE0021');
+            INSERT INTO itemNotes VALUES (21, NULL, '<p>alone</p>', NULL);
+            INSERT INTO tags VALUES (7, 'alone-tag');
+            INSERT INTO itemTags VALUES (21, 7, 0);
+            INSERT INTO items VALUES (22, 2, '2024-07-04', '2024-07-04', '2024-07-04', 1, 'TRSH0022');
+            INSERT INTO itemDataValues VALUES (40, 'Trashed Parent');
+            INSERT INTO itemData VALUES (22, 4, 40);
+            INSERT INTO deletedItems VALUES (22, '2024-08-01');
+            INSERT INTO tags VALUES (8, 'trash-tag');
+            INSERT INTO itemTags VALUES (22, 8, 0);
+            INSERT INTO items VALUES (23, 14, '2024-07-05', '2024-07-05', '2024-07-05', 1, 'PDF00023');
+            INSERT INTO itemAttachments VALUES (23, 22, 0, 'application/pdf', NULL, 'storage:trash.pdf');
+            INSERT INTO items VALUES (24, 26, '2024-07-06', '2024-07-06', '2024-07-06', 1, 'NOTE0024');
+            INSERT INTO itemNotes VALUES (24, 22, '<p>trash note</p>', NULL);
+            ",
+        );
+        let rows = project_user_inventory(&fixture.lib.conn);
+        let body = serde_json::to_string(&rows).expect("json");
+        let total = rows.len().to_string();
+        let http = tiny_http::Server::http("127.0.0.1:0").expect("server");
+        let client = zot_desktop::LocalApiClient::with_base_url_for_tests(
+            &format!("http://{}/", http.server_addr()),
+            Duration::from_secs(2),
+        )
+        .expect("client");
+        let reader = zot_desktop::DesktopRead::new(
+            client,
+            Some("cmp-server".to_string()),
+            LibraryScope::User,
+        )
+        .with_limits(zot_desktop::DesktopScanLimits {
+            page_size: 1,
+            max_pages: 1,
+            version_attempts: 3,
+        });
+        let handle = thread::spawn(move || {
+            let mut urls = Vec::new();
+            for _ in 0..3 {
+                let request = http
+                    .recv_timeout(Duration::from_secs(3))
+                    .expect("recv")
+                    .expect("request");
+                urls.push(request.url().to_string());
+                let mut response =
+                    tiny_http::Response::from_string(body.clone()).with_status_code(200);
+                for (name, value) in [
+                    ("Zotero-API-Version", "3"),
+                    ("Zotero-Server-ID", "cmp-server"),
+                    ("Last-Modified-Version", "9"),
+                    ("Total-Results", total.as_str()),
+                ] {
+                    response
+                        .add_header(tiny_http::Header::from_bytes(name, value).expect("header"));
+                }
+                request.respond(response).expect("respond");
+            }
+            urls
+        });
+        let stats = reader.library_stats(false).await.expect("stats");
+        let with_trash = reader.library_stats(true).await.expect("trash stats");
+        let tags = reader.library_tags().await.expect("tags");
+        let urls = handle.join().expect("join");
+        assert!(urls.iter().all(|url| {
+            url.contains("includeTrashed=1") && url.contains("limit=100") && !url.contains("sort=")
+        }));
+        let snapshot_stats = fixture
+            .lib
+            .get_stats_with_trashed(false)
+            .expect("sql stats");
+        let snapshot_trash = fixture
+            .lib
+            .get_stats_with_trashed(true)
+            .expect("sql trash stats");
+        let snapshot_tags = fixture.lib.get_tags().expect("sql tags");
+        assert_eq!(stats, snapshot_stats);
+        assert_eq!(with_trash, snapshot_trash);
+        assert_eq!(tags, snapshot_tags);
+        assert!(
+            tags.iter()
+                .any(|tag| tag.name == "attention" && tag.count == 2)
+        );
+        assert_eq!(stats.top_tags.get("attention"), Some(&1));
+        assert_eq!(stats.pdf_attachments, 1);
+        assert_eq!(stats.notes, 2);
+        assert_eq!(with_trash.pdf_attachments, 2);
+        assert_eq!(with_trash.notes, 3);
+        assert!(
+            snapshot_tags
+                .iter()
+                .any(|tag| tag.name == "attention" && tag.count == 2)
+        );
+    }
+
+    #[tokio::test]
+    async fn desktop_item_json_matches_the_snapshot_item() {
+        let fixture = rich_fixture_library_with_extra_sql(
+            "
+            INSERT INTO fields VALUES (110, 'publicationTitle');
+            INSERT INTO items VALUES (30, 2, '2024-01-01 12:30:45', '2024-01-02 03:04:05', '2024-01-02 03:04:05', 1, 'TIME0030');
+            INSERT INTO itemDataValues VALUES (70, 'Timed Title');
+            INSERT INTO itemDataValues VALUES (71, 'An abstract');
+            INSERT INTO itemDataValues VALUES (72, '2024');
+            INSERT INTO itemDataValues VALUES (73, 'https://example.invalid/timed');
+            INSERT INTO itemDataValues VALUES (74, '10.5555/timed');
+            INSERT INTO itemDataValues VALUES (75, 'Nature');
+            INSERT INTO itemData VALUES (30, 4, 70);
+            INSERT INTO itemData VALUES (30, 6, 71);
+            INSERT INTO itemData VALUES (30, 14, 72);
+            INSERT INTO itemData VALUES (30, 1, 73);
+            INSERT INTO itemData VALUES (30, 26, 74);
+            INSERT INTO itemData VALUES (30, 110, 75);
+            INSERT INTO creators VALUES (20, 'Ada', 'Lovelace');
+            INSERT INTO itemCreators VALUES (30, 20, 1, 0);
+            INSERT INTO tags VALUES (20, 'timed-tag');
+            INSERT INTO itemTags VALUES (30, 20, 0);
+            INSERT INTO collections VALUES (30, 'Timed', NULL, 1, 'COLTIME1');
+            INSERT INTO collectionItems VALUES (30, 30, 0);
+            ",
+        );
+        let snapshot = fixture
+            .lib
+            .get_item("TIME0030")
+            .expect("snapshot")
+            .expect("item");
+        let body = serde_json::json!([{
+            "key": "TIME0030",
+            "data": {
+                "key": "TIME0030",
+                "itemType": "journalArticle",
+                "title": "Timed Title",
+                "abstractNote": "An abstract",
+                "date": "2024",
+                "url": "https://example.invalid/timed",
+                "DOI": "10.5555/timed",
+                "publicationTitle": "Nature",
+                "creators": [{"creatorType": "author", "firstName": "Ada", "lastName": "Lovelace"}],
+                "tags": [{"tag": "timed-tag"}],
+                "collections": ["COLTIME1"],
+                "dateAdded": "2024-01-01T12:30:45Z",
+                "dateModified": "2024-01-02T03:04:05Z"
+            }
+        }])
+        .to_string();
+        let http = tiny_http::Server::http("127.0.0.1:0").expect("server");
+        let client = zot_desktop::LocalApiClient::with_base_url_for_tests(
+            &format!("http://{}/", http.server_addr()),
+            Duration::from_secs(2),
+        )
+        .expect("client");
+        let reader = zot_desktop::DesktopRead::new(
+            client,
+            Some("cmp-server".to_string()),
+            LibraryScope::User,
+        );
+        let handle = thread::spawn(move || {
+            let request = http
+                .recv_timeout(Duration::from_secs(3))
+                .expect("recv")
+                .expect("request");
+            let url = request.url().to_string();
+            let mut response = tiny_http::Response::from_string(body).with_status_code(200);
+            for (name, value) in [
+                ("Zotero-API-Version", "3"),
+                ("Zotero-Server-ID", "cmp-server"),
+                ("Last-Modified-Version", "9"),
+                ("Total-Results", "1"),
+            ] {
+                response.add_header(tiny_http::Header::from_bytes(name, value).expect("header"));
+            }
+            request.respond(response).expect("respond");
+            url
+        });
+        let listed = reader
+            .library_list(None, 10, 0, true)
+            .await
+            .expect("desktop");
+        let url = handle.join().expect("join");
+        assert!(url.contains("/items/top?"));
+        assert!(url.contains("itemType=-attachment"));
+        assert_eq!(listed.items.len(), 1);
+        assert_eq!(
+            serde_json::to_value(&listed.items[0]).expect("desktop json"),
+            serde_json::to_value(&snapshot).expect("snapshot json")
         );
     }
 }
