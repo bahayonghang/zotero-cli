@@ -1211,3 +1211,43 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Status
 
 [OK] **Completed**
+
+
+## Session 37: 开着 Zotero 读取分类和全库
+
+**Date**: 2026-11-10
+**Task**: 开着 Zotero 读取分类和全库
+**Branch**: `dev`
+
+### Summary
+
+十条分类和全库清单命令在桌面优先读取。未知分类、对象版本和过滤前上限已按 10.0.8 收口。
+
+### Main Changes
+
+- 桌面读取先确认分类，再按书目和目标分类分页。
+- 快照清单保留直接成员，工作区导入和语义索引仍只要书目。
+- 时间字段写回快照拼写，信封标出省略的回收站分类和直接批注。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `089275d` | (see git log) |
+| `0a8bb54` | (see git log) |
+| `961a421` | (see git log) |
+| `088181d` | (see git log) |
+| `7b42ff1` | (see git log) |
+| `9c8a363` | (see git log) |
+
+### Testing
+
+- [OK] just ci 通过。拆分后 zot-desktop 56 项、zot-local 72 项、旧 CLI 199 项、新 CLI 207 项通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 本机 Zotero 端到端验收仍未做。
