@@ -18,7 +18,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust)](./Cargo.toml)
-[![MSRV](https://img.shields.io/badge/MSRV-1.85-red.svg?logo=rust)](./Cargo.toml)
+[![MSRV](https://img.shields.io/badge/MSRV-1.89-red.svg?logo=rust)](./Cargo.toml)
 [![平台](https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-lightgrey.svg)](#推荐的-agent-启动方式)
 [![Zotero](https://img.shields.io/badge/Zotero-7-CC2936.svg)](https://www.zotero.org)
 [![文档](https://img.shields.io/badge/docs-VitePress-42b883.svg)](./docs/index.md)

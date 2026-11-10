@@ -47,20 +47,20 @@ jobs:
         run: git diff --exit-code
 
   msrv:
-    name: Rust 1.85.0 / locked workspace
+    name: Rust 1.89.0 / locked workspace
     if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install Rust 1.85.0
-        uses: dtolnay/rust-toolchain@1.85.0
+      - name: Install Rust 1.89.0
+        uses: dtolnay/rust-toolchain@1.89.0
 
       - name: Cache cargo registry and target
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: msrv-1.85.0
+          shared-key: msrv-1.89.0
 
       - name: Check workspace at MSRV
         run: cargo check --workspace --locked

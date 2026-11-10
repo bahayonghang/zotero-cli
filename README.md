@@ -18,7 +18,7 @@ Use an existing Zotero library in AI workflows: find items, read PDF evidence, e
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust)](./Cargo.toml)
-[![MSRV](https://img.shields.io/badge/MSRV-1.85-red.svg?logo=rust)](./Cargo.toml)
+[![MSRV](https://img.shields.io/badge/MSRV-1.89-red.svg?logo=rust)](./Cargo.toml)
 [![Platform](https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-lightgrey.svg)](#recommended-agent-setup)
 [![Zotero](https://img.shields.io/badge/Zotero-7-CC2936.svg)](https://www.zotero.org)
 [![Docs](https://img.shields.io/badge/docs-VitePress-42b883.svg)](./docs/en/index.md)

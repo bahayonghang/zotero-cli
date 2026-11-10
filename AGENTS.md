@@ -5,7 +5,7 @@
 - `skills/zot/SKILL.md` is worth checking for real operator workflows around `doctor`, write actions, and workspaces.
 
 ## Workspace map
-- This is a Rust workspace (`edition = 2024`, `rust-version = 1.85`) with 5 crates under `src/`:
+- This is a Rust workspace (`edition = 2024`, `rust-version = 1.89`) with 5 crates under `src/`:
   - `zot-cli` — binary crate for `zot`; real CLI entrypoint is `src/zot-cli/src/main.rs`
   - `zot-core` — config, models, errors, JSON envelope
   - `zot-local` — local `zotero.sqlite` reads, PDF extraction/cache, workspace/RAG
@@ -73,7 +73,7 @@
 
 ## Constraints and repo hygiene
 - Every workspace member inherits lints that forbid `unsafe`, `dbg!`, `todo!`, and `unwrap()`.
-- `.github/workflows/ci.yml` runs the pure gate on Linux, Windows, and macOS, checks Rust 1.85
+- `.github/workflows/ci.yml` runs the pure gate on Linux, Windows, and macOS, checks Rust 1.89
   MSRV, and includes dependency security and unused-dependency jobs. Local `just ci` remains the
   source of truth for the stable build/test sequence.
 - Tests are mostly inline crate tests. `src/zot-cli/tests/` also has integration targets
