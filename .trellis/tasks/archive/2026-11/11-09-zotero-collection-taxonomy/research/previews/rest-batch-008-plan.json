@@ -1,0 +1,1996 @@
+{
+  "schema_version": 1,
+  "backend": "local",
+  "server_id": "2ZxitCcOtvOu",
+  "library": "user",
+  "profile": null,
+  "max_affected": 50,
+  "item_count": 40,
+  "action_count": 103,
+  "changed_count": 40,
+  "unchanged_count": 0,
+  "items": [
+    {
+      "item_key": "BPV7BT9G",
+      "title": "Multidomain Graph Meta-Learning Network for Few-Shot Prediction in Industrial Processes",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BPV7BT9G",
+        "add_tags": [
+          "ts/small-sample"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ND3WMEQQ"
+        ],
+        "move_collection": null,
+        "reason": "dissolve small-sample"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ND3WMEQQ"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ],
+        "tags": [
+          {
+            "tag": "ts/small-sample",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ND3WMEQQ",
+          "name": "small_sample|Zero-Shot",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BQISEJRI",
+      "title": "Twinning quality sensors in wastewater treatment process via optimized echo state network-based soft sensors",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BQISEJRI",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ZME8XQMS"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Soft Sensor"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BRSI8JRG",
+      "title": "MDMLP-EIA: Multi-domain Dynamic MLPs with Energy Invariant Attention for Time Series Forecasting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BRSI8JRG",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "MSKRR445"
+        ],
+        "move_collection": null,
+        "reason": "dissolve TimeSeriesForecasting"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "WEUYPTDU",
+          "MSKRR445"
+        ]
+      },
+      "after": {
+        "collections": [
+          "WEUYPTDU",
+          "Z2YE4E6Y"
+        ]
+      },
+      "collections": [
+        {
+          "key": "MSKRR445",
+          "name": "TimeSeriesForecasting",
+          "version": 795
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BS8GK5UJ",
+      "title": "Disentangled Parameter-Efficient Linear Model for Long-Term Time Series Forecasting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BS8GK5UJ",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "MSKRR445"
+        ],
+        "move_collection": null,
+        "reason": "dissolve TimeSeriesForecasting"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "MSKRR445"
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ]
+      },
+      "collections": [
+        {
+          "key": "MSKRR445",
+          "name": "TimeSeriesForecasting",
+          "version": 795
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BSQCTG5L",
+      "title": "Deep Co-Training Partial Least Squares Model for Semi-Supervised Industrial Soft Sensing",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BSQCTG5L",
+        "add_tags": [
+          "ts/semi-supervised"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ZME8XQMS",
+          "58QAX269"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Soft Sensor, semi-supervised"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZME8XQMS",
+          "58QAX269"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "🤖️"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "ts/semi-supervised",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "58QAX269",
+          "name": "semi-supervised",
+          "version": 0
+        },
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BT8VT28E",
+      "title": "数据与知识混合驱动的深度学习工业软测量方法研究",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BT8VT28E",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ZME8XQMS"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Soft Sensor"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BTKN2D8J",
+      "title": "Interpretable feature selection and deep learning for short-term probabilistic PV power forecasting in buildings using local monitoring data",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BTKN2D8J",
+        "add_tags": [
+          "ts/interpretability"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "93X55XEE"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Interpretability"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "93X55XEE"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "ts/interpretability",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "93X55XEE",
+          "name": "Interpretability",
+          "version": 0
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BTPSW4WR",
+      "title": "计及多能耦合关系的小样本综合能源系统多元负荷预测方法研究",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BTPSW4WR",
+        "add_tags": [
+          "dl/multi-task"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "5FFJS7PN"
+        ],
+        "remove_collections": [
+          "NSPIFD9R"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Multi-Task"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "NSPIFD9R"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "Reference"
+          },
+          {
+            "tag": "/reading"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "5FFJS7PN"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "Reference"
+          },
+          {
+            "tag": "/reading"
+          },
+          {
+            "tag": "dl/multi-task",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "5FFJS7PN",
+          "name": "00Basic",
+          "version": 0
+        },
+        {
+          "key": "NSPIFD9R",
+          "name": "08Multi-Task Learning",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BULG9E75",
+      "title": "Multivariate Time Series Deep Spatiotemporal Forecasting with Graph Neural Network",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BULG9E75",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "7AI4CBF3"
+        ],
+        "remove_collections": [
+          "HVRA5J27"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Graph Neural Networks"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "HVRA5J27"
+        ]
+      },
+      "after": {
+        "collections": [
+          "7AI4CBF3"
+        ]
+      },
+      "collections": [
+        {
+          "key": "7AI4CBF3",
+          "name": "Graphs",
+          "version": 3685
+        },
+        {
+          "key": "HVRA5J27",
+          "name": "Graph Neural Networks",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BWII3EQS",
+      "title": "Data-Driven Soft Sensor for Hot Strip Mill Process Based on Multiscale Information-Fusion Attention Network",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BWII3EQS",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ZME8XQMS"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Soft Sensor"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BXEHV584",
+      "title": "UmambaTSF: A U-shaped Multi-Scale Long-Term Time Series Forecasting Method Using Mamba",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BXEHV584",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "UMQV286S"
+        ],
+        "remove_collections": [
+          "J4PNTSY2"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Mamba"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "J4PNTSY2"
+        ]
+      },
+      "after": {
+        "collections": [
+          "UMQV286S"
+        ]
+      },
+      "collections": [
+        {
+          "key": "J4PNTSY2",
+          "name": "Mamba",
+          "version": 0
+        },
+        {
+          "key": "UMQV286S",
+          "name": "Sequences",
+          "version": 3686
+        }
+      ]
+    },
+    {
+      "item_key": "BXUB73JT",
+      "title": "Pathformer: Multi-scale Transformers with Adaptive Pathways for Time Series Forecasting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BXUB73JT",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "U4ZWG29U"
+        ],
+        "remove_collections": [
+          "ZE3Z2YJK"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Transformer_based_ts_prediction"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "collections": [
+        {
+          "key": "U4ZWG29U",
+          "name": "Transformers",
+          "version": 3683
+        },
+        {
+          "key": "ZE3Z2YJK",
+          "name": "Transformer_based_ts_prediction",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BZ9ESWPD",
+      "title": "TIDFormer: Exploiting Temporal and Interactive Dynamics Makes A Great Dynamic Graph Transformer",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BZ9ESWPD",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "U4ZWG29U"
+        ],
+        "remove_collections": [
+          "ZE3Z2YJK"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Transformer_based_ts_prediction"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "collections": [
+        {
+          "key": "U4ZWG29U",
+          "name": "Transformers",
+          "version": 3683
+        },
+        {
+          "key": "ZE3Z2YJK",
+          "name": "Transformer_based_ts_prediction",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BZGXQG8I",
+      "title": "Advancing Industrial Data Augmentation in AIGC Era: From Foundations to Frontier Applications",
+      "expected_version": 319,
+      "original_request": {
+        "item_key": "BZGXQG8I",
+        "add_tags": [
+          "ts/generation"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "6QZ3XITA"
+        ],
+        "remove_collections": [
+          "759ZGSUM"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Generation"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "759ZGSUM",
+          "8JZ5KBHF"
+        ],
+        "tags": [
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "8JZ5KBHF",
+          "6QZ3XITA"
+        ],
+        "tags": [
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/generation",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "6QZ3XITA",
+          "name": "02Analysis",
+          "version": 0
+        },
+        {
+          "key": "759ZGSUM",
+          "name": "03Generation",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "BZY6C2XA",
+      "title": "AlphaOPT: Formulating Optimization Programs with Self-Improving LLM Experience Library",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "BZY6C2XA",
+        "add_tags": [
+          "opt/llm"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "C929JUTG"
+        ],
+        "remove_collections": [
+          "LLF6KEBI"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Opt LLM"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "LLF6KEBI"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "C929JUTG"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "opt/llm",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "C929JUTG",
+          "name": "02Optimization",
+          "version": 0
+        },
+        {
+          "key": "LLF6KEBI",
+          "name": "14LLM",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "C45RFS8R",
+      "title": "A Novel Accuracy-Constrained Scheme for Efficient Trend Extraction of Industrial Time-Series Data",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "C45RFS8R",
+        "add_tags": [
+          "ts/trend"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "6QZ3XITA"
+        ],
+        "remove_collections": [
+          "B85MT3V6"
+        ],
+        "move_collection": null,
+        "reason": "dissolve TrendExtraction"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "B85MT3V6"
+        ],
+        "tags": [
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "6QZ3XITA"
+        ],
+        "tags": [
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/trend",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "6QZ3XITA",
+          "name": "02Analysis",
+          "version": 0
+        },
+        {
+          "key": "B85MT3V6",
+          "name": "09TrendExtraction",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "C4RMX6WL",
+      "title": "Industrial Foundation Model",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "C4RMX6WL",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "XRF5WWX2"
+        ],
+        "remove_collections": [
+          "P5WKAC5Y"
+        ],
+        "move_collection": null,
+        "reason": "dissolve LLM/FoundationModels"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "collections": [
+        {
+          "key": "P5WKAC5Y",
+          "name": "LLM/FoundationModels",
+          "version": 0
+        },
+        {
+          "key": "XRF5WWX2",
+          "name": "Foundation Models",
+          "version": 3682
+        }
+      ]
+    },
+    {
+      "item_key": "C5457XXL",
+      "title": "TimeMixer++: A General Time Series Pattern Machine for Universal Predictive Analysis",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "C5457XXL",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "U4ZWG29U"
+        ],
+        "remove_collections": [
+          "ZE3Z2YJK"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Transformer_based_ts_prediction"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "collections": [
+        {
+          "key": "U4ZWG29U",
+          "name": "Transformers",
+          "version": 3683
+        },
+        {
+          "key": "ZE3Z2YJK",
+          "name": "Transformer_based_ts_prediction",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "C54YSNHW",
+      "title": "Attention-based multiscale temporal fusion network for uncertain-mode fault diagnosis in multimode processes",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "C54YSNHW",
+        "add_tags": [
+          "ts/fault"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "HU7D6CU9"
+        ],
+        "remove_collections": [
+          "5TM93XGJ"
+        ],
+        "move_collection": null,
+        "reason": "dissolve FaultDiagnosis"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "5TM93XGJ"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "HU7D6CU9"
+        ],
+        "tags": [
+          {
+            "tag": "ts/fault",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "5TM93XGJ",
+          "name": "FaultDiagnosis",
+          "version": 0
+        },
+        {
+          "key": "HU7D6CU9",
+          "name": "05AnormalyDetection",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "C6DH7KKX",
+      "title": "LLM-PS: Empowering Large Language Models for Time Series Forecasting with Temporal Patterns and Semantics",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "C6DH7KKX",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "XRF5WWX2"
+        ],
+        "remove_collections": [
+          "P5WKAC5Y"
+        ],
+        "move_collection": null,
+        "reason": "dissolve LLM/FoundationModels"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "collections": [
+        {
+          "key": "P5WKAC5Y",
+          "name": "LLM/FoundationModels",
+          "version": 0
+        },
+        {
+          "key": "XRF5WWX2",
+          "name": "Foundation Models",
+          "version": 3682
+        }
+      ]
+    },
+    {
+      "item_key": "C8AWWDQN",
+      "title": "ModernTCN: A Modern Pure Convolution Structure for General Time Series Analysis",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "C8AWWDQN",
+        "add_tags": [
+          "dl/cnn"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "5FFJS7PN",
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "BM9UHJUB",
+          "MSKRR445"
+        ],
+        "move_collection": null,
+        "reason": "dissolve CNN, TimeSeriesForecasting"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "MSKRR445",
+          "BM9UHJUB"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "5FFJS7PN",
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          },
+          {
+            "tag": "dl/cnn",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "5FFJS7PN",
+          "name": "00Basic",
+          "version": 0
+        },
+        {
+          "key": "BM9UHJUB",
+          "name": "05CNN",
+          "version": 0
+        },
+        {
+          "key": "MSKRR445",
+          "name": "TimeSeriesForecasting",
+          "version": 795
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CB9J8LZP",
+      "title": "A Spatiotemporal Masked Pretraining Framework for Nonlinear Dynamic Soft Sensor Development",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CB9J8LZP",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ZME8XQMS"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Soft Sensor"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CCD9K8H7",
+      "title": "Domain knowledge guided pseudo-label generation framework for semi-supervised domain generalization fault diagnosis",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CCD9K8H7",
+        "add_tags": [
+          "ts/fault"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "HU7D6CU9"
+        ],
+        "remove_collections": [
+          "5TM93XGJ"
+        ],
+        "move_collection": null,
+        "reason": "dissolve FaultDiagnosis"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "5TM93XGJ"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "HU7D6CU9"
+        ],
+        "tags": [
+          {
+            "tag": "ts/fault",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "5TM93XGJ",
+          "name": "FaultDiagnosis",
+          "version": 0
+        },
+        {
+          "key": "HU7D6CU9",
+          "name": "05AnormalyDetection",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CDJ8FAXZ",
+      "title": "Res-BiLSTMs model based on multi-task attention for real-time measurement of the free calcium oxide content",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CDJ8FAXZ",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ZME8XQMS"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Soft Sensor"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CDPD6VAD",
+      "title": "TCLN: A Transformer-based Conv-LSTM network for multivariate time series forecasting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CDPD6VAD",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "U4ZWG29U"
+        ],
+        "remove_collections": [
+          "ZE3Z2YJK"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Transformer_based_ts_prediction"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "collections": [
+        {
+          "key": "U4ZWG29U",
+          "name": "Transformers",
+          "version": 3683
+        },
+        {
+          "key": "ZE3Z2YJK",
+          "name": "Transformer_based_ts_prediction",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CDUIWRTJ",
+      "title": "Towards Long-Term Time-Series Forecasting: Feature, Pattern, and Distribution",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CDUIWRTJ",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "U4ZWG29U"
+        ],
+        "remove_collections": [
+          "ZE3Z2YJK"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Transformer_based_ts_prediction"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "collections": [
+        {
+          "key": "U4ZWG29U",
+          "name": "Transformers",
+          "version": 3683
+        },
+        {
+          "key": "ZE3Z2YJK",
+          "name": "Transformer_based_ts_prediction",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CGKU6MKP",
+      "title": "MMFNet: Multi-Scale Frequency Masking Neural Network for Multivariate Time Series Forecasting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CGKU6MKP",
+        "add_tags": [
+          "ts/multiscale"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "S7LAUZAB"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Multi-Scale"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "S7LAUZAB"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "ts/multiscale",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "S7LAUZAB",
+          "name": "Multi-Scale|Horizon|Resolution",
+          "version": 0
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CIWSEHT7",
+      "title": "Understanding Different Design Choices in Training Large Time Series Models",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CIWSEHT7",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "XRF5WWX2"
+        ],
+        "remove_collections": [
+          "P5WKAC5Y"
+        ],
+        "move_collection": null,
+        "reason": "dissolve LLM/FoundationModels"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "collections": [
+        {
+          "key": "P5WKAC5Y",
+          "name": "LLM/FoundationModels",
+          "version": 0
+        },
+        {
+          "key": "XRF5WWX2",
+          "name": "Foundation Models",
+          "version": 3682
+        }
+      ]
+    },
+    {
+      "item_key": "CJ5NHAP6",
+      "title": "WaveFormer: Wavelet Transformer for Noise-Robust Video Inpainting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CJ5NHAP6",
+        "add_tags": [
+          "dl/wavelet"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "S94BVLDT"
+        ],
+        "remove_collections": [
+          "IT4IVRVT"
+        ],
+        "move_collection": null,
+        "reason": "dissolve DL Wavelet"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "IT4IVRVT"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "S94BVLDT"
+        ],
+        "tags": [
+          {
+            "tag": "dl/wavelet",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "IT4IVRVT",
+          "name": "Wavelet",
+          "version": 0
+        },
+        {
+          "key": "S94BVLDT",
+          "name": "02Transformer",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CJ6HEYQV",
+      "title": "WITRAN: Water-wave Information Transmission and Recurrent Acceleration Network for Long-range Time Series Forecasting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CJ6HEYQV",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "MSKRR445"
+        ],
+        "move_collection": null,
+        "reason": "dissolve TimeSeriesForecasting"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "MSKRR445"
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ]
+      },
+      "collections": [
+        {
+          "key": "MSKRR445",
+          "name": "TimeSeriesForecasting",
+          "version": 795
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CLZURN6F",
+      "title": "Predicting the Dynamics of Complex System via Multiscale Diffusion Autoencoder",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CLZURN6F",
+        "add_tags": [
+          "ts/multiscale"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "S7LAUZAB"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Multi-Scale"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "S7LAUZAB"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          },
+          {
+            "tag": "ts/multiscale",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "S7LAUZAB",
+          "name": "Multi-Scale|Horizon|Resolution",
+          "version": 0
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CNHBQ5EG",
+      "title": "Spread: Sampling-based pareto front refinement via efficient adaptive diffusion",
+      "expected_version": 3373,
+      "original_request": {
+        "item_key": "CNHBQ5EG",
+        "add_tags": [
+          "opt/algorithms"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "C929JUTG"
+        ],
+        "remove_collections": [
+          "EPGXDNU2"
+        ],
+        "move_collection": null,
+        "reason": "dissolve OptimizationAlgorithms"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "EPGXDNU2"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable",
+            "type": 1
+          },
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "C929JUTG"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable",
+            "type": 1
+          },
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "opt/algorithms",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "C929JUTG",
+          "name": "02Optimization",
+          "version": 0
+        },
+        {
+          "key": "EPGXDNU2",
+          "name": "07OptimizationAlgorithms",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CPRU4S9K",
+      "title": "Dynamic historical information incorporated attention deep learning model for industrial soft sensor modeling",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CPRU4S9K",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ZME8XQMS"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Soft Sensor"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CQUGXEJD",
+      "title": "Recursive deep latent variable-based soft sensor for long-term measurements of key performance indicators in time-varying environments",
+      "expected_version": 3006,
+      "original_request": {
+        "item_key": "CQUGXEJD",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "ZME8XQMS"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Soft Sensor"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CSVWTKNH",
+      "title": "AIGC for Industrial Time Series: From Deep Generative Models to Large Generative Models",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CSVWTKNH",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "XRF5WWX2"
+        ],
+        "remove_collections": [
+          "P5WKAC5Y"
+        ],
+        "move_collection": null,
+        "reason": "dissolve LLM/FoundationModels"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "collections": [
+        {
+          "key": "P5WKAC5Y",
+          "name": "LLM/FoundationModels",
+          "version": 0
+        },
+        {
+          "key": "XRF5WWX2",
+          "name": "Foundation Models",
+          "version": 3682
+        }
+      ]
+    },
+    {
+      "item_key": "CUIPI47A",
+      "title": "Unlocking the Potential of Transformers in Time Series Forecasting with Sharpness-Aware Minimization and Channel-Wise Attention",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CUIPI47A",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "U4ZWG29U"
+        ],
+        "remove_collections": [
+          "ZE3Z2YJK"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Transformer_based_ts_prediction"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "collections": [
+        {
+          "key": "U4ZWG29U",
+          "name": "Transformers",
+          "version": 3683
+        },
+        {
+          "key": "ZE3Z2YJK",
+          "name": "Transformer_based_ts_prediction",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CURIT6V8",
+      "title": "Are Transformers Effective for Time Series Forecasting?",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CURIT6V8",
+        "add_tags": [],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "MSKRR445"
+        ],
+        "move_collection": null,
+        "reason": "dissolve TimeSeriesForecasting"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "MSKRR445"
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ]
+      },
+      "collections": [
+        {
+          "key": "MSKRR445",
+          "name": "TimeSeriesForecasting",
+          "version": 795
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CVGQTSB5",
+      "title": "Quality Prediction Modeling for Industrial Processes Using Multiscale Attention-Based Convolutional Neural Network",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CVGQTSB5",
+        "add_tags": [
+          "ts/multiscale"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y",
+          "FQZ9GPPN"
+        ],
+        "remove_collections": [
+          "S7LAUZAB",
+          "ZME8XQMS"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Multi-Scale, Soft Sensor"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "S7LAUZAB",
+          "ZME8XQMS",
+          "TUYBGNXG",
+          "QIQPCKMJ"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "TUYBGNXG",
+          "QIQPCKMJ",
+          "Z2YE4E6Y",
+          "FQZ9GPPN"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/multiscale",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "FQZ9GPPN",
+          "name": "Soft Sensor",
+          "version": 3681
+        },
+        {
+          "key": "S7LAUZAB",
+          "name": "Multi-Scale|Horizon|Resolution",
+          "version": 0
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        },
+        {
+          "key": "ZME8XQMS",
+          "name": "Soft Sensor",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CVQZSMGC",
+      "title": "TimeMixer: Decomposable Multiscale Mixing for Time Series Forecasting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CVQZSMGC",
+        "add_tags": [
+          "ts/multiscale"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "S7LAUZAB",
+          "MSKRR445"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Multi-Scale, TimeSeriesForecasting"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "MSKRR445",
+          "S7LAUZAB"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          },
+          {
+            "tag": "ts/multiscale",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "MSKRR445",
+          "name": "TimeSeriesForecasting",
+          "version": 795
+        },
+        {
+          "key": "S7LAUZAB",
+          "name": "Multi-Scale|Horizon|Resolution",
+          "version": 0
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    },
+    {
+      "item_key": "CXPBURYG",
+      "title": "Neural Conformal Control for Time Series Forecasting",
+      "expected_version": 0,
+      "original_request": {
+        "item_key": "CXPBURYG",
+        "add_tags": [
+          "ts/nonstationary"
+        ],
+        "remove_tags": [],
+        "add_collections": [
+          "Z2YE4E6Y"
+        ],
+        "remove_collections": [
+          "AD9X6CJI"
+        ],
+        "move_collection": null,
+        "reason": "dissolve Non-stationaryTS"
+      },
+      "changed": true,
+      "before": {
+        "collections": [
+          "AD9X6CJI"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "ts/nonstationary",
+            "type": 0
+          }
+        ]
+      },
+      "collections": [
+        {
+          "key": "AD9X6CJI",
+          "name": "Non-stationaryTS",
+          "version": 0
+        },
+        {
+          "key": "Z2YE4E6Y",
+          "name": "01Forecasting",
+          "version": 0
+        }
+      ]
+    }
+  ]
+}

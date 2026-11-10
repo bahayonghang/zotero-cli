@@ -23,9 +23,11 @@ library organize apply --plan plan.json --confirm --expected-plan-sha256 HASH --
 collection add-item COLLECTION ITEM --write-backend local
 collection remove-item COLLECTION ITEM --write-backend local
 collection move-item ITEM --from SOURCE --to TARGET --write-backend local
+collection delete KEY --write-backend local
 
 Item and membership operations: [--confirm --expected-server-id ID --expected-version N]
 Collection create: [--confirm --expected-server-id ID --expected-library-version N]
+Collection delete: [--confirm --expected-server-id ID --expected-version N --expected-descendants-sha256 HASH]
 GET /api/
 GET /api/itemTypeFields?itemType=TYPE
 GET /api/itemTypeCreatorTypes?itemType=TYPE
@@ -33,6 +35,7 @@ GET /api/{users/0|groups/ID}/collections
 GET /api/{users/0|groups/ID}/{items|collections}/KEY
 POST /api/local/authorize {"appName":"zot CLI"}
 POST /api/{users/0|groups/ID}/collections
+DELETE /api/{users/0|groups/ID}/collections/KEY
 PATCH /api/{users/0|groups/ID}/items/KEY
 ```
 
@@ -50,10 +53,11 @@ uppercase ASCII letters/digits. Group IDs are public IDs from `LibraryScope`.
 - Probe requires Zotero major >=10, API 3, and nonempty Server ID. Server identity
   is checked on every read and successful write. Local versions never come from
   Web or SQLite. Local commands never call `ctx.remote()`/`ctx.local_library()`.
-- Existing update/add/remove, single-item tag add/remove, and collection create
-  default to Web. Move is explicitly local only. Web rejects local confirmation,
-  overwrite, creators-file, and library-version flags. `item tag batch` has no
-  local backend. Collection rename/delete remain Web-only.
+- Existing update/add/remove, single-item tag add/remove, collection create,
+  and single-key collection delete default to Web. Move is explicitly local
+  only. Web rejects local confirmation, overwrite, creators-file,
+  library-version, and descendant-hash flags. `item tag batch` has no local
+  backend. Collection rename and reparent remain Web-only.
 - Preview/no-op never reads credential contents, authorizes, or sends PATCH.
   Confirmation re-reads the item and rejects stale server/version before auth.
   Use the same library, key, mutations, and flags as the reviewed preview.
@@ -80,6 +84,31 @@ uppercase ASCII letters/digits. Group IDs are public IDs from `LibraryScope`.
   name, parent, and server. `failed` is a rejection. Timeout, 5xx, and
   malformed success responses are `unknown`, with no resend and no same-name
   claim. Same-parent exact names are rejected with candidate keys.
+- Single-key local collection delete previews without credentials, authorization,
+  DELETE, or SQLite. The key is eight uppercase letters or digits. The report
+  lists every descendant collection returned by the Local API collection
+  list, sorted by key, and keeps a deleted flag when that response includes
+  one. Zotero 10.0.8 `GET /collections` omits trashed collections and ignores
+  `includeTrashed`, so those keys are absent from the preview and the hash.
+  Do not open SQLite to fill that gap, and do not describe the hash as a
+  complete trash-inclusive set on that server. SHA-256 covers the listed keys
+  joined by newline with no trailing newline. The empty set hashes the empty
+  byte string. Confirmation requires the preview's Server ID, collection
+  object version (zero only when that preview returned zero), and descendant
+  hash. A library version is display-only. Server or version mismatch is
+  `local-api-conflict`; hash mismatch is `local-delete-descendants`. Both
+  refuse before auth and before DELETE.
+  One `DELETE .../collections/KEY` sends the API key, Server ID, and
+  `If-Unmodified-Since-Version`, with no body, query, or write token.
+  Descendant collections are permanently erased with the target, including
+  trashed descendants the list did not show. Items stay in the library and
+  only lose those memberships. Children are not promoted.
+  DELETE HTTP 204 with the same Server ID is accepted; `applied` requires the
+  following GET to be 404. Do not treat this 204 as unknown the way collection
+  create does. HTTP 200, timeout, 5xx, or a mismatched Server ID is `unknown`
+  and must not be followed by a GET that reinterprets the outcome. DELETE 404
+  is `absent`: this call did not delete the object. HTTP 412 is
+  `local-api-conflict`, not unknown. There is no 50-key bulk delete.
 - `library organize` is local-only. It does not replace `item tag batch` or create
   collections. Request v1 is a field whitelist. Planning reads the Local API only.
   SHA-256 covers the exact plan bytes and is not embedded in the file. Changed
@@ -115,8 +144,10 @@ uppercase ASCII letters/digits. Group IDs are public IDs from `LibraryScope`.
   One-time keys remain in process memory. Never log request keys/response bodies.
 - A 401 can invalidate the cached key, authorize, and retry once. No retries
   after timeout, 5xx, or unreliable successful responses: report `unknown` and
-  attempt readback. Never switch backends. A 204 from the expected server is
-  accepted; it becomes `applied` only after matching same-server readback.
+  attempt readback for an item PATCH. Never switch backends. A PATCH 204 from
+  the expected server is accepted; it becomes `applied` only after matching
+  same-server readback. Collection create treats HTTP 204 as unknown. Collection
+  delete does not send a verifying GET after an unknown DELETE.
 - Report fields include `backend`, `state`, `server_id`, `library`, `item_key`,
   `expected_version`, `before`, `after`, `skipped_fields`, collection names,
   `write_accepted`, `verified`, `observed_expected_state`, and optional `error`.
@@ -159,6 +190,11 @@ uppercase ASCII letters/digits. Group IDs are public IDs from `LibraryScope`.
 | Report save fails before submission | current and remaining items not-attempted; non-zero exit |
 | Report save fails after submission/finalization | known stdout results retained + report error; disk may remain in-flight; non-zero exit |
 | Collection POST buckets conflict or contain malformed/extra indexes | unknown; never claim success or resend |
+| Local collection delete hash/server/version mismatch | `local-delete-descendants` or `local-api-conflict`, before auth and DELETE |
+| DELETE 204 with the same Server ID, then GET 404 | `applied`, verified true |
+| DELETE HTTP 200, timeout, 5xx, or mismatched Server ID | `unknown`; do not GET and then claim success |
+| DELETE 404 | `absent`; this call did not delete the object |
+| DELETE 412 | `local-api-conflict`, not unknown |
 
 ## 5. Good / Base / Bad Examples
 

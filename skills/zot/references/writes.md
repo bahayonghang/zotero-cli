@@ -40,7 +40,7 @@
 | 路径 | 当前能力 | 凭据 / 运行条件 |
 | --- | --- | --- |
 | local SQLite / Local HTTP reads | 查询、提取和 dedupe planning | SQLite 永远不能写 |
-| Zotero 10+ Local API | item update、collection create/add-item/remove-item/move-item、item tag add/remove | 显式 local 后端、预览/确认、Zotero 桌面授权；无需 Web key |
+| Zotero 10+ Local API | item update、collection create/add-item/remove-item/move-item/delete、item tag add/remove | 显式 local 后端、预览/确认、Zotero 桌面授权；无需 Web key |
 | connector 本机导入 | 仅 `item import` 新增 BibTeX/RIS 条目 | Zotero 正在运行、connector 可达、UI 当前目标可写 |
 | Zotero Web API | 既有 mutation 默认后端，含 merge/dedupe 与 item tag batch；不含 move-item。item tag add/remove 未指定 local 时仍走这里 | `ZOT_LIBRARY_ID` + `ZOT_API_KEY` 或对应 profile 配置 |
 
@@ -48,14 +48,14 @@
 
 1. 先跑 `zot --json doctor`，读取 `capabilities.local_api_write`、`capabilities.connector_write`、`capabilities.web_write` 和 `write_credentials`。
 2. BibTeX/RIS 新增导入只走 connector：先不带 `--confirm` 预览目标、可写性、记录数和格式，复述后取得确认，再执行 `item import ... --confirm`。
-3. 本地字段/作者、分类创建/成员或单条标签操作优先评估 `local_api_write` 并按下一节显式选择 local；其他 mutation 走 Web API。Web 凭据缺失时停止对应 Web 操作；不要切换到 connector。
+3. 本地字段/作者、分类创建/成员、单 key 分类删除或单条标签操作优先评估 `local_api_write` 并按下一节显式选择 local；其他 mutation 走 Web API。Web 凭据缺失时停止对应 Web 操作；不要切换到 connector。
 4. 对 merge/dedupe 先跑不带 `--confirm` 的本地 preview，复述 keeper、sources、confidence 和跳过项；执行 `--confirm` 前再检查 Web 凭据。
 
 命令路由：
 
 - connector 写：仅 `item import`。
 - Web API 写：`item create/add-doi/add-url/add-file/update/trash/restore/attach`、`item note add/update/delete`、未指定 local 的 `item tag add/remove`、`item tag batch`、未指定 local 的 collection mutation、saved-search mutation、annotation creation、`sync update-status --apply` 和 merge/dedupe。
-- Local API 写：`item update`、`collection create/add-item/remove-item/move-item`、`item tag add/remove`，都必须显式带 `--write-backend local`。
+- Local API 写：`item update`、`collection create/add-item/remove-item/move-item/delete`、`item tag add/remove`，都必须显式带 `--write-backend local`。
 - `library dedupe --confirm` 默认只执行 normal-confidence 组；low-confidence 组保留在 `skipped_low_confidence`。普通 confirm 不等于 low-confidence 授权；只有用户看过 preview 后另行、明确接受这部分风险，才可追加 `--include-low-confidence`。
 - 不要宣称 connector 能执行 tag、note、collection、attachment、annotation、saved-search、status-sync 或 merge/dedupe mutation。
 
@@ -88,7 +88,7 @@
 
 ### 7c. 本地分类创建（Zotero 10+）
 
-`collection create NAME [--parent KEY] --write-backend local` 默认只预览。不带 local 时仍立即走 Web。重命名、删除和重挂父级仍只走 Web。
+`collection create NAME [--parent KEY] --write-backend local` 默认只预览。不带 local 时仍立即走 Web。重命名和重挂父级仍只走 Web。
 
 1. 先 doctor。用完整分类列表确认父分类属于同一库；不要猜 key，也不要一次创建多层路径。
 2. 预览展示名称、父级和库版本。确认使用 `--confirm --expected-server-id <预览值> --expected-library-version <预览值>`。不要把不存在对象的 version 填 0，也不要复用条目的 `--expected-version`。
@@ -106,6 +106,15 @@
 4. 用户认可后，`apply --plan plan.json --confirm --expected-plan-sha256 <命令输出> --report report.json --write-backend local`。hash、scope、profile 或版本不符时不要写入。
 5. 每条目最多一次条件 PATCH。首次 failed、conflict、unknown 或 verification-failed 即停止，后续是 not-attempted。不自动回滚，不盲重试，不自动 resume。
 6. 只有全部 applied 或 unchanged 且报告成功落盘才算批次成功。partial、failed、unknown 即使 envelope `ok: true` 也不是全成功，退出码非 0。落盘失败时 stdout 保留已知结果及报告错误；磁盘 in-flight 是待核查，不得重放。
+
+### 7e. 本地单 key 分类删除（Zotero 10+）
+
+`collection delete KEY --write-backend local` 默认只预览。不带 local 时仍立即走 Web API。重命名和重挂父级仍只走 Web。不调用 50-key 批量 DELETE，失败后也不改走 Web、connector 或 SQLite。
+
+1. 先 doctor。key 必须是八位大写字母或数字。不要猜 key，也不要读 Web 凭据来完成本地路径。
+2. 预览不读取授权、不 DELETE、不打开 `zotero.sqlite`。它列出 Local API 分类列表返回的目标分类和全部子孙分类；响应里带 `deleted` 时，这些子孙进入列表和哈希。Zotero 10.0.8 的 `GET /collections` 不返回已在废纸篓中的分类，也不识别 `includeTrashed`，所以它们不会出现在预览或哈希里。确认后的 DELETE 仍会把这些未列出的子分类和目标一起永久擦除。子分类不会提升到父级。文献留在库里，只失去这些分类的成员关系。
+3. 用户认可后，保持同一 key，并增加 `--confirm --expected-server-id <预览值> --expected-version <预览中的分类对象 version> --expected-descendants-sha256 <预览值>`。版本是分类对象版本，不是库版本。只有预览返回 0 时才能确认 0，不要自行填 0。Server ID、对象版本或子孙哈希任一不符就拒绝，不授权、不删除。不要替用户点击授权框。
+4. 只有 DELETE 返回 204 且 Server ID 一致，随后 GET 404，才是 `applied` 且 `verified=true`。HTTP 200、超时、5xx 或 Server ID 不符是 `unknown`。204 之后对象仍在是 `verification-failed`。DELETE 本身 404 是 `absent`，这次调用没有删除它。`unknown` 之后的 404 不能改记为这次删除成功。这些非成功状态即使 envelope `ok: true` 也不是成功，退出码非 0；只看 `state` 与 `verified`，不得盲重试。
 
 ## 安全门
 
@@ -154,7 +163,7 @@
    - `item note delete`（实际是把 note 移到 trash，文案 `Note moved to trash`）
 
    层 B，高风险删除、合并或状态写入：
-   - `collection delete`
+   - `collection delete`（本地删除还会永久删除全部子分类，包括 Zotero 10.0.8 分类列表里看不到的废纸篓子分类；文献仍留在库里，只失去这些成员关系）
    - `library saved-search delete`
    - `library duplicates-merge --confirm`
    - `library dedupe --confirm`

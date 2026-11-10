@@ -517,6 +517,28 @@
         "Does not turn the request into ordinary library maintenance or a write.",
         "Keeps Zotero read-only unless a separate write is explicitly authorized."
       ]
+    },
+    {
+      "id": 48,
+      "prompt": "没有 Web API key。删除已知分类 COLL0001。它下面还有子分类。先告诉我会删掉什么，我确认后再删。文献不要删。",
+      "expected_output": "先预览 collection delete --write-backend local 的子孙集合；有子分类时说明会永久删除子分类且文献仍在。确认必须同时使用预览中的 Server ID、分类对象 version 和子孙 SHA-256。不走 Web。",
+      "files": [],
+      "expectations": [
+        "Uses collection delete with explicit --write-backend local, not Web, connector, or a bulk delete.",
+        "Previews descendant collections before confirmation and says child collections are permanently deleted while items stay in the library.",
+        "Confirms with the preview Server ID, collection object version, and descendant SHA-256; does not treat unknown, absent, or verification-failed as success."
+      ]
+    },
+    {
+      "id": 49,
+      "prompt": "Zotero 正开着。doctor 说 sqlite snapshot 是 zotero-db-busy。请列出分类、全库条目、统计和标签，不要让我先关闭 Zotero。",
+      "expected_output": "继续用桌面读执行 collection list、library list、library stats 和 library tags。不要叫用户关闭 Zotero。非空 library search 仍先读快照。",
+      "files": [],
+      "expectations": [
+        "Uses desktop read for collection list, library list, library stats, and library tags while sqlite is busy.",
+        "Does not tell the user to close Zotero before those commands.",
+        "Keeps nonempty library search snapshot-first."
+      ]
     }
   ]
 }

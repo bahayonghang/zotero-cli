@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "Parse tests, skill mirror gate, and forbidden lints"}
+{"file": ".trellis/spec/zot-cli/backend/local-api.md", "reason": "Updated delete contract must match preview, confirm, and unknown rules"}
+{"file": ".trellis/spec/zot-cli/backend/database-guidelines.md", "reason": "Delete may use local API; SQLite stays read-only; no transport fallback"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "Conflict stays an error; unknown and absent stay non-success"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Receipt, command state, docs, and skills must not disagree"}
+{"file": ".trellis/tasks/11-10-zotero-local-collection-delete/research/erase-semantics.md", "reason": "Success claims must match erase semantics from the installed client"}

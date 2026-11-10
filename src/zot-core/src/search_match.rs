@@ -58,10 +58,10 @@ pub fn item_matches_field_filters(
     journal: Option<&str>,
     topic: Option<&str>,
 ) -> bool {
-    if let Some(title) = active_filter(title) {
-        if !collapsed_contains(&item.title, title) {
-            return false;
-        }
+    if let Some(title) = active_filter(title)
+        && !collapsed_contains(&item.title, title)
+    {
+        return false;
     }
     if let Some(journal) = active_filter(journal) {
         let publication = item

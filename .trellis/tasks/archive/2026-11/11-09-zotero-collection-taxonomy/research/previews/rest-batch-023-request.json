@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "item_key": "YXG8TQGR",
+      "remove_collections": [
+        "MVTJN75R"
+      ],
+      "reason": "dissolve Multi-Modal",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/multimodal"
+      ]
+    },
+    {
+      "item_key": "YZ3R5UTG",
+      "remove_collections": [
+        "NYH2W5V4"
+      ],
+      "reason": "dissolve Fuzzy",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/fuzzy"
+      ]
+    },
+    {
+      "item_key": "Z3TUHT9Z",
+      "remove_collections": [
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve Soft Sensor",
+      "add_collections": [
+        "FQZ9GPPN"
+      ]
+    },
+    {
+      "item_key": "Z4B9NG6V",
+      "remove_collections": [
+        "NSPIFD9R"
+      ],
+      "reason": "dissolve Multi-Task",
+      "add_collections": [
+        "5FFJS7PN"
+      ],
+      "add_tags": [
+        "dl/multi-task"
+      ]
+    },
+    {
+      "item_key": "Z6TY8VTD",
+      "remove_collections": [
+        "Z9BJ9QB5"
+      ],
+      "reason": "dissolve MultiVariable",
+      "add_collections": [
+        "ID2KTFJG"
+      ]
+    },
+    {
+      "item_key": "Z8RIP3K2",
+      "remove_collections": [
+        "U5JATS34"
+      ],
+      "reason": "dissolve SCN",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/scn"
+      ]
+    },
+    {
+      "item_key": "Z9CUMUD3",
+      "remove_collections": [
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve Soft Sensor",
+      "add_collections": [
+        "FQZ9GPPN"
+      ]
+    },
+    {
+      "item_key": "Z9PVCF8R",
+      "remove_collections": [
+        "MSKRR445"
+      ],
+      "reason": "dissolve TimeSeriesForecasting",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ]
+    },
+    {
+      "item_key": "ZEAIQWPB",
+      "remove_collections": [
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve Soft Sensor",
+      "add_collections": [
+        "FQZ9GPPN"
+      ]
+    },
+    {
+      "item_key": "ZGWCQJ57",
+      "remove_collections": [
+        "ZME8XQMS",
+        "WUB6KYIW"
+      ],
+      "reason": "dissolve Soft Sensor, irregular sampling",
+      "add_collections": [
+        "FQZ9GPPN",
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/irregular"
+      ]
+    },
+    {
+      "item_key": "ZI7WNHRL",
+      "remove_collections": [
+        "NSPIFD9R"
+      ],
+      "reason": "dissolve Multi-Task",
+      "add_collections": [
+        "5FFJS7PN"
+      ],
+      "add_tags": [
+        "dl/multi-task"
+      ]
+    },
+    {
+      "item_key": "ZJX3ALBS",
+      "remove_collections": [
+        "J4PNTSY2"
+      ],
+      "reason": "dissolve Mamba",
+      "add_collections": [
+        "UMQV286S"
+      ]
+    },
+    {
+      "item_key": "ZQ6KK25X",
+      "remove_collections": [
+        "3R2KZKPK"
+      ],
+      "reason": "dissolve Wavelet",
+      "add_collections": [
+        "WEUYPTDU"
+      ],
+      "add_tags": [
+        "ts/wavelet"
+      ]
+    },
+    {
+      "item_key": "ZSNBJ89F",
+      "remove_collections": [
+        "P5WKAC5Y"
+      ],
+      "reason": "dissolve LLM/FoundationModels",
+      "add_collections": [
+        "XRF5WWX2"
+      ]
+    },
+    {
+      "item_key": "ZUWZHINK",
+      "remove_collections": [
+        "J4PNTSY2"
+      ],
+      "reason": "dissolve Mamba",
+      "add_collections": [
+        "UMQV286S"
+      ]
+    },
+    {
+      "item_key": "ZZZJXXK9",
+      "remove_collections": [
+        "H25B6H67"
+      ],
+      "reason": "dissolve Representation Learning",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/representation"
+      ]
+    }
+  ]
+}

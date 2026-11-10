@@ -1,0 +1,41 @@
+{
+  "ok": true,
+  "data": {
+    "backend": "local",
+    "state": "preview",
+    "operation": "create-collection",
+    "server_id": "2ZxitCcOtvOu",
+    "library": "User",
+    "collection_key": "",
+    "name": "Soft Sensor",
+    "parent_key": "LJFSL4UY",
+    "parent_name": "01TimeSeries",
+    "path": [
+      {
+        "key": "EUKN35DS",
+        "name": "02_Area"
+      },
+      {
+        "key": "2LAXPFZB",
+        "name": "01ScientificResearch"
+      },
+      {
+        "key": "LJFSL4UY",
+        "name": "01TimeSeries"
+      }
+    ],
+    "expected_library_version": 3680,
+    "before": null,
+    "after": {
+      "name": "Soft Sensor",
+      "parentCollection": "LJFSL4UY"
+    },
+    "write_accepted": false,
+    "verified": false,
+    "observed_expected_state": null,
+    "error": null
+  },
+  "meta": {
+    "api_version": 1
+  }
+}

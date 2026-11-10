@@ -31,7 +31,7 @@ It is not a command catalog.
 - “download the attachment”: treat it as an attachment task, not upload
 - “preview this merge first”: treat it as `item merge`, not immediate duplicate merge
 - local read-only requests: do not require a Web key
-- any mutation: run doctor first; Zotero 10+ fields/creators, collection create/membership, and single-item tag add/remove can use the Local API, BibTeX/RIS imports use the connector, and other mutations use the Web API
+- any mutation: run doctor first; Zotero 10+ fields/creators, collection create/membership, single-key collection delete, and single-item tag add/remove can use the Local API, BibTeX/RIS imports use the connector, and other mutations, including collection rename and reparent, use the Web API
 - the connector cannot update or merge existing items; local notes, merge, and `item tag batch` are not implemented
 - skip low-confidence groups by default and never add `--include-low-confidence` on the user's behalf
 - any “why is this broken?” question: start with doctor or config

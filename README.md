@@ -12,13 +12,13 @@
 
 **An agent-first Zotero skill runtime for querying, reading, and safely updating library content.**
 
-Use an existing Zotero library in AI workflows: find items, read PDF evidence, extract annotations and notes, and build topic workspaces. Zotero 10+ supports local field/creator edits and collection membership changes with a preview and desktop authorization. Merge duplicates and perform other library mutations through the Zotero Web API. The Desktop connector imports new BibTeX/RIS records.
+Use an existing Zotero library in AI workflows: find items, read PDF evidence, extract annotations and notes, and build topic workspaces. Zotero 10+ supports local field/creator edits, collection membership, collection create, single-key collection delete, and single-item tag changes with a preview and desktop authorization. Merge duplicates, collection rename/reparent, and other library mutations go through the Zotero Web API. The Desktop connector imports new BibTeX/RIS records.
 
 <img src="./docs/public/images/zot-icon.png" alt="zot icon" width="180" />
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-2024_edition-orange.svg?logo=rust)](./Cargo.toml)
-[![MSRV](https://img.shields.io/badge/MSRV-1.85-red.svg?logo=rust)](./Cargo.toml)
+[![MSRV](https://img.shields.io/badge/MSRV-1.89-red.svg?logo=rust)](./Cargo.toml)
 [![Platform](https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-lightgrey.svg)](#recommended-agent-setup)
 [![Zotero](https://img.shields.io/badge/Zotero-7-CC2936.svg)](https://www.zotero.org)
 [![Docs](https://img.shields.io/badge/docs-VitePress-42b883.svg)](./docs/en/index.md)
@@ -45,7 +45,7 @@ This matches the underlying products:
 - Zotero stores library data in `zotero.sqlite` plus attachment files under `storage/`.
 - Zotero items carry metadata, notes, tags, attachments, and other related data.
 - Zotero annotations can be turned into notes with links back to the source PDF page.
-- Zotero Desktop's built-in connector can import BibTeX or RIS into the selected writable target. Zotero 10+ Local API supports previewed local field/creator edits, collection membership, and single-item tag add/remove. Other supported mutations use the Web API with write-scoped credentials and version checks.
+- Zotero Desktop's built-in connector can import BibTeX or RIS into the selected writable target. Zotero 10+ Local API supports previewed local field/creator edits, collection membership, collection create, single-key collection delete, and single-item tag add/remove. Other supported mutations use the Web API with write-scoped credentials and version checks.
 
 `zot` mirrors that structure for agents: read local content directly, import new records through the built-in connector, and route merge/dedupe plus other mutations through the Web API.
 
@@ -206,9 +206,9 @@ Released docs are published to GitHub Pages via [`.github/workflows/deploy-docs.
 ## Current boundary
 
 - `zot mcp serve` is scaffolded and currently returns `mcp-not-implemented`. For now, use the skill plus the runtime.
-- Local SQLite remains read-only. For Zotero 10+ local field/creator edits, collection membership, and single-item tag add/remove, see [local content operations](docs/en/cli/local-write.md); these use the official authenticated Local API.
+- Local SQLite remains read-only. For Zotero 10+ local field/creator edits, collection membership, collection create, single-key collection delete, and single-item tag add/remove, see [local content operations](docs/en/cli/local-write.md); these use the official authenticated Local API.
 - The built-in connector only imports new BibTeX/RIS records into Zotero's currently selected writable target; it does not update or merge existing items.
-- Merge/dedupe, notes, `item tag batch`, collection rename/delete, Web import, annotation, saved-search, and status-sync mutations use the Zotero Web API. Single-item `item tag add/remove` and `collection create` default to Web unless `--write-backend local` is explicit.
+- Merge/dedupe, notes, `item tag batch`, collection rename and reparent, Web import, annotation, saved-search, and status-sync mutations use the Zotero Web API. Single-item `item tag add/remove`, `collection create`, and single-key `collection delete` default to Web unless `--write-backend local` is explicit. Rename and reparent stay on the Web API.
 - Legacy `desktop_bridge` and `write_backend` config entries are ignored; `doctor` reports a migration hint so they can be removed safely.
 - Merge/dedupe is preview-first. Batch dedupe skips low-confidence groups unless the user separately authorizes `--include-low-confidence` after reviewing them.
 - `item tag batch` is preview-first and requires `--confirm`; confirmed targets cannot exceed

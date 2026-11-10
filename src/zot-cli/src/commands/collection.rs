@@ -3,7 +3,7 @@ use zot_local::{CollectionContent, CollectionNav};
 
 use crate::cli::{CollectionCommand, resolved_output_limit};
 use crate::context::AppContext;
-use crate::format::{print_collections, print_items};
+use crate::format::{EnvelopeMetaSeed, print_collections, print_items};
 use crate::output::CommandOutput;
 
 pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Result<CommandOutput> {
@@ -31,6 +31,11 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
             CommandOutput::new(ctx, payload, None, |_| println!("Collection renamed."))
         }
         CollectionCommand::Delete(args) => {
+            if args.write.write_backend == crate::cli::WriteBackendArg::Local {
+                // Keep the local delete future off the Windows main-thread stack.
+                return Box::pin(super::local_delete::delete(ctx, args)).await;
+            }
+            super::local_delete::validate_web_options(&args.write)?;
             ctx.remote()?.delete_collection(&args.key).await?;
             let payload = serde_json::json!({ "deleted": args.key });
             CommandOutput::new(ctx, payload, None, |_| println!("Collection deleted."))
@@ -98,22 +103,46 @@ pub(crate) async fn handle(ctx: &AppContext, command: CollectionCommand) -> Resu
             )
             .await
         }
-        read => handle_read(ctx, &ctx.local_library()?, read),
+        read => {
+            let running = collection_running(&read);
+            let io = super::desktop_read::ReadIo::from_context(ctx, running);
+            super::desktop_read::read_collection(ctx, &io, read).await
+        }
+    }
+}
+
+fn collection_running(command: &CollectionCommand) -> bool {
+    match command {
+        CollectionCommand::List(args) => args.running_zotero,
+        CollectionCommand::Get(args)
+        | CollectionCommand::Subcollections(args)
+        | CollectionCommand::ItemCount(args)
+        | CollectionCommand::Tags(args) => args.running_zotero,
+        CollectionCommand::Items(args) => args.running_zotero,
+        CollectionCommand::Search(args) => args.running_zotero,
+        CollectionCommand::Create(_)
+        | CollectionCommand::Rename(_)
+        | CollectionCommand::Delete(_)
+        | CollectionCommand::AddItem(_)
+        | CollectionCommand::RemoveItem(_)
+        | CollectionCommand::MoveItem(_) => false,
     }
 }
 
 /// Read-side arms, generic over the two collection faces so tests can drive
 /// the full output path with a fake library. Write arms stay in [`handle`]
 /// because they go through `ctx.remote()`.
-fn handle_read<L: CollectionNav + CollectionContent>(
+pub(crate) fn read_snapshot<L: CollectionNav + CollectionContent>(
     ctx: &AppContext,
     library: &L,
     command: CollectionCommand,
+    source: Option<&str>,
 ) -> Result<CommandOutput> {
+    let seed = snapshot_seed(source);
     match command {
-        CollectionCommand::List => {
+        CollectionCommand::List(_) => {
             let collections = library.get_collections()?;
-            CommandOutput::new(ctx, collections, None, |collections| {
+            CommandOutput::new(ctx, collections, seed, |collections| {
                 print_collections(collections, 0)
             })
         }
@@ -125,13 +154,13 @@ fn handle_read<L: CollectionNav + CollectionContent>(
                     hint: Some("Use 'zot collection list' to inspect collection keys".to_string()),
                 }
             })?;
-            CommandOutput::new(ctx, collection, None, |collection| {
+            CommandOutput::new(ctx, collection, seed, |collection| {
                 print_collections(std::slice::from_ref(collection), 0)
             })
         }
         CollectionCommand::Subcollections(args) => {
             let collections = library.get_subcollections(&args.key)?;
-            CommandOutput::new(ctx, collections, None, |collections| {
+            CommandOutput::new(ctx, collections, seed, |collections| {
                 if collections.is_empty() {
                     println!("No subcollections found.");
                 } else {
@@ -140,24 +169,24 @@ fn handle_read<L: CollectionNav + CollectionContent>(
             })
         }
         CollectionCommand::Items(args) => {
-            let items = library.get_collection_items(&args.key)?;
-            CommandOutput::new(ctx, items, None, |items| print_items(items))
+            let items = library.get_collection_direct_items(&args.key)?;
+            CommandOutput::new(ctx, items, seed, |items| print_items(items))
         }
         CollectionCommand::Search(args) => {
             let collections =
                 library.search_collections(&args.query, resolved_output_limit(args.limit))?;
-            CommandOutput::new(ctx, collections, None, |collections| {
+            CommandOutput::new(ctx, collections, seed, |collections| {
                 print_collections(collections, 0)
             })
         }
         CollectionCommand::ItemCount(args) => {
             let count = library.get_collection_item_count(&args.key)?;
             let payload = serde_json::json!({ "collection_key": args.key, "item_count": count });
-            CommandOutput::new(ctx, payload, None, move |_| println!("{count}"))
+            CommandOutput::new(ctx, payload, seed, move |_| println!("{count}"))
         }
         CollectionCommand::Tags(args) => {
             let tags = library.get_collection_tags(&args.key)?;
-            CommandOutput::new(ctx, tags, None, |tags| {
+            CommandOutput::new(ctx, tags, seed, |tags| {
                 if tags.is_empty() {
                     println!("No tags found.");
                 } else {
@@ -171,6 +200,13 @@ fn handle_read<L: CollectionNav + CollectionContent>(
     }
 }
 
+fn snapshot_seed(source: Option<&str>) -> Option<EnvelopeMetaSeed> {
+    source.map(|source| EnvelopeMetaSeed {
+        read_source: Some(source.to_string()),
+        ..EnvelopeMetaSeed::default()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -180,7 +216,7 @@ mod tests {
     use zot_remote::HttpRuntime;
 
     use super::*;
-    use crate::cli::CollectionKeyArgs;
+    use crate::cli::{CollectionItemsArgs, CollectionKeyArgs, CollectionListArgs};
 
     fn ctx(json: bool) -> AppContext {
         AppContext {
@@ -263,12 +299,19 @@ mod tests {
     fn key_args(key: &str) -> CollectionKeyArgs {
         CollectionKeyArgs {
             key: key.to_string(),
+            running_zotero: false,
         }
+    }
+
+    fn list_command() -> CollectionCommand {
+        CollectionCommand::List(CollectionListArgs {
+            running_zotero: false,
+        })
     }
 
     #[test]
     fn list_envelope_carries_collections() {
-        let out = handle_read(&ctx(true), &sample_library(), CollectionCommand::List)
+        let out = read_snapshot(&ctx(true), &sample_library(), list_command(), None)
             .expect("list must succeed");
         let json = out.as_json().expect("json payload");
         assert!(json.contains("\"ok\": true"));
@@ -278,12 +321,14 @@ mod tests {
 
     #[test]
     fn items_envelope_carries_collection_items() {
-        let out = handle_read(
+        let out = read_snapshot(
             &ctx(true),
             &sample_library(),
-            CollectionCommand::Items(crate::cli::CollectionItemsArgs {
+            CollectionCommand::Items(CollectionItemsArgs {
                 key: "COLL1".to_string(),
+                running_zotero: false,
             }),
+            None,
         )
         .expect("items must succeed");
         let json = out.as_json().expect("json payload");
@@ -293,10 +338,11 @@ mod tests {
 
     #[test]
     fn tags_envelope_carries_tag_counts() {
-        let out = handle_read(
+        let out = read_snapshot(
             &ctx(true),
             &sample_library(),
             CollectionCommand::Tags(key_args("COLL1")),
+            None,
         )
         .expect("tags must succeed");
         let json = out.as_json().expect("json payload");
@@ -306,10 +352,11 @@ mod tests {
 
     #[test]
     fn item_count_payload_keeps_its_shape() {
-        let out = handle_read(
+        let out = read_snapshot(
             &ctx(true),
             &sample_library(),
             CollectionCommand::ItemCount(key_args("COLL1")),
+            None,
         )
         .expect("item count must succeed");
         let json = out.as_json().expect("json payload");
@@ -319,10 +366,11 @@ mod tests {
 
     #[test]
     fn get_missing_collection_maps_to_stable_error() {
-        let err = handle_read(
+        let err = read_snapshot(
             &ctx(true),
             &sample_library(),
             CollectionCommand::Get(key_args("NOPE")),
+            None,
         )
         .expect_err("missing collection must fail");
         let err = err.downcast_ref::<ZotError>().expect("zot error");
@@ -337,7 +385,7 @@ mod tests {
 
     #[test]
     fn human_mode_produces_no_json() {
-        let out = handle_read(&ctx(false), &sample_library(), CollectionCommand::List)
+        let out = read_snapshot(&ctx(false), &sample_library(), list_command(), None)
             .expect("list must succeed");
         assert_eq!(out.as_json(), None);
     }

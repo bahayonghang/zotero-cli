@@ -199,13 +199,13 @@ fn parse_fields(args: &ItemUpdateArgs) -> ZotResult<BTreeMap<String, String>> {
                 "Field name and value must be nonempty",
             ));
         }
-        if let Some(previous) = fields.insert(key.to_string(), value.to_string()) {
-            if previous != value {
-                return Err(invalid(
-                    "local-write-field",
-                    "Conflicting values for the same field",
-                ));
-            }
+        if let Some(previous) = fields.insert(key.to_string(), value.to_string())
+            && previous != value
+        {
+            return Err(invalid(
+                "local-write-field",
+                "Conflicting values for the same field",
+            ));
         }
     }
     Ok(fields)
@@ -398,21 +398,22 @@ pub(crate) fn next_memberships(
     if add == remove {
         return Ok(next);
     }
-    if let (Some(to), Some(from)) = (add, remove) {
-        if !next.iter().any(|value| value == from) && !next.iter().any(|value| value == to) {
-            return Err(invalid(
-                "local-write-source-missing",
-                "Item is not in the source collection",
-            ));
-        }
+    if let (Some(to), Some(from)) = (add, remove)
+        && !next.iter().any(|value| value == from)
+        && !next.iter().any(|value| value == to)
+    {
+        return Err(invalid(
+            "local-write-source-missing",
+            "Item is not in the source collection",
+        ));
     }
     if let Some(remove) = remove {
         next.retain(|value| value != remove);
     }
-    if let Some(add) = add {
-        if !next.iter().any(|value| value == add) {
-            next.push(add.to_string());
-        }
+    if let Some(add) = add
+        && !next.iter().any(|value| value == add)
+    {
+        next.push(add.to_string());
     }
     Ok(next)
 }
@@ -496,13 +497,13 @@ fn validate_server_tag(entry: &Value) -> ZotResult<()> {
             "Item tags must be an array of tag objects",
         ));
     }
-    if let Some(tag_type) = object.get("type") {
-        if !matches!(tag_type.as_u64(), Some(0 | 1)) {
-            return Err(invalid(
-                "local-api-protocol",
-                "Item tag type must be 0, 1, or omitted",
-            ));
-        }
+    if let Some(tag_type) = object.get("type")
+        && !matches!(tag_type.as_u64(), Some(0 | 1))
+    {
+        return Err(invalid(
+            "local-api-protocol",
+            "Item tag type must be 0, 1, or omitted",
+        ));
     }
     Ok(())
 }

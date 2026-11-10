@@ -22,7 +22,7 @@ pub(crate) enum LibraryCommand {
     Recent(LibraryRecentArgs),
     Stats(LibraryStatsArgs),
     Citekey(LibraryCiteKeyArgs),
-    Tags,
+    Tags(LibraryTagsArgs),
     Libraries,
     Feeds,
     FeedItems(LibraryFeedItemsArgs),
@@ -124,7 +124,7 @@ pub(crate) enum ItemSciteCommand {
 
 #[derive(Subcommand)]
 pub(crate) enum CollectionCommand {
-    List,
+    List(CollectionListArgs),
     Get(CollectionKeyArgs),
     Subcollections(CollectionKeyArgs),
     Items(CollectionItemsArgs),
@@ -133,7 +133,7 @@ pub(crate) enum CollectionCommand {
     Tags(CollectionKeyArgs),
     Create(CollectionCreateArgs),
     Rename(CollectionRenameArgs),
-    Delete(CollectionKeyArgs),
+    Delete(CollectionDeleteArgs),
     AddItem(CollectionMembershipArgs),
     RemoveItem(CollectionMembershipArgs),
     /// Move one item between collections in the same local library.
@@ -272,12 +272,25 @@ pub(crate) struct LibraryListArgs {
     pub(crate) offset: usize,
     #[arg(long)]
     pub(crate) include_trashed: bool,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
 pub(crate) struct LibraryStatsArgs {
     #[arg(long)]
     pub(crate) include_trashed: bool,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
+}
+
+#[derive(Args)]
+pub(crate) struct LibraryTagsArgs {
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
@@ -697,8 +710,18 @@ pub(crate) struct LibraryOrganizeApplyArgs {
 }
 
 #[derive(Args)]
+pub(crate) struct CollectionListArgs {
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
+}
+
+#[derive(Args)]
 pub(crate) struct CollectionItemsArgs {
     pub(crate) key: String,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
@@ -706,6 +729,9 @@ pub(crate) struct CollectionSearchArgs {
     pub(crate) query: String,
     #[arg(long)]
     pub(crate) limit: Option<usize>,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args, Debug, Default)]
@@ -736,9 +762,42 @@ pub(crate) struct CollectionRenameArgs {
     pub(crate) new_name: String,
 }
 
+#[derive(Args, Debug, Default)]
+pub(crate) struct LocalDeleteArgs {
+    #[arg(long, value_enum, default_value = "web")]
+    pub(crate) write_backend: WriteBackendArg,
+    /// Apply a local collection-delete preview; requires its Server ID, object version, and descendant hash.
+    #[arg(
+        long,
+        requires_all = [
+            "expected_server_id",
+            "expected_version",
+            "expected_descendants_sha256"
+        ]
+    )]
+    pub(crate) confirm: bool,
+    #[arg(long, requires = "confirm")]
+    pub(crate) expected_server_id: Option<String>,
+    /// Collection object version. Zero is valid and distinct from a missing flag.
+    #[arg(long, requires = "confirm")]
+    pub(crate) expected_version: Option<u64>,
+    #[arg(long, requires = "confirm")]
+    pub(crate) expected_descendants_sha256: Option<String>,
+}
+
+#[derive(Args, Debug)]
+pub(crate) struct CollectionDeleteArgs {
+    pub(crate) key: String,
+    #[command(flatten)]
+    pub(crate) write: LocalDeleteArgs,
+}
+
 #[derive(Args)]
 pub(crate) struct CollectionKeyArgs {
     pub(crate) key: String,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]

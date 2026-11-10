@@ -1,0 +1,1027 @@
+{
+  "ok": true,
+  "data": {
+    "schema_version": 1,
+    "plan_sha256": "05265236be065e1e8ea7230a546b9676d9ba8ddc008c6a34fe0ccc95d49baa24",
+    "server_id": "2ZxitCcOtvOu",
+    "library": "user",
+    "state": "partial",
+    "started_at": "2026-11-10T05:08:19.550202700+00:00",
+    "updated_at": "2026-11-10T05:08:20.698628800+00:00",
+    "item_count": 40,
+    "applied_count": 10,
+    "unchanged_count": 0,
+    "failed_count": 0,
+    "unknown_count": 0,
+    "not_attempted_count": 30,
+    "items": [
+      {
+        "item_key": "P8EZHP4E",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "MSKRR445"
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4610,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PAFPKVTX",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "ZN7BT294"
+          ],
+          "tags": []
+        },
+        "after": {
+          "collections": [
+            "5FFJS7PN"
+          ],
+          "tags": [
+            {
+              "tag": "dl/joint-training",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4612,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PB5CKIYH",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "ZME8XQMS"
+          ]
+        },
+        "after": {
+          "collections": [
+            "FQZ9GPPN"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4613,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PC45HAI6",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4615,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PDPQLX73",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "ZME8XQMS",
+            "TUYBGNXG",
+            "QIQPCKMJ"
+          ]
+        },
+        "after": {
+          "collections": [
+            "TUYBGNXG",
+            "QIQPCKMJ",
+            "FQZ9GPPN"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4616,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PGCACP65",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "Z9BJ9QB5"
+          ]
+        },
+        "after": {
+          "collections": [
+            "ID2KTFJG"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4617,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PGUKQFCQ",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "52IMKB43"
+          ],
+          "tags": [
+            {
+              "tag": "📒"
+            },
+            {
+              "tag": "🤖️"
+            }
+          ]
+        },
+        "after": {
+          "collections": [
+            "5FFJS7PN"
+          ],
+          "tags": [
+            {
+              "tag": "📒"
+            },
+            {
+              "tag": "🤖️"
+            },
+            {
+              "tag": "dl/moe",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4619,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PH2ACIML",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "MSKRR445"
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ]
+        },
+        "expected_version": 3446,
+        "observed_version": 4620,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PHAC9RFQ",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "MSKRR445"
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4621,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PIUQ2I4J",
+        "status": "applied",
+        "before": {
+          "collections": [
+            "ZE3Z2YJK"
+          ]
+        },
+        "after": {
+          "collections": [
+            "U4ZWG29U"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": 4622,
+        "write_accepted": true,
+        "verified": true,
+        "observed_expected_state": true,
+        "error": null
+      },
+      {
+        "item_key": "PJU8VDHB",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "3R2KZKPK"
+          ],
+          "tags": [
+            {
+              "tag": "CodeAvailable"
+            }
+          ]
+        },
+        "after": {
+          "collections": [
+            "WEUYPTDU"
+          ],
+          "tags": [
+            {
+              "tag": "CodeAvailable"
+            },
+            {
+              "tag": "ts/wavelet",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "PKNXVR5H",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "ZME8XQMS",
+            "ZE3Z2YJK"
+          ]
+        },
+        "after": {
+          "collections": [
+            "FQZ9GPPN",
+            "U4ZWG29U"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "PLILU9U6",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "PM355EPC",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "HVRA5J27"
+          ]
+        },
+        "after": {
+          "collections": [
+            "7AI4CBF3"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "PP6PZR7G",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "MVTJN75R"
+          ],
+          "tags": [
+            {
+              "tag": "CodeAvailable"
+            }
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ],
+          "tags": [
+            {
+              "tag": "CodeAvailable"
+            },
+            {
+              "tag": "ts/multimodal",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "PR8ZHIDB",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "AD9X6CJI"
+          ],
+          "tags": [
+            {
+              "tag": "Chinese_Interpretation"
+            }
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ],
+          "tags": [
+            {
+              "tag": "Chinese_Interpretation"
+            },
+            {
+              "tag": "ts/nonstationary",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "PU3BQYN8",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "PXE8SRDM",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "MSKRR445"
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ]
+        },
+        "expected_version": 438,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "PYWNXDCD",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "HVRA5J27"
+          ]
+        },
+        "after": {
+          "collections": [
+            "7AI4CBF3"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "Q3QQFWH9",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "58QAX269"
+          ],
+          "tags": [
+            {
+              "tag": "📒"
+            }
+          ]
+        },
+        "after": {
+          "collections": [
+            "FQZ9GPPN"
+          ],
+          "tags": [
+            {
+              "tag": "📒"
+            },
+            {
+              "tag": "ts/semi-supervised",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "Q5FR5LHB",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 3504,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "Q5ZP42DW",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "ZME8XQMS"
+          ]
+        },
+        "after": {
+          "collections": [
+            "FQZ9GPPN"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "Q6JEVI68",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "Q6VI8LVU",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "Q895USQ8",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "ND3WMEQQ"
+          ],
+          "tags": []
+        },
+        "after": {
+          "collections": [
+            "FQZ9GPPN"
+          ],
+          "tags": [
+            {
+              "tag": "ts/small-sample",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QASESQFW",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "ZERW3BLH"
+          ],
+          "tags": []
+        },
+        "after": {
+          "collections": [
+            "5FFJS7PN"
+          ],
+          "tags": [
+            {
+              "tag": "dl/hyperparameter",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QBKG6VNJ",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "H25B6H67"
+          ],
+          "tags": [
+            {
+              "tag": "📒"
+            },
+            {
+              "tag": "🤖️"
+            }
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ],
+          "tags": [
+            {
+              "tag": "📒"
+            },
+            {
+              "tag": "🤖️"
+            },
+            {
+              "tag": "ts/representation",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QCBZCQQU",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QCPJLNGR",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "W8UJ2SNG"
+          ],
+          "tags": [
+            {
+              "tag": "Chinese_Interpretation",
+              "type": 1
+            },
+            {
+              "tag": "/unread",
+              "type": 1
+            }
+          ]
+        },
+        "after": {
+          "collections": [
+            "HU7D6CU9"
+          ],
+          "tags": [
+            {
+              "tag": "Chinese_Interpretation",
+              "type": 1
+            },
+            {
+              "tag": "/unread",
+              "type": 1
+            },
+            {
+              "tag": "ts/fault",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QDV5YXH9",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QDW9I2IN",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QF3YU6XU",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "7ZWBQZUZ"
+          ],
+          "tags": []
+        },
+        "after": {
+          "collections": [
+            "5FFJS7PN"
+          ],
+          "tags": [
+            {
+              "tag": "dl/meta-learning",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QFZ4XUD3",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "MSKRR445"
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QGZ7BQCA",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "MSKRR445"
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QIVEUGR2",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "MVTJN75R"
+          ],
+          "tags": [
+            {
+              "tag": "📒"
+            },
+            {
+              "tag": "CodeAvailable",
+              "type": 1
+            },
+            {
+              "tag": "🤖️"
+            },
+            {
+              "tag": "Chinese_Interpretation",
+              "type": 1
+            },
+            {
+              "tag": "/unread",
+              "type": 1
+            }
+          ]
+        },
+        "after": {
+          "collections": [
+            "Z2YE4E6Y"
+          ],
+          "tags": [
+            {
+              "tag": "📒"
+            },
+            {
+              "tag": "CodeAvailable",
+              "type": 1
+            },
+            {
+              "tag": "🤖️"
+            },
+            {
+              "tag": "Chinese_Interpretation",
+              "type": 1
+            },
+            {
+              "tag": "/unread",
+              "type": 1
+            },
+            {
+              "tag": "ts/multimodal",
+              "type": 0
+            }
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QJDU43WV",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "ZME8XQMS",
+            "TUYBGNXG"
+          ]
+        },
+        "after": {
+          "collections": [
+            "TUYBGNXG",
+            "FQZ9GPPN"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QKJKD4SD",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "ZE3Z2YJK"
+          ]
+        },
+        "after": {
+          "collections": [
+            "U4ZWG29U"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QN87YSNC",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "ZE3Z2YJK"
+          ]
+        },
+        "after": {
+          "collections": [
+            "U4ZWG29U"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QQG4E92H",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "P5WKAC5Y"
+          ]
+        },
+        "after": {
+          "collections": [
+            "XRF5WWX2"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      },
+      {
+        "item_key": "QS6NYKG5",
+        "status": "not-attempted",
+        "before": {
+          "collections": [
+            "ZE3Z2YJK"
+          ]
+        },
+        "after": {
+          "collections": [
+            "U4ZWG29U"
+          ]
+        },
+        "expected_version": 0,
+        "observed_version": null,
+        "write_accepted": false,
+        "verified": false,
+        "observed_expected_state": null,
+        "error": null
+      }
+    ],
+    "error": {
+      "code": "local-organize-file",
+      "message": "Execution report could not be saved; stdout retains known outcomes, disk may retain in-flight; do not resume automatically"
+    }
+  },
+  "meta": {
+    "api_version": 1
+  }
+}

@@ -3,7 +3,10 @@
 ## 1. Scope / Trigger
 
 Use when editing open-library reads for `item get`, `item children`,
-`item pdf` / `item fulltext`, `library search`, or `library citekey`,
+`item pdf` / `item fulltext`, `library search`, `library citekey`,
+`collection list`, `collection get`, `collection subcollections`,
+`collection search`, `collection items`, `collection item-count`,
+`collection tags`, `library list`, `library stats`, or `library tags`,
 including `zot-cli/src/commands/desktop_read.rs`,
 `zot-desktop/src/local_read.rs`, the read side of
 `zot-desktop/src/local_api.rs`, citation-key lookup in `zot-local`,
@@ -22,10 +25,15 @@ item pdf KEY [--pages RANGE] [--annotations] [--running-zotero]
 item fulltext KEY [--pages RANGE] [--annotations] [--running-zotero]
 library search [QUERY] [--title TEXT] [--journal TEXT] [--topic TEXT] [--running-zotero]
 library citekey CITEKEY [--running-zotero]
+collection list|get|subcollections|search|items|item-count|tags [--running-zotero]
+library list|stats|tags [--running-zotero]
 
 LocalApiClient::probe_for_read() -> ZotResult<LocalApiProbe>   # 2s, GET /api/
-LocalApiClient::read_exchange(path, server_id) -> ZotResult<LocalReadExchange>
-DesktopRead::{item_view, children_for_keys, local_pdf_path, search, citation_key_matches}
+LocalApiClient::read_exchange(path, Option<&str>) -> ZotResult<LocalReadExchange>
+DesktopRead::{item_view, children_for_keys, local_pdf_path, search, citation_key_matches,
+              collection_list, collection_get, collection_subcollections, collection_search,
+              collection_items, collection_item_count, collection_tags,
+              library_list, library_stats, library_tags}
 ```
 
 `QUERY` may be empty when a field flag is present. `--running-zotero` is the
@@ -68,7 +76,81 @@ only opt-in for an unproved running instance. Binding file:
   not report a total or an empty result. Field filters run before the final
   page. Journal matches `publicationTitle` or `journalAbbreviation`. Topic
   matches title, abstract, or tag text. Trash and attachments stay excluded
-  unless the existing trash flag says otherwise.
+  unless the existing trash flag says otherwise. `DesktopScanLimits.max_pages`
+  stays 20. Inventory reads do not use that cap.
+- Collection and library inventory reads always send `limit=100` and `start`
+  through `read_exchange`. `desktop-unbound` passes `server: None` and sends
+  no `Zotero-Server-ID`. The cap is 100 pages (10,000 rows). Exactly 10,000
+  succeeds. A 10,001st row, a next link after 10,000, or a short page whose
+  `Total-Results` exceeds the rows collected returns `desktop-read-incomplete`
+  with no `total` and no partial list. The message does not invent a library
+  total. Version or `Total-Results` drift retries the whole read up to 3
+  times, then `desktop-read-inconsistent`. That is not `local-api-conflict`.
+  HTTP 412 and redirects stay immediate and do not switch source.
+- Do not call `collection_snapshot` for these reads. It remains the
+  write-preview helper: it requires `server: &str` and returns
+  `local-api-conflict` on version drift.
+- Collection items, item-count, and collection tags first resolve the
+  argument from the collection list: exact key, otherwise one name, otherwise
+  `collection-ambiguous`. Only a confirmed key is then read from
+  `GET {prefix}/collections/{key}/items/top?includeTrashed=1&limit=100`.
+  On Zotero 10.0.8 an unknown key becomes `collectionID` false. Looking that
+  id up returns false, and destructuring it throws; the adjacent branch
+  returns without adding the condition when the lookup has no key. The member
+  URL is therefore not a not-found signal, and a skipped condition is HTTP
+  200 for the whole top-level library. Do not trust that response. Do not use non-top
+  `/items` totals or `/collections/{key}/tags`.
+  Annotations in that payload are dropped. Notes and attachments stay.
+  A child note is absent, so its unique tag is absent. Count is the length
+  of that set. Desktop member commands set `meta.direct_annotations` to
+  `omitted`. Snapshot collection SQL can still return a direct annotation.
+  A child row that also has its own `collectionItems` row stays in the
+  snapshot and is absent from `/items/top`. Do not open SQLite to fill it.
+  Desktop member order follows the API page. Snapshot item order follows
+  `orderIndex`. Collection tree order is not part of this contract.
+- `collection get` takes its node from that same paged collection list. A
+  single-object response carries the collection's own version, while the list
+  carries the library version. Do not compare those two headers. An object
+  version of 7 and a library version of 45, with no edit during the read, is
+  success.
+- Collection list, get, subcollections, and search follow the API collection
+  list, which omits trashed collections. Desktop tree commands set
+  `meta.trashed_collections` to `omitted`. Closed SQLite collection list
+  behavior stays unchanged. Do not open SQLite to fill either gap.
+- `library list` requests `/items/top` or
+  `/collections/{key}/items/top` with
+  `itemType=-attachment&itemType=-note&itemType=-annotation` before applying
+  the 10,000-row cap. The cap is the candidate total after those constraints,
+  not the unfiltered library total. 10,000 bibliographic rows succeed across
+  100 pages of 100. One extra attachment, or a collection that holds one
+  article inside a larger library, does not trip the cap. Sort the candidate
+  set by key descending locally, then apply offset/limit. Never send
+  `sort=key`. `--collection` accepts a key or
+  a unique name. Duplicate names return `collection-ambiguous` with keys in
+  ascending order. Resolve the name from the same source's collection list,
+  including rows the tree drops. Do not open a second snapshot.
+- `library tags` reproduces `get_tags()` (every item tag, including notes,
+  attachments, annotations, and trash), count descending and name ascending.
+  `library stats` reproduces `get_stats_with_trashed`. `top_tags` stays
+  bibliographic. `pdf_attachments` counts distinct bibliographic parents with
+  `application/pdf`. `notes` counts note rows under bibliographic parents.
+  Trash for those two fields follows the parent. Both fetches send
+  `includeTrashed=1` and filter locally. Do not change the SQL.
+  `dateAdded` and `dateModified` use the snapshot spelling:
+  `YYYY-MM-DD HH:MM:SS`. Zotero's `sqlToISO8601` only inserts `T` and `Z`,
+  so reverse that spelling and do not shift the clock. Compare the full item
+  JSON on one fixture.
+- `get_collection_items` stays bibliographic. Collection item commands use
+  `get_collection_direct_items`, which keeps parentless notes and attachments.
+  Workspace import, semantic indexing, and Scite must not switch to the
+  direct set.
+- `group:<id>` uses `prefix(scope)`. Identity mismatch without
+  `--running-zotero` is `desktop-library-mismatch` and does not read the
+  other source. Collection 404 is `collection-not-found` and does not fall
+  back. A collection list HTTP 404 is `local-api-http`. Probe success does
+  not increase `snapshot_open_attempts`. Probe failure uses the
+  `LocalLibrary` already inside `Route::Snapshot` and increases that counter
+  by exactly one.
 - Citation key match is exact and case-preserving. Closed snapshots query the
   native `citationKey` field and Extra `Citation Key:` / `CitationKey:` lines.
   Open reads use those Local API fields, then a loopback Better BibTeX
@@ -100,6 +182,10 @@ only opt-in for an unproved running instance. Binding file:
 | HTTP 3xx | `local-api-redirect` | no |
 | Missing or changed library version after 3 tries | `desktop-read-inconsistent` | no |
 | Declared total exceeds collected rows, or 20-page cap | `desktop-search-incomplete` | no total |
+| Inventory read above 10,000 rows | `desktop-read-incomplete` | no total, no partial list |
+| Inventory version or `Total-Results` drift after 3 tries | `desktop-read-inconsistent` | no |
+| Collection object or member 404 | `collection-not-found` | no |
+| Collection list HTTP 404 | `local-api-http` | no |
 | File URL 405 or 501 | `desktop-file-url-unsupported` | no |
 | File URL 404 | `desktop-file-missing` | no |
 | Symlink or non-file PDF path | `desktop-file-type` | no |
@@ -113,7 +199,8 @@ only opt-in for an unproved running instance. Binding file:
 
 - Good: Zotero 10+ holds the exclusive lock, the server id matches the stored
   binding, and `item get` returns the committed fields with zero snapshot
-  opens and zero authorize calls.
+  opens and zero authorize calls. The same lock still serves `collection list`
+  and `library list` from the desktop, with `snapshot_open_attempts` unchanged.
 - Base: Zotero is closed. The same command uses one consistent snapshot and
   reports `read_source=snapshot`.
 - Bad: the running server id does not match, and the command reads either
@@ -133,6 +220,16 @@ only opt-in for an unproved running instance. Binding file:
   cross-page total that must not be reported when the walk stops early.
 - Open and closed runs of the same fixture agree on candidates. A generic
   query does not mix a snapshot fulltext hit with desktop metadata.
+- Inventory: one article plus one parentless attachment is count 2, and a
+  tag that exists only on the child note is absent. `library tags` and
+  `library stats` keep their existing SQL counts on the same fixture.
+- A complete read sends `limit=100`, accepts exactly 10,000 rows, and rejects
+  10,001 with `desktop-read-incomplete` and no total. `sort=key` is absent.
+  Version drift retries 3 times into `desktop-read-inconsistent`, not
+  `local-api-conflict`. Search `max_pages` stays 20.
+- Probe success leaves `snapshot_open_attempts` unchanged. Probe failure
+  uses the library inside `Route::Snapshot` and increases it by one.
+  `--running-zotero` is absent from write commands.
 
 ## 7. Wrong / Correct
 
@@ -141,6 +238,8 @@ only opt-in for an unproved running instance. Binding file:
 Follow a Local API or Better BibTeX redirect, call authorize for a GET, copy
 the locked database, or treat a missing `Last-Modified-Version` as one commit.
 Replace `desktop-read-bindings.json` with `rename` alone on Windows.
+Read inventory through `collection_snapshot`, send `sort=key`, or use a
+non-top `/items` total as the collection member count.
 
 #### Correct
 

@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file. Dates use
 
 ## [Unreleased]
 
+### Security
+
+- Upgrade `rusqlite` to 0.41.1 so the bundled SQLite is 3.54.x
+  (`RUSTSEC-2026-0459` / CVE-2026-119375).
+
+### Changed
+
+- Minimum supported Rust version is 1.89.
+
 ## [1.1.0] - 2026-11-02
 
 ### Added

@@ -224,11 +224,11 @@ impl PdfiumBackend {
             }
         }
 
-        if matches!(mode, PdfiumLoadMode::AllowDownload) {
-            if let Some(target) = current_download_target() {
-                let path = download_pdfium_library(target, &library_name)?;
-                return bind_pdfium_from_path(&path);
-            }
+        if matches!(mode, PdfiumLoadMode::AllowDownload)
+            && let Some(target) = current_download_target()
+        {
+            let path = download_pdfium_library(target, &library_name)?;
+            return bind_pdfium_from_path(&path);
         }
 
         Err(last_error.unwrap_or_else(pdfium_manual_setup_error))

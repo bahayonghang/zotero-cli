@@ -17,13 +17,18 @@ zot --json collection create "待读" --write-backend local
 zot --json collection create "子类" --parent ROOT2345 --write-backend local
 zot --json collection rename COLL001 "Renamed Project"
 zot --json collection delete COLL001
+zot --json collection delete COLL0001 --write-backend local
+zot --json collection delete COLL0001 --write-backend local --confirm --expected-server-id <server_id> --expected-version <version> --expected-descendants-sha256 <sha256>
 zot --json collection add-item COLL001 ATTN001
 zot --json collection remove-item COLL001 ATTN001
 ```
 
+`list`、`get`、`subcollections`、`search`、`items`、`item-count`、`tags` 在 Zotero 打开且本机通信可用时直接读桌面。数据目录还不能证明是同一个库时加 `--running-zotero`。成功时 `meta.read_source` 为 `desktop` 或 `desktop-unbound`，人类输出不另起来源行。`items`、`item-count` 和 `tags` 来自同一组直接成员（`/items/top`）；子笔记不算成员。桌面分类树省略回收站分类（`meta.trashed_collections` 为 `omitted`），桌面成员省略直接注释（`meta.direct_annotations` 为 `omitted`）。Zotero 关闭时仍走原来的 SQLite 结果。
+
 ## 什么时候使用 collection
 
 `create`、`add-item` / `remove-item` 默认使用 Web API，也可显式指定 `--write-backend local`。本地创建的确认参数是 `--expected-library-version`，不是条目 version。详见[本地内容操作](./local-write.md)。
+`delete` 不带 `--write-backend local` 时仍立即走 Web API。显式 local 时默认只预览。确认必须同时带预览中的 Server ID、分类对象 version 和子孙 key 集合 SHA-256。本地 key 必须是八位大写字母或数字。删除会永久擦除该分类和全部子分类，包括 Zotero 10.0.8 分类列表里看不到的废纸篓子分类；子分类不会提升到父级；文献留在库里，只失去这些成员关系。重命名和重挂父级仍只走 Web。
 Zotero 10+ 的 `move-item ITEMKEY --from SOURCEKEY --to TARGETKEY --write-backend local`
 会预览同库分类移动并保留其他分类。确认参数见[本地内容操作](./local-write.md)。
 

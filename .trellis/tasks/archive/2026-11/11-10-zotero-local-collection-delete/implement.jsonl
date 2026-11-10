@@ -1,0 +1,10 @@
+{"file": ".trellis/spec/zot-cli/backend/index.md", "reason": "Pre-development checklist for CLI and Local API changes"}
+{"file": ".trellis/spec/zot-cli/backend/directory-structure.md", "reason": "Where command modules and clap args live"}
+{"file": ".trellis/spec/zot-cli/backend/database-guidelines.md", "reason": "Local API writes must not open SQLite or switch to remote"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "ZotError codes and JSON envelope for conflicts and unknown"}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "Clap parse coverage, test-support, skills-sync, no rewrite in just ci"}
+{"file": ".trellis/spec/zot-cli/backend/local-api.md", "reason": "Existing local write contract; delete is still documented as Web-only and must change"}
+{"file": ".trellis/spec/zot-cli/backend/logging-guidelines.md", "reason": "Human output must not leak authorization material"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Reuse create preview/confirm and check_status instead of a second client"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Desktop receipt, CLI report, and skill text must describe the same delete outcome"}
+{"file": ".trellis/tasks/11-10-zotero-local-collection-delete/research/erase-semantics.md", "reason": "Installed Zotero 10.0.8 erase behavior: child collections die, items remain"}

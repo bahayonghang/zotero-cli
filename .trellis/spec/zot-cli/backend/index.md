@@ -22,7 +22,10 @@ doctor diagnostics, and orchestration between `zot-core`, `zot-local`, and
   `library duplicates-merge`, or `library dedupe` behavior.
 - Read [Logging Guidelines](./logging-guidelines.md) before adding output.
 - Read [Desktop Library Reads](./desktop-read.md) before changing `item get`,
-  `item children`, `item pdf`, `library search`, `library citekey`, or the
+  `item children`, `item pdf`, `library search`, `library citekey`,
+  `collection list`, `collection get`, `collection subcollections`,
+  `collection search`, `collection items`, `collection item-count`,
+  `collection tags`, `library list`, `library stats`, `library tags`, or the
   doctor `sqlite_snapshot` / `desktop_read` rows.
 
 ## Guidelines Index
@@ -40,7 +43,7 @@ GET routing.
 | [Quality Guidelines](./quality-guidelines.md)   | CLI parse tests, JSON contract tests, and workspace manifest guard                   | Complete |
 | [Connector Import Contract](./connector.md)     | Unauthenticated built-in connector server, `item import`, format/entry rules         | Complete |
 | [Local API Content Operations](./local-api.md) | Zotero 10+ authorization, local versions, previews, fields/creators and memberships | Complete |
-| [Desktop Library Reads](./desktop-read.md) | Open-library GET routing, identity binding, search, citation key, and local PDF | Complete |
+| [Desktop Library Reads](./desktop-read.md) | Open-library GET routing, identity binding, inventory reads, search, citation key, and local PDF | Complete |
 | [Merge & Dedupe Engine](./merge-dedupe.md)      | Cross-type merge safety, dc:replaces citation protection, dedupe planning invariants | Complete |
 | [Logging Guidelines](./logging-guidelines.md)   | Human vs JSON output rules                                                           | Complete |
 

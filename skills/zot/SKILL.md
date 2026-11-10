@@ -1,6 +1,6 @@
 ---
 name: zot
-description: 当用户要直接查询、提取、整理或安全更新本机已有的 Zotero 库或 reading workspace 时使用，即使用户没说 zot。覆盖库内搜索、citation key、PDF/批注/笔记、collection、saved search、feed、附件、语义索引、Scite、配置排障、Zotero 10+ Local API 字段/作者/分类/单条标签、connector 导入 BibTeX/RIS，以及明确授权的 Web API 写入。不要用于泛化找论文、引用格式教学、非 Zotero PDF，也不要用于文献缺陷分析、创新点或 brainstorm 报告；后者使用 zot-brainstorm。 (v1.1.0)
+description: 当用户要直接查询、提取、整理或安全更新本机已有的 Zotero 库或 reading workspace 时使用，即使用户没说 zot。覆盖库内搜索、citation key、PDF/批注/笔记、collection、saved search、feed、附件、语义索引、Scite、配置排障、Zotero 10+ Local API 字段/作者/分类创建与单 key 删除/单条标签、connector 导入 BibTeX/RIS，以及明确授权的 Web API 写入。不要用于泛化找论文、引用格式教学、非 Zotero PDF，也不要用于文献缺陷分析、创新点或 brainstorm 报告；后者使用 zot-brainstorm。 (v1.1.0)
 ---
 
 # zot
@@ -11,8 +11,8 @@ description: 当用户要直接查询、提取、整理或安全更新本机已�
 
 - 目标是已有本地 Zotero 库或 reading workspace 时使用本 skill。文献缺陷、创新点或研究报告交给 `zot-brainstorm`。
 - `zot` 是唯一执行面。`ref/` 和 `zot mcp serve` 都不是当前路径。
-- SQLite 只读。Zotero 10+ Local API 只做已实现的字段、作者、分类和单条标签操作。Connector 只新增导入 BibTeX/RIS。其他 mutation 走 Web API。
-- 打开的库中，`item get`、`item children`、`item pdf` / `fulltext`、`library search`、`library citekey` 可以读正在运行的桌面。一次命令只用一个来源，不拼接桌面结果和快照，也不自动改走 Web API。
+- SQLite 只读。Zotero 10+ Local API 只做已实现的字段、作者、分类创建与成员、单 key 分类删除和单条标签操作。Connector 只新增导入 BibTeX/RIS。其他 mutation 走 Web API。
+- 打开的库中，`item get`、`item children`、`item pdf` / `fulltext`、`library citekey`、`collection list` / `get` / `subcollections` / `search` / `items` / `item-count` / `tags`，以及 `library list` / `stats` / `tags` 可以读正在运行的桌面。非空通用 `library search` 仍先读快照。一次命令只用一个来源，不拼接桌面结果和快照，也不自动改走 Web API。
 - 每条写路径拥有自己的成功和失败。Connector 或 Web API 出错时不能 fallback 到另一条路径。
 - 旧命令名或未实现能力先读 [references/migration.md](references/migration.md)，不要编造命令。
 
@@ -26,7 +26,7 @@ description: 当用户要直接查询、提取、整理或安全更新本机已�
 4. 保存查询：`library saved-search list/create/delete`。保存的是查询条件，不是结果快照。删除前进入下面的安全门。细节读 [references/reads.md](references/reads.md)。
 5. 下载附件：已知 key 用 `item download`；只有父条目时先 `item children`。不要把它当成 `item attach`，目标已存在时不自行加 `--force`。细节读 [references/reads.md](references/reads.md)。
 6. 导入：唯一路由是 `item import`。先 dry-run 并复述目标、可写性和记录数；同一输入确认后才加 `--confirm`。目标变化就停止。细节读 [references/writes.md](references/writes.md)。
-7. 安全写入：先选后端，再按下一节预览和确认。字段、作者、分类、单条标签、批量整理、merge/dedupe 和 preprint 状态都读 [references/writes.md](references/writes.md)。
+7. 安全写入：先选后端，再按下一节预览和确认。字段、作者、分类创建与单 key 删除、单条标签、批量整理、merge/dedupe 和 preprint 状态都读 [references/writes.md](references/writes.md)。
 8. 配置排障：`doctor` 或 `config show/init/set/profiles`。不要把 connector 配成通用写后端。字段含义读 [references/doctor.md](references/doctor.md)。
 9. Scite：单条 `item scite report`，库内 `item scite search`，撤稿扫描 `item scite retractions`。外部服务失败就直说，不伪造结果。细节读 [references/reads.md](references/reads.md)。
 10. 版本与回收站：`item versions --since` 和 `item deleted` 是读取。`sync update-status` 是 Web 写入，默认 dry-run。读取细节在 [references/reads.md](references/reads.md)，状态写回在 [references/writes.md](references/writes.md)。
@@ -41,7 +41,7 @@ description: 当用户要直接查询、提取、整理或安全更新本机已�
 
 第一次接触环境、任何写入、PDF 或附件排障、semantic index/search、workspace query、citation key、saved search、profile 切换，以及“为什么不工作”，先运行 `zot --json doctor`。
 
-`item get`、`item children`、`item pdf`、`library search`、`library citekey` 不必先跑完整 doctor。SQLite snapshot 被锁时看 `capabilities.sqlite_snapshot` 和 `capabilities.desktop_read` 的 `next`，继续执行读命令。探针可达不等于条目或 PDF 已读。
+`item get`、`item children`、`item pdf`、`library search`、`library citekey`，以及 `collection list` / `get` / `subcollections` / `search` / `items` / `item-count` / `tags` 和 `library list` / `stats` / `tags` 不必先跑完整 doctor。SQLite snapshot 被锁时，这十条分类和库清单命令继续走桌面读，不要先让用户关闭 Zotero。非空通用 `library search` 仍先读快照。看 `capabilities.sqlite_snapshot` 和 `capabilities.desktop_read` 的 `next`。探针可达不等于条目或 PDF 已读。
 
 路由时重点看四项能力：`desktop_read`、`local_api_write`、`connector_write`、`web_write`。`verified: false` 不是写入成功。其余字段、平台路径、硬约束和失败后的停止方式读 [references/doctor.md](references/doctor.md)。
 
@@ -50,6 +50,7 @@ description: 当用户要直接查询、提取、整理或安全更新本机已�
 - 用户只是查看、分析或评估时，不写 Zotero。
 - 预览不是完成。未带确认参数的 merge、dedupe、batch、import 和 status sync 都还没改库。
 - 确认参数必须来自同一次预览，并保持同一输入、过滤器和目标。目标、版本、hash、scope 或 profile 变化时重新预览。
+- 本地 `collection delete` 的确认必须同时带同一次预览的 Server ID、分类对象 version 和子孙 SHA-256。有子分类时先说明它们会被永久删除，文献仍留在库里。Zotero 10.0.8 的分类列表不含废纸篓中的子分类，预览和哈希也看不到它们，但这次删除仍会永久擦除它们。不要替用户点击授权框。
 - low-confidence 默认跳过。普通 confirm 不是授权，不能自行追加 `--include-low-confidence`。
 - 批量写入先看影响范围，默认不超过 50 条。超过时必须显式提高上限并重新审阅。部分失败不能说成全部成功。
 - 权限缺失、目标只读或路径不支持该 mutation 时停在只读说明。不改走另一条后端，不直接写 `zotero.sqlite`。

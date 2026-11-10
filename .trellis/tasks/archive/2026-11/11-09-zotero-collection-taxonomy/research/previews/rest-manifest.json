@@ -1,0 +1,224 @@
+{
+  "created": {
+    "soft-sensor": "FQZ9GPPN",
+    "foundation-models": "XRF5WWX2",
+    "transformers": "U4ZWG29U",
+    "multivariate": "ID2KTFJG",
+    "graphs": "7AI4CBF3",
+    "sequences": "UMQV286S"
+  },
+  "applied_count": 866,
+  "batches": [
+    {
+      "stem": "rest-batch-001",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-002",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-003",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-004",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-005",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-006",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-007",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-008",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-009",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-010",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-011",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-012",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-013",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-014",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-015",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-016",
+      "state": "in-progress",
+      "applied_count": 9,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 1,
+      "not_attempted_count": 30,
+      "stdout_state": "partial",
+      "stdout_applied": 10,
+      "note": "report rename failed after 10 verified applies; disk file stayed in-flight; PIUQ2I4J applied in stdout"
+    },
+    {
+      "stem": "rest-batch-017",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-018",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-019",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-020",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-021",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-022",
+      "state": "applied",
+      "applied_count": 40,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    },
+    {
+      "stem": "rest-batch-023",
+      "state": "applied",
+      "applied_count": 16,
+      "unchanged_count": 0,
+      "failed_count": 0,
+      "unknown_count": 0,
+      "not_attempted_count": 0
+    }
+  ],
+  "skipped": []
+}

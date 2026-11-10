@@ -5,7 +5,7 @@
 - `skills/zot/SKILL.md` is worth checking for real operator workflows around `doctor`, write actions, and workspaces.
 
 ## Workspace map
-- This is a Rust workspace (`edition = 2024`, `rust-version = 1.85`) with 5 crates under `src/`:
+- This is a Rust workspace (`edition = 2024`, `rust-version = 1.89`) with 5 crates under `src/`:
   - `zot-cli` — binary crate for `zot`; real CLI entrypoint is `src/zot-cli/src/main.rs`
   - `zot-core` — config, models, errors, JSON envelope
   - `zot-local` — local `zotero.sqlite` reads, PDF extraction/cache, workspace/RAG
@@ -36,9 +36,9 @@
   - failure: `{"ok": false, "error": {"code": "...", "message": "...", "hint": "..."}}`
 
 ## Read/write boundaries
-- Local SQLite (`zot-local`, `zotero.sqlite` plus attachment storage) remains read-only. Zotero 10+ Local API supports authenticated local writes through `zot-desktop` for `item update` and collection membership operations with explicit `--write-backend local`.
+- Local SQLite (`zot-local`, `zotero.sqlite` plus attachment storage) remains read-only. Zotero 10+ Local API supports authenticated local writes through `zot-desktop` for `item update`, collection membership, and single-key collection delete with explicit `--write-backend local`.
 - The built-in connector (`zot-desktop`) is import-only. The connector imports new BibTeX/RIS into Zotero's currently selected writable target. The connector does not update, merge, tag, note, or mutate collections.
-- Other library mutations go through the Zotero Web API via `zot-remote`. Existing commands default to Web; local writes preview by default and require `--confirm --expected-server-id ... --expected-version ...`. Never automatically switch transports.
+- Other library mutations go through the Zotero Web API via `zot-remote`. Existing commands default to Web; local writes preview by default and require `--confirm --expected-server-id ... --expected-version ...`. Collection delete can explicitly use local preview and confirm, bound to the Server ID, the collection object version, and the descendant SHA-256. Collection rename and reparent stay on the Web API. Never automatically switch transports.
 - Never write `zotero.sqlite` directly.
 - `zot mcp serve` is scaffolded but currently returns `mcp-not-implemented`; do not build workflows around MCP yet.
 
@@ -73,7 +73,7 @@
 
 ## Constraints and repo hygiene
 - Every workspace member inherits lints that forbid `unsafe`, `dbg!`, `todo!`, and `unwrap()`.
-- `.github/workflows/ci.yml` runs the pure gate on Linux, Windows, and macOS, checks Rust 1.85
+- `.github/workflows/ci.yml` runs the pure gate on Linux, Windows, and macOS, checks Rust 1.89
   MSRV, and includes dependency security and unused-dependency jobs. Local `just ci` remains the
   source of truth for the stable build/test sequence.
 - Tests are mostly inline crate tests. `src/zot-cli/tests/` also has integration targets

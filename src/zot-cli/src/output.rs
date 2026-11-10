@@ -60,6 +60,8 @@ impl CommandOutput {
                 trash_policy: seed.trash_policy,
                 fulltext_index: seed.fulltext_index,
                 read_source: seed.read_source,
+                trashed_collections: seed.trashed_collections,
+                direct_annotations: seed.direct_annotations,
                 api_version: Some(ENVELOPE_API_VERSION),
             };
             Ok(Self {
@@ -141,6 +143,8 @@ mod tests {
             trash_policy: None,
             fulltext_index: None,
             read_source: None,
+            trashed_collections: None,
+            direct_annotations: None,
         });
         let out = CommandOutput::new(&c, data, seed, |_| unreachable!()).expect("build");
         assert_eq!(

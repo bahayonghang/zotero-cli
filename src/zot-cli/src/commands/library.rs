@@ -15,18 +15,9 @@ use crate::cli::{
 use crate::commands::item::merge::{merge_item_set, selected_merge_writer};
 use crate::commands::library_dedupe::{WriterGroupMerger, apply_dedupe_plan, build_dedupe_plan};
 use crate::context::AppContext;
-use crate::format::{EnvelopeMetaSeed, print_items, print_stats};
+use crate::format::{EnvelopeMetaSeed, print_items};
 use crate::output::CommandOutput;
 use crate::util::{maybe_embed_query, parse_json_input, run_local, run_pdf};
-
-fn trash_policy(include_trashed: bool) -> String {
-    if include_trashed {
-        "included"
-    } else {
-        "excluded"
-    }
-    .to_string()
-}
 
 fn ensure_complete_duplicate_scan(scan: &DuplicateScanResult) -> ZotResult<()> {
     if scan.truncated {
@@ -80,26 +71,8 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             super::desktop_read::read_search(ctx, &io, options).await
         }
         LibraryCommand::List(args) => {
-            let include_trashed = args.include_trashed;
-            let options = SearchOptions {
-                collection: args.collection,
-                limit: resolved_output_limit(args.limit),
-                offset: args.offset,
-                exclude_trashed: !include_trashed,
-                ..SearchOptions::default()
-            };
-            let result = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
-                library.search(options)
-            })
-            .await?;
-            let seed = Some(EnvelopeMetaSeed {
-                count: Some(result.items.len()),
-                total: Some(result.total),
-                trash_policy: Some(trash_policy(include_trashed)),
-                fulltext_index: None,
-                read_source: None,
-            });
-            CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
+            let io = super::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
+            super::desktop_read::read_library_list(ctx, &io, args).await
         }
         LibraryCommand::Recent(args) => {
             let library = ctx.local_library()?;
@@ -117,32 +90,16 @@ pub(crate) async fn handle(ctx: &AppContext, command: LibraryCommand) -> Result<
             CommandOutput::new(ctx, items, None, |items| print_items(items))
         }
         LibraryCommand::Stats(args) => {
-            let include_trashed = args.include_trashed;
-            let stats = run_local(ctx.config.clone(), ctx.scope.clone(), move |library| {
-                library.get_stats_with_trashed(include_trashed)
-            })
-            .await?;
-            let seed = Some(EnvelopeMetaSeed {
-                count: None,
-                total: Some(stats.total_items),
-                trash_policy: Some(trash_policy(include_trashed)),
-                fulltext_index: None,
-                read_source: None,
-            });
-            CommandOutput::new(ctx, stats, seed, print_stats)
+            let io = super::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
+            super::desktop_read::read_library_stats(ctx, &io, args.include_trashed).await
         }
         LibraryCommand::Citekey(args) => {
             let io = super::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
             super::desktop_read::read_citekey(ctx, &io, &args.citekey).await
         }
-        LibraryCommand::Tags => {
-            let library = ctx.local_library()?;
-            let tags = library.get_tags()?;
-            CommandOutput::new(ctx, tags, None, |tags| {
-                for tag in tags {
-                    println!("{} ({})", tag.name, tag.count);
-                }
-            })
+        LibraryCommand::Tags(args) => {
+            let io = super::desktop_read::ReadIo::from_context(ctx, args.running_zotero);
+            super::desktop_read::read_library_tags(ctx, &io).await
         }
         LibraryCommand::Libraries => {
             let library = ctx.local_library()?;
@@ -305,6 +262,8 @@ async fn handle_saved_search(
                 trash_policy: None,
                 fulltext_index: None,
                 read_source: None,
+                trashed_collections: None,
+                direct_annotations: None,
             });
             CommandOutput::new(ctx, searches, seed, |searches| {
                 if searches.is_empty() {

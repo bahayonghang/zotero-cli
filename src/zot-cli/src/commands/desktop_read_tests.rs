@@ -10,12 +10,18 @@ use tiny_http::{Header, Response as FakeResponse, Server};
 use zot_core::{AnnotationSnippet, AppConfig, LibraryScope, PdfOutlineEntry, ZotError};
 use zot_desktop::{DesktopScanLimits, LocalApiClient};
 use zot_local::{
-    PdfAreaPosition, PdfBackend, PdfMatchPosition, SearchOptions, SortDirection, SortField,
+    LocalLibrary, PdfAreaPosition, PdfBackend, PdfMatchPosition, SearchOptions,
+    SnapshotOpenMeasure, SortDirection, SortField,
 };
 use zot_remote::{BetterBibTexClient, HttpRuntime};
 
 use super::{
-    ReadIo, identity_explicit, read_children, read_citekey, read_item, read_pdf, read_search,
+    ReadIo, identity_explicit, read_children, read_citekey, read_collection, read_item,
+    read_library_list, read_library_stats, read_library_tags, read_pdf, read_search,
+};
+use crate::cli::{
+    CollectionCommand, CollectionItemsArgs, CollectionKeyArgs, CollectionListArgs,
+    CollectionSearchArgs, LibraryListArgs,
 };
 use crate::context::AppContext;
 use crate::output::CommandOutput;
@@ -1127,6 +1133,18 @@ async fn identity_failures_do_not_fall_through() {
     );
     assert_eq!(unbound["meta"]["read_source"], "desktop-unbound");
     assert_eq!(mismatch.opens.load(Ordering::SeqCst), 0);
+    {
+        let hits = running.hits.lock().expect("hits");
+        assert!(
+            hits.iter()
+                .filter(|hit| hit.url.contains("/items/ATTN001"))
+                .all(|hit| {
+                    hit.headers
+                        .iter()
+                        .all(|(name, _)| name != "zotero-server-id")
+                })
+        );
+    }
 
     let (group_io, _) = io_for(
         dir.path(),
@@ -1664,4 +1682,693 @@ fn bbt_server(result: Value) -> (String, Arc<Mutex<Vec<String>>>) {
         }
     });
     (base, hits)
+}
+
+fn seed_open_inventory(dir: &Path) {
+    seed_sqlite(dir);
+    let conn = Connection::open(dir.join("zotero.sqlite")).expect("inventory db");
+    conn.execute_batch(
+        "
+        INSERT INTO collections VALUES (1, 'Members', NULL, 1, 'COLMEM01');
+        INSERT INTO collections VALUES (2, 'Child', 1, 1, 'COLCH002');
+        INSERT INTO collections VALUES (3, 'Sql Only', NULL, 1, 'SQLONLY1');
+        INSERT INTO collections VALUES (4, 'Trashed Shelf', NULL, 1, 'TRASHCOL');
+        INSERT INTO items VALUES (30, 1, '2024-01-01 00:00:00', '2024-01-02 00:00:00', '2024-01-02 00:00:00', 1, 'ART00030');
+        INSERT INTO items VALUES (31, 3, '2024-01-01 00:00:00', '2024-01-02 00:00:00', '2024-01-02 00:00:00', 1, 'NOTE0031');
+        INSERT INTO items VALUES (32, 2, '2024-01-01 00:00:00', '2024-01-02 00:00:00', '2024-01-02 00:00:00', 1, 'ATT00032');
+        INSERT INTO itemNotes VALUES (31, 30, 'child note', NULL);
+        INSERT INTO itemAttachments VALUES (32, NULL, 0, 'application/pdf', NULL, 'storage:loose.pdf');
+        INSERT INTO tags VALUES (50, 'article-tag');
+        INSERT INTO tags VALUES (51, 'note-only');
+        INSERT INTO itemTags VALUES (30, 50, 0);
+        INSERT INTO itemTags VALUES (31, 51, 0);
+        INSERT INTO collectionItems VALUES (1, 30, 0);
+        INSERT INTO collectionItems VALUES (1, 32, 1);
+        ",
+    )
+    .expect("inventory rows");
+}
+
+fn inventory_dir() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("temp");
+    seed_open_inventory(dir.path());
+    dir
+}
+
+fn inventory_headers() -> Vec<(&'static str, String)> {
+    vec![
+        ("X-Zotero-Version", "10.0.8".to_string()),
+        ("Zotero-API-Version", "3".to_string()),
+        ("Zotero-Server-ID", "server-abc".to_string()),
+        ("Last-Modified-Version", "5".to_string()),
+    ]
+}
+
+fn tagged_row(
+    key: &str,
+    kind: &str,
+    title: &str,
+    tag: Option<&str>,
+    parent: Option<&str>,
+    deleted: bool,
+    collection: Option<&str>,
+) -> Value {
+    let mut data = serde_json::Map::new();
+    data.insert("key".to_string(), json!(key));
+    data.insert("itemType".to_string(), json!(kind));
+    data.insert("title".to_string(), json!(title));
+    data.insert(
+        "tags".to_string(),
+        match tag {
+            Some(tag) => json!([{"tag": tag}]),
+            None => json!([]),
+        },
+    );
+    data.insert(
+        "collections".to_string(),
+        match collection {
+            Some(collection) => json!([collection]),
+            None => json!([]),
+        },
+    );
+    if let Some(parent) = parent {
+        data.insert("parentItem".to_string(), json!(parent));
+    }
+    if kind == "attachment" {
+        data.insert("contentType".to_string(), json!("application/pdf"));
+    }
+    if deleted {
+        data.insert("deleted".to_string(), json!(true));
+    }
+    json!({"key": key, "data": data})
+}
+
+fn inventory_collections() -> String {
+    json!([
+        {"key":"COLMEM01","data":{"key":"COLMEM01","name":"Members","parentCollection":false}},
+        {"key":"COLCH002","data":{"key":"COLCH002","name":"Child","parentCollection":"COLMEM01"}}
+    ])
+    .to_string()
+}
+
+fn inventory_members() -> String {
+    json!([
+        tagged_row(
+            "ART00030",
+            "journalArticle",
+            "Paper",
+            Some("article-tag"),
+            None,
+            false,
+            Some("COLMEM01")
+        ),
+        tagged_row(
+            "ATT00032",
+            "attachment",
+            "Loose",
+            None,
+            None,
+            false,
+            Some("COLMEM01")
+        ),
+        tagged_row(
+            "ANN00033",
+            "annotation",
+            "",
+            Some("note-only"),
+            Some("ATT00032"),
+            false,
+            Some("COLMEM01")
+        )
+    ])
+    .to_string()
+}
+
+fn inventory_items() -> String {
+    json!([
+        tagged_row("AAAA1111", "journalArticle", "New", None, None, false, None),
+        tagged_row(
+            "ART00030",
+            "journalArticle",
+            "Paper",
+            Some("article-tag"),
+            None,
+            false,
+            Some("COLMEM01")
+        ),
+        tagged_row("ZZZZ9999", "journalArticle", "Old", None, None, false, None),
+        tagged_row(
+            "ATT00032",
+            "attachment",
+            "Loose",
+            None,
+            None,
+            false,
+            Some("COLMEM01")
+        ),
+        tagged_row(
+            "NOTE0031",
+            "note",
+            "",
+            Some("note-only"),
+            Some("ART00030"),
+            false,
+            None
+        ),
+        tagged_row(
+            "ANN00033",
+            "annotation",
+            "",
+            Some("anno-hidden"),
+            Some("ATT00032"),
+            false,
+            None
+        ),
+        tagged_row("TRSH0001", "journalArticle", "Gone", None, None, true, None)
+    ])
+    .to_string()
+}
+
+fn collection_object_key(url: &str) -> Option<&str> {
+    let rest = url.split("/collections/").nth(1)?;
+    if rest.contains('?') || rest.contains('/') {
+        return None;
+    }
+    Some(rest)
+}
+
+fn serve_inventory(list_status: u16) -> Running {
+    let http = Server::http("127.0.0.1:0").expect("server");
+    let base = format!("http://{}/", http.server_addr());
+    let hits = Arc::new(Mutex::new(Vec::new()));
+    let recorded = Arc::clone(&hits);
+    let stop = Arc::new(AtomicBool::new(false));
+    let running = Arc::clone(&stop);
+    let collections = inventory_collections();
+    let members = inventory_members();
+    let items = inventory_items();
+    std::thread::spawn(move || {
+        while !running.load(Ordering::SeqCst) {
+            let Ok(Some(request)) = http.recv_timeout(Duration::from_millis(200)) else {
+                continue;
+            };
+            let url = request.url().to_string();
+            let method = request.method().to_string();
+            let headers = request
+                .headers()
+                .iter()
+                .map(|header| {
+                    (
+                        header.field.to_string().to_ascii_lowercase(),
+                        header.value.to_string(),
+                    )
+                })
+                .collect();
+            recorded.lock().expect("hits").push(Hit {
+                method,
+                url: url.clone(),
+                headers,
+            });
+            let (status, body) = if is_probe(&url) {
+                (200, "{}".to_string())
+            } else if url.contains("/collections/") && url.contains("/items/top") {
+                if url.contains("/collections/COLMEM01/items/top") {
+                    (200, members.clone())
+                } else {
+                    (200, items.clone())
+                }
+            } else if url.contains("/items/top") {
+                (200, items.clone())
+            } else if url.contains("/collections?") {
+                (list_status, collections.clone())
+            } else if let Some(key) = collection_object_key(&url) {
+                if key == "COLMEM01" || key == "COLCH002" {
+                    let name = if key == "COLMEM01" {
+                        "Members"
+                    } else {
+                        "Child"
+                    };
+                    let parent = if key == "COLCH002" {
+                        json!("COLMEM01")
+                    } else {
+                        json!(false)
+                    };
+                    (
+                        200,
+                        json!({"key": key, "data": {"key": key, "name": name, "parentCollection": parent}}).to_string(),
+                    )
+                } else {
+                    (404, "{}".to_string())
+                }
+            } else if url.contains("/items?") {
+                (200, items.clone())
+            } else {
+                (404, "{}".to_string())
+            };
+            let mut response = FakeResponse::from_string(body).with_status_code(status);
+            for (name, value) in inventory_headers() {
+                response.add_header(Header::from_bytes(name, value).expect("header"));
+            }
+            let _ = request.respond(response);
+        }
+    });
+    Running { base, hits, stop }
+}
+
+const OPEN_READS: [&str; 10] = [
+    "collection-list",
+    "collection-get",
+    "collection-subcollections",
+    "collection-search",
+    "collection-items",
+    "collection-item-count",
+    "collection-tags",
+    "library-list",
+    "library-stats",
+    "library-tags",
+];
+
+async fn run_open_read(io: &ReadIo, kind: &str) -> Result<CommandOutput> {
+    let context = ctx(false);
+    match kind {
+        "collection-list" => {
+            read_collection(
+                &context,
+                io,
+                CollectionCommand::List(CollectionListArgs {
+                    running_zotero: false,
+                }),
+            )
+            .await
+        }
+        "collection-get" => {
+            read_collection(
+                &context,
+                io,
+                CollectionCommand::Get(CollectionKeyArgs {
+                    key: "COLMEM01".to_string(),
+                    running_zotero: false,
+                }),
+            )
+            .await
+        }
+        "collection-subcollections" => {
+            read_collection(
+                &context,
+                io,
+                CollectionCommand::Subcollections(CollectionKeyArgs {
+                    key: "COLMEM01".to_string(),
+                    running_zotero: false,
+                }),
+            )
+            .await
+        }
+        "collection-search" => {
+            read_collection(
+                &context,
+                io,
+                CollectionCommand::Search(CollectionSearchArgs {
+                    query: "Members".to_string(),
+                    limit: Some(20),
+                    running_zotero: false,
+                }),
+            )
+            .await
+        }
+        "collection-items" => {
+            read_collection(
+                &context,
+                io,
+                CollectionCommand::Items(CollectionItemsArgs {
+                    key: "COLMEM01".to_string(),
+                    running_zotero: false,
+                }),
+            )
+            .await
+        }
+        "collection-item-count" => {
+            read_collection(
+                &context,
+                io,
+                CollectionCommand::ItemCount(CollectionKeyArgs {
+                    key: "COLMEM01".to_string(),
+                    running_zotero: false,
+                }),
+            )
+            .await
+        }
+        "collection-tags" => {
+            read_collection(
+                &context,
+                io,
+                CollectionCommand::Tags(CollectionKeyArgs {
+                    key: "COLMEM01".to_string(),
+                    running_zotero: false,
+                }),
+            )
+            .await
+        }
+        "library-list" => {
+            read_library_list(
+                &context,
+                io,
+                LibraryListArgs {
+                    collection: None,
+                    limit: Some(50),
+                    offset: 0,
+                    include_trashed: false,
+                    running_zotero: false,
+                },
+            )
+            .await
+        }
+        "library-stats" => read_library_stats(&context, io, false).await,
+        "library-tags" => read_library_tags(&context, io).await,
+        _ => unreachable!("unknown inventory command"),
+    }
+}
+
+fn nested_keys(value: &Value) -> Vec<String> {
+    let mut keys = Vec::new();
+    fn walk(value: &Value, keys: &mut Vec<String>) {
+        if let Some(key) = value.get("key").and_then(Value::as_str) {
+            keys.push(key.to_string());
+        }
+        if let Some(children) = value.get("children").and_then(Value::as_array) {
+            for child in children {
+                walk(child, keys);
+            }
+        }
+    }
+    match value.get("data") {
+        Some(Value::Array(rows)) => {
+            for row in rows {
+                walk(row, &mut keys);
+            }
+        }
+        Some(row) => walk(row, &mut keys),
+        None => {}
+    }
+    keys
+}
+
+fn assert_desktop_inventory(kind: &str, value: &Value) {
+    assert_eq!(value["meta"]["read_source"], "desktop", "{kind}");
+    match kind {
+        "collection-list"
+        | "collection-get"
+        | "collection-subcollections"
+        | "collection-search" => {
+            assert_eq!(value["meta"]["trashed_collections"], "omitted");
+            assert!(value["meta"].get("direct_annotations").is_none());
+        }
+        "collection-items" | "collection-item-count" | "collection-tags" => {
+            assert_eq!(value["meta"]["direct_annotations"], "omitted");
+            assert!(value["meta"].get("trashed_collections").is_none());
+        }
+        _ => {
+            assert!(value["meta"].get("trashed_collections").is_none());
+            assert!(value["meta"].get("direct_annotations").is_none());
+        }
+    }
+    match kind {
+        "collection-list" => {
+            let keys = nested_keys(value);
+            assert!(keys.contains(&"COLMEM01".to_string()));
+            assert!(keys.contains(&"COLCH002".to_string()));
+            assert!(!keys.contains(&"SQLONLY1".to_string()));
+            assert!(!keys.contains(&"TRASHCOL".to_string()));
+        }
+        "collection-get" => assert!(nested_keys(value).contains(&"COLCH002".to_string())),
+        "collection-subcollections" => assert_eq!(nested_keys(value), vec!["COLCH002".to_string()]),
+        "collection-search" => assert!(nested_keys(value).contains(&"COLMEM01".to_string())),
+        "collection-items" => assert_eq!(
+            keys_of(value),
+            vec!["ART00030".to_string(), "ATT00032".to_string()]
+        ),
+        "collection-item-count" => assert_eq!(value["data"]["item_count"], 2),
+        "collection-tags" => {
+            let names = value["data"]
+                .as_array()
+                .expect("tags")
+                .iter()
+                .map(|tag| tag["name"].as_str().expect("name"))
+                .collect::<Vec<_>>();
+            assert_eq!(names, vec!["article-tag"]);
+        }
+        "library-list" => {
+            assert_eq!(
+                keys_of(value),
+                vec![
+                    "ZZZZ9999".to_string(),
+                    "ART00030".to_string(),
+                    "AAAA1111".to_string()
+                ]
+            );
+            assert_eq!(value["meta"]["trash_policy"], "excluded");
+        }
+        "library-stats" => {
+            assert_eq!(value["data"]["top_tags"]["article-tag"], 1);
+            assert!(value["data"]["top_tags"].get("note-only").is_none());
+            assert_eq!(value["data"]["notes"], 1);
+            assert_eq!(value["data"]["pdf_attachments"], 0);
+        }
+        "library-tags" => {
+            let names = value["data"]
+                .as_array()
+                .expect("tags")
+                .iter()
+                .map(|tag| tag["name"].as_str().expect("name"))
+                .collect::<Vec<_>>();
+            assert!(names.contains(&"note-only"));
+            assert!(names.contains(&"anno-hidden"));
+            assert!(names.contains(&"article-tag"));
+        }
+        _ => {}
+    }
+}
+
+#[tokio::test]
+async fn open_collection_and_library_reads_skip_the_locked_snapshot() {
+    let dir = inventory_dir();
+    let _lock = hold_exclusive(&dir.path().join("zotero.sqlite"));
+    let measure = SnapshotOpenMeasure::begin();
+    let running = serve_inventory(200);
+    let (io, _) = io_for(
+        dir.path(),
+        Some(client(&running.base)),
+        false,
+        false,
+        LibraryScope::User,
+    );
+    for kind in OPEN_READS {
+        let value = envelope(run_open_read(&io, kind).await.expect(kind));
+        assert_desktop_inventory(kind, &value);
+    }
+    assert_eq!(measure.delta(), 0);
+    assert_eq!(io.opens.load(Ordering::SeqCst), 0);
+    assert_read_only(&running.hits.lock().expect("hits"));
+    drop(measure);
+}
+
+#[tokio::test]
+async fn closed_collection_and_library_reads_open_one_snapshot() {
+    let dir = inventory_dir();
+    let port = closed_port();
+    let base = format!("http://127.0.0.1:{port}/");
+    for kind in OPEN_READS {
+        let measure = SnapshotOpenMeasure::begin();
+        let (io, _) = io_for(
+            dir.path(),
+            Some(client(&base)),
+            false,
+            false,
+            LibraryScope::User,
+        );
+        let value = envelope(run_open_read(&io, kind).await.expect(kind));
+        assert_eq!(value["meta"]["read_source"], "snapshot", "{kind}");
+        assert!(value["meta"].get("trashed_collections").is_none(), "{kind}");
+        assert!(value["meta"].get("direct_annotations").is_none(), "{kind}");
+        assert_eq!(measure.delta(), 1, "{kind}");
+        assert_eq!(io.opens.load(Ordering::SeqCst), 1, "{kind}");
+        if kind == "library-tags" {
+            let _again = LocalLibrary::open(dir.path(), LibraryScope::User).expect("second open");
+            assert_eq!(measure.delta(), 2);
+        }
+        drop(measure);
+        match kind {
+            "collection-list" => {
+                let keys = nested_keys(&value);
+                assert!(keys.contains(&"SQLONLY1".to_string()));
+                assert!(keys.contains(&"TRASHCOL".to_string()));
+            }
+            "collection-items" => assert_eq!(
+                keys_of(&value),
+                vec!["ART00030".to_string(), "ATT00032".to_string()]
+            ),
+            "collection-item-count" => assert_eq!(value["data"]["item_count"], 2),
+            "collection-tags" => {
+                let names = value["data"]
+                    .as_array()
+                    .expect("tags")
+                    .iter()
+                    .map(|tag| tag["name"].as_str().expect("name"))
+                    .collect::<Vec<_>>();
+                assert_eq!(names, vec!["article-tag"]);
+            }
+            _ => {}
+        }
+    }
+}
+
+#[tokio::test]
+async fn collection_identity_mismatch_does_not_read_the_library_snapshot() {
+    let dir = inventory_dir();
+    let running = serve_inventory(200);
+    let measure = SnapshotOpenMeasure::begin();
+    let (io, binding) = io_for(
+        dir.path(),
+        Some(client(&running.base)),
+        true,
+        false,
+        LibraryScope::User,
+    );
+    std::fs::write(
+        &binding,
+        serde_json::json!({
+            "bindings": [{"data_dir": dir.path().display().to_string(), "server_id": "other-server"}]
+        })
+        .to_string(),
+    )
+    .expect("binding");
+    assert_eq!(
+        error_code(run_open_read(&io, "library-list").await),
+        "desktop-library-mismatch"
+    );
+    assert_eq!(io.opens.load(Ordering::SeqCst), 0);
+    assert_eq!(measure.delta(), 0);
+    assert!(
+        running
+            .hits
+            .lock()
+            .expect("hits")
+            .iter()
+            .all(|hit| is_probe(&hit.url))
+    );
+    drop(measure);
+}
+
+#[tokio::test]
+async fn unbound_collection_items_omit_the_library_server_id() {
+    let dir = inventory_dir();
+    let running = serve_inventory(200);
+    let measure = SnapshotOpenMeasure::begin();
+    let (io, _) = io_for(
+        dir.path(),
+        Some(client(&running.base)),
+        true,
+        true,
+        LibraryScope::User,
+    );
+    let value = envelope(
+        run_open_read(&io, "collection-items")
+            .await
+            .expect("unbound"),
+    );
+    assert_eq!(value["meta"]["read_source"], "desktop-unbound");
+    assert_eq!(measure.delta(), 0);
+    assert_eq!(io.opens.load(Ordering::SeqCst), 0);
+    let hits = running.hits.lock().expect("hits");
+    assert!(hits.iter().filter(|hit| !is_probe(&hit.url)).all(|hit| {
+        hit.headers
+            .iter()
+            .all(|(name, _)| name != "zotero-server-id" && name != "zotero-api-key")
+    }));
+    drop(measure);
+}
+
+#[tokio::test]
+async fn collection_items_404_does_not_fall_back_to_the_library_snapshot() {
+    let dir = inventory_dir();
+    let running = serve_inventory(200);
+    let measure = SnapshotOpenMeasure::begin();
+    let (io, _) = io_for(
+        dir.path(),
+        Some(client(&running.base)),
+        false,
+        false,
+        LibraryScope::User,
+    );
+    let context = ctx(false);
+    let error = read_collection(
+        &context,
+        &io,
+        CollectionCommand::Items(CollectionItemsArgs {
+            key: "NOPEKEY1".to_string(),
+            running_zotero: false,
+        }),
+    )
+    .await
+    .expect_err("missing collection");
+    let payload = error.downcast_ref::<ZotError>().expect("zot").payload();
+    assert_eq!(payload.code, "collection-not-found");
+    assert_eq!(
+        payload.hint.as_deref(),
+        Some("Use 'zot collection list' to inspect collection names")
+    );
+    assert_eq!(io.opens.load(Ordering::SeqCst), 0);
+    assert_eq!(measure.delta(), 0);
+    assert!(
+        running
+            .hits
+            .lock()
+            .expect("hits")
+            .iter()
+            .all(|hit| !hit.url.contains("NOPEKEY1/items"))
+    );
+    drop(measure);
+}
+
+#[tokio::test]
+async fn collection_list_http_404_stays_on_the_desktop_library_error() {
+    let dir = inventory_dir();
+    let running = serve_inventory(404);
+    let measure = SnapshotOpenMeasure::begin();
+    let (io, _) = io_for(
+        dir.path(),
+        Some(client(&running.base)),
+        false,
+        false,
+        LibraryScope::User,
+    );
+    assert_eq!(
+        error_code(run_open_read(&io, "collection-list").await),
+        "local-api-http"
+    );
+    assert_eq!(io.opens.load(Ordering::SeqCst), 0);
+    assert_eq!(measure.delta(), 0);
+    drop(measure);
+}
+
+#[tokio::test]
+async fn group_library_tags_use_the_group_collection_prefix() {
+    let dir = inventory_dir();
+    let running = serve_inventory(200);
+    let (io, _) = io_for(
+        dir.path(),
+        Some(client(&running.base)),
+        false,
+        false,
+        LibraryScope::Group { group_id: 99999 },
+    );
+    let value = envelope(run_open_read(&io, "library-tags").await.expect("group"));
+    assert_eq!(value["meta"]["read_source"], "desktop");
+    assert!(
+        running
+            .hits
+            .lock()
+            .expect("hits")
+            .iter()
+            .any(|hit| hit.url.contains("/groups/99999/"))
+    );
 }

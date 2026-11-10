@@ -30,7 +30,7 @@ connector 不需要 API key 或插件配置。`doctor` 显示 `connector_write` 
 - saved search / 配置排障 / profile 切换
 - 用户说“为什么不工作”
 
-`item get`、`item children`、`item pdf`、`library search`、`library citekey` 不必先跑完整 doctor 就能读。doctor 仍用于第一次接触环境、写操作、PDF 排障和“为什么不工作”。SQLite snapshot 单独失败（库被 Zotero 锁住）不要中止上述读取：看 `capabilities.sqlite_snapshot` 和 `capabilities.desktop_read` 的 `next`，再执行读命令。探针可达不是条目或 PDF 已经读成功。`desktop_read.item_read_verified` 和 `pdf_read_verified` 恒为 false。
+`item get`、`item children`、`item pdf`、`library search`、`library citekey`，以及 `collection list` / `get` / `subcollections` / `search` / `items` / `item-count` / `tags` 和 `library list` / `stats` / `tags` 不必先跑完整 doctor 就能读。doctor 仍用于第一次接触环境、写操作、PDF 排障和“为什么不工作”。SQLite snapshot 单独失败（库被 Zotero 锁住）不要中止这些读取，也不要把「先关闭 Zotero」说成这十条命令的下一步：看 `capabilities.sqlite_snapshot` 和 `capabilities.desktop_read` 的 `next`，再执行读命令。非空通用 `library search` 仍先读快照。探针可达不是条目或 PDF 已经读成功。`desktop_read.item_read_verified` 和 `pdf_read_verified` 恒为 false。
 
 首选：
 

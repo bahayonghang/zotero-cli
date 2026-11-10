@@ -1,0 +1,456 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "item_key": "5TYCIX6R",
+      "remove_collections": [
+        "J4PNTSY2",
+        "MSKRR445"
+      ],
+      "reason": "dissolve Mamba, TimeSeriesForecasting",
+      "add_collections": [
+        "UMQV286S",
+        "Z2YE4E6Y"
+      ]
+    },
+    {
+      "item_key": "5USGCSVG",
+      "remove_collections": [
+        "MSKRR445"
+      ],
+      "reason": "dissolve TimeSeriesForecasting",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ]
+    },
+    {
+      "item_key": "5VB59K96",
+      "remove_collections": [
+        "MVTJN75R"
+      ],
+      "reason": "dissolve Multi-Modal",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/multimodal"
+      ]
+    },
+    {
+      "item_key": "5VG2J865",
+      "remove_collections": [
+        "C29NNG2W"
+      ],
+      "reason": "dissolve DistributionShift",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/distribution-shift"
+      ]
+    },
+    {
+      "item_key": "5XCFMRIS",
+      "remove_collections": [
+        "P5WKAC5Y"
+      ],
+      "reason": "dissolve LLM/FoundationModels",
+      "add_collections": [
+        "XRF5WWX2"
+      ]
+    },
+    {
+      "item_key": "62MN67P6",
+      "remove_collections": [
+        "2NXF6MY7"
+      ],
+      "reason": "dissolve MissingValues",
+      "add_collections": [
+        "AQVFMLX8"
+      ],
+      "add_tags": [
+        "ts/missing"
+      ]
+    },
+    {
+      "item_key": "63ABKWDC",
+      "remove_collections": [
+        "3R2KZKPK"
+      ],
+      "reason": "dissolve Wavelet",
+      "add_collections": [
+        "WEUYPTDU"
+      ],
+      "add_tags": [
+        "ts/wavelet"
+      ]
+    },
+    {
+      "item_key": "64W3NMDY",
+      "remove_collections": [
+        "I7EXK2G4"
+      ],
+      "reason": "dissolve FiLM",
+      "add_collections": [
+        "5FFJS7PN"
+      ],
+      "add_tags": [
+        "dl/film"
+      ]
+    },
+    {
+      "item_key": "653EKZ66",
+      "remove_collections": [
+        "5TM93XGJ"
+      ],
+      "reason": "dissolve FaultDiagnosis",
+      "add_collections": [
+        "HU7D6CU9"
+      ],
+      "add_tags": [
+        "ts/fault"
+      ]
+    },
+    {
+      "item_key": "66EFJU9M",
+      "remove_collections": [
+        "WDQDMY6T"
+      ],
+      "reason": "dissolve Data&Feature Selection",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/feature-selection"
+      ]
+    },
+    {
+      "item_key": "68XU7DPN",
+      "remove_collections": [
+        "AD9X6CJI"
+      ],
+      "reason": "dissolve Non-stationaryTS",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/nonstationary"
+      ]
+    },
+    {
+      "item_key": "69RZR842",
+      "remove_collections": [
+        "MSKRR445"
+      ],
+      "reason": "dissolve TimeSeriesForecasting",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ]
+    },
+    {
+      "item_key": "6AFU3RH6",
+      "remove_collections": [
+        "MSKRR445"
+      ],
+      "reason": "dissolve TimeSeriesForecasting",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ]
+    },
+    {
+      "item_key": "6BQJ5TJY",
+      "remove_collections": [
+        "P5WKAC5Y"
+      ],
+      "reason": "dissolve LLM/FoundationModels",
+      "add_collections": [
+        "XRF5WWX2"
+      ]
+    },
+    {
+      "item_key": "6DQYV7XK",
+      "remove_collections": [
+        "Z9BJ9QB5"
+      ],
+      "reason": "dissolve MultiVariable",
+      "add_collections": [
+        "ID2KTFJG"
+      ]
+    },
+    {
+      "item_key": "6E9PJXFA",
+      "remove_collections": [
+        "MSKRR445"
+      ],
+      "reason": "dissolve TimeSeriesForecasting",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ]
+    },
+    {
+      "item_key": "6GHG5K8F",
+      "remove_collections": [
+        "MSKRR445"
+      ],
+      "reason": "dissolve TimeSeriesForecasting",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ]
+    },
+    {
+      "item_key": "6H88ADRN",
+      "remove_collections": [
+        "P5WKAC5Y"
+      ],
+      "reason": "dissolve LLM/FoundationModels",
+      "add_collections": [
+        "XRF5WWX2"
+      ]
+    },
+    {
+      "item_key": "6I388SXH",
+      "remove_collections": [
+        "P5WKAC5Y"
+      ],
+      "reason": "dissolve LLM/FoundationModels",
+      "add_collections": [
+        "XRF5WWX2"
+      ]
+    },
+    {
+      "item_key": "6I6NATM7",
+      "remove_collections": [
+        "ZE3Z2YJK"
+      ],
+      "reason": "dissolve Transformer_based_ts_prediction",
+      "add_collections": [
+        "U4ZWG29U"
+      ]
+    },
+    {
+      "item_key": "6IQH2SQQ",
+      "remove_collections": [
+        "3HMSXAP3"
+      ],
+      "reason": "dissolve embed",
+      "add_collections": [
+        "U4ZWG29U"
+      ],
+      "add_tags": [
+        "ts/embed"
+      ]
+    },
+    {
+      "item_key": "6MCGWL6X",
+      "remove_collections": [
+        "52IMKB43",
+        "Z9BJ9QB5",
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve MOE, MultiVariable, Soft Sensor",
+      "add_collections": [
+        "5FFJS7PN",
+        "ID2KTFJG",
+        "FQZ9GPPN"
+      ],
+      "add_tags": [
+        "dl/moe"
+      ]
+    },
+    {
+      "item_key": "6NPM66A7",
+      "remove_collections": [
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve Soft Sensor",
+      "add_collections": [
+        "FQZ9GPPN"
+      ]
+    },
+    {
+      "item_key": "6PL9QBR7",
+      "remove_collections": [
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve Soft Sensor",
+      "add_collections": [
+        "FQZ9GPPN"
+      ]
+    },
+    {
+      "item_key": "6PWX8LG2",
+      "remove_collections": [
+        "MSKRR445"
+      ],
+      "reason": "dissolve TimeSeriesForecasting",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ]
+    },
+    {
+      "item_key": "6R3QP6FH",
+      "remove_collections": [
+        "MVTJN75R"
+      ],
+      "reason": "dissolve Multi-Modal",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/multimodal"
+      ]
+    },
+    {
+      "item_key": "6SFNI78Z",
+      "remove_collections": [
+        "P5WKAC5Y"
+      ],
+      "reason": "dissolve LLM/FoundationModels",
+      "add_collections": [
+        "XRF5WWX2"
+      ]
+    },
+    {
+      "item_key": "6SSCMTK5",
+      "remove_collections": [
+        "58QAX269"
+      ],
+      "reason": "dissolve semi-supervised",
+      "add_collections": [
+        "FQZ9GPPN"
+      ],
+      "add_tags": [
+        "ts/semi-supervised"
+      ]
+    },
+    {
+      "item_key": "6VDD6KKQ",
+      "remove_collections": [
+        "Z9BJ9QB5"
+      ],
+      "reason": "dissolve MultiVariable",
+      "add_collections": [
+        "ID2KTFJG"
+      ]
+    },
+    {
+      "item_key": "6VPCW4DA",
+      "remove_collections": [
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve Soft Sensor",
+      "add_collections": [
+        "FQZ9GPPN"
+      ]
+    },
+    {
+      "item_key": "6WFWZ84E",
+      "remove_collections": [
+        "P5WKAC5Y"
+      ],
+      "reason": "dissolve LLM/FoundationModels",
+      "add_collections": [
+        "XRF5WWX2"
+      ]
+    },
+    {
+      "item_key": "6XQSHDYK",
+      "remove_collections": [
+        "HVRA5J27"
+      ],
+      "reason": "dissolve Graph Neural Networks",
+      "add_collections": [
+        "7AI4CBF3"
+      ]
+    },
+    {
+      "item_key": "6ZU5XMGK",
+      "remove_collections": [
+        "P5WKAC5Y"
+      ],
+      "reason": "dissolve LLM/FoundationModels",
+      "add_collections": [
+        "XRF5WWX2"
+      ]
+    },
+    {
+      "item_key": "72F9JMSA",
+      "remove_collections": [
+        "3R2KZKPK"
+      ],
+      "reason": "dissolve Wavelet",
+      "add_collections": [
+        "WEUYPTDU"
+      ],
+      "add_tags": [
+        "ts/wavelet"
+      ]
+    },
+    {
+      "item_key": "73ISM2CQ",
+      "remove_collections": [
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve Soft Sensor",
+      "add_collections": [
+        "FQZ9GPPN"
+      ]
+    },
+    {
+      "item_key": "74U9GR7A",
+      "remove_collections": [
+        "ZME8XQMS"
+      ],
+      "reason": "dissolve Soft Sensor",
+      "add_collections": [
+        "FQZ9GPPN"
+      ]
+    },
+    {
+      "item_key": "75CLNG4H",
+      "remove_collections": [
+        "S7LAUZAB"
+      ],
+      "reason": "dissolve Multi-Scale",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/multiscale"
+      ]
+    },
+    {
+      "item_key": "76M2JT4E",
+      "remove_collections": [
+        "ZUUGNTI8"
+      ],
+      "reason": "dissolve Spatial-Temporal",
+      "add_collections": [
+        "Z2YE4E6Y"
+      ],
+      "add_tags": [
+        "ts/spatial-temporal"
+      ]
+    },
+    {
+      "item_key": "78F6IC9J",
+      "remove_collections": [
+        "Z9BJ9QB5"
+      ],
+      "reason": "dissolve MultiVariable",
+      "add_collections": [
+        "ID2KTFJG"
+      ]
+    },
+    {
+      "item_key": "79D9N8W3",
+      "remove_collections": [
+        "ZE3Z2YJK"
+      ],
+      "reason": "dissolve Transformer_based_ts_prediction",
+      "add_collections": [
+        "U4ZWG29U"
+      ]
+    }
+  ]
+}

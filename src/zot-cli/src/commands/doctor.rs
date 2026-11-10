@@ -235,7 +235,7 @@ fn read_route_rows(
         }),
         Err(error) => {
             let next = if error.payload().code == "zotero-db-busy" {
-                "Close Zotero before a snapshot read."
+                "The snapshot is locked. collection list, get, subcollections, search, items, item-count, tags and library list, stats, and tags can use desktop read when local communication is available."
             } else {
                 "The snapshot could not be opened. Close Zotero and retry, or read the running Zotero when that library is proved."
             };
@@ -256,7 +256,7 @@ fn read_route_rows(
             "pdf_read_verified": false,
             "zotero_version": probe.zotero_version,
             "api_version": probe.api_version,
-            "next": "item get, item children, item pdf, library search, and library citekey can read the running Zotero. A reachable probe is not an item or PDF read. Pass --running-zotero when a profile or explicit data directory is not proved.",
+            "next": "item get, item children, item pdf, library search, library citekey, collection list, get, subcollections, search, items, item-count, tags, and library list, stats, and tags can read the running Zotero. A reachable probe is not an item or PDF read. Pass --running-zotero when a profile or explicit data directory is not proved.",
         }),
         Ok(probe) => serde_json::json!({
             "reachable": true,
@@ -502,7 +502,10 @@ mod tests {
         let (sqlite_row, desktop_row) = read_route_rows(&busy, &forbidden);
         assert_eq!(sqlite_row["available"], false);
         assert_eq!(sqlite_row["error"]["code"], "zotero-db-busy");
-        assert_eq!(sqlite_row["next"], "Close Zotero before a snapshot read.");
+        assert_eq!(
+            sqlite_row["next"],
+            "The snapshot is locked. collection list, get, subcollections, search, items, item-count, tags and library list, stats, and tags can use desktop read when local communication is available."
+        );
         assert_eq!(sqlite_row["item_read_verified"], false);
         assert_eq!(desktop_row["reachable"], false);
         assert_eq!(desktop_row["error"]["code"], "local-api-forbidden");

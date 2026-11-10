@@ -20,8 +20,9 @@ use zot_desktop::{
 use zot_local::{LocalLibrary, PdfCache, SearchOptions, SortDirection, SortField};
 use zot_remote::{BetterBibTexClient, BetterBibTexSearchItem};
 
+use crate::cli::{CollectionCommand, resolved_output_limit};
 use crate::context::AppContext;
-use crate::format::{EnvelopeMetaSeed, print_item, print_items};
+use crate::format::{EnvelopeMetaSeed, print_collections, print_item, print_items, print_stats};
 use crate::output::CommandOutput;
 use crate::util::{item_not_found, parse_page_range, require_item, require_item_pdf, run_pdf};
 
@@ -187,6 +188,8 @@ pub(crate) async fn read_search(
         trash_policy: Some(trash_policy(include_trashed)),
         fulltext_index: result.fulltext_index,
         read_source: Some(source.to_string()),
+        trashed_collections: None,
+        direct_annotations: None,
     });
     CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
 }
@@ -381,7 +384,7 @@ impl ReadIo {
             }
             return if self.running_zotero {
                 Ok(DesktopChoice {
-                    server_id,
+                    server_id: None,
                     source: "desktop-unbound",
                 })
             } else {
@@ -399,7 +402,7 @@ impl ReadIo {
             if stored_id != header {
                 return if self.running_zotero {
                     Ok(DesktopChoice {
-                        server_id: Some(header),
+                        server_id: None,
                         source: "desktop-unbound",
                     })
                 } else {
@@ -408,7 +411,7 @@ impl ReadIo {
             }
             return if self.running_zotero {
                 Ok(DesktopChoice {
-                    server_id: Some(header),
+                    server_id: None,
                     source: "desktop-unbound",
                 })
             } else {
@@ -427,7 +430,7 @@ impl ReadIo {
         }
         if self.running_zotero {
             return Ok(DesktopChoice {
-                server_id,
+                server_id: None,
                 source: "desktop-unbound",
             });
         }
@@ -468,7 +471,9 @@ impl ReadIo {
         let data_dir = self.data_dir.clone();
         let scope = self.scope.clone();
         let binding_path = self.binding_path.clone();
+        let token = zot_local::snapshot_open_token();
         tokio::task::spawn_blocking(move || {
+            let _token = zot_local::SnapshotOpenTokenGuard::inherit(token);
             opens.fetch_add(1, Ordering::SeqCst);
             let Some(data_dir) = data_dir else {
                 return Err(ZotError::Database {
@@ -646,6 +651,195 @@ async fn render_pdf(
     let payload = serde_json::json!({ "text": text });
     CommandOutput::new(ctx, payload, source_seed(source), move |_| {
         println!("{text}")
+    })
+}
+
+pub(crate) async fn read_collection(
+    ctx: &AppContext,
+    io: &ReadIo,
+    command: CollectionCommand,
+) -> Result<CommandOutput> {
+    match io.route(false).await? {
+        Route::Desktop(choice) => {
+            let source = choice.source;
+            let reader = io.reader(&choice)?;
+            desktop_collection(ctx, &reader, source, command).await
+        }
+        Route::Snapshot(library) => crate::commands::collection::read_snapshot(
+            ctx,
+            library.as_ref(),
+            command,
+            Some("snapshot"),
+        ),
+    }
+}
+
+async fn desktop_collection(
+    ctx: &AppContext,
+    reader: &DesktopRead,
+    source: &str,
+    command: CollectionCommand,
+) -> Result<CommandOutput> {
+    match command {
+        CollectionCommand::List(_) => {
+            let collections = reader.collection_list().await?;
+            CommandOutput::new(
+                ctx,
+                collections,
+                omission_seed(source, true, false),
+                |collections| print_collections(collections, 0),
+            )
+        }
+        CollectionCommand::Get(args) => {
+            let collection = reader.collection_get(&args.key).await?;
+            CommandOutput::new(
+                ctx,
+                collection,
+                omission_seed(source, true, false),
+                |collection| print_collections(std::slice::from_ref(collection), 0),
+            )
+        }
+        CollectionCommand::Subcollections(args) => {
+            let collections = reader.collection_subcollections(&args.key).await?;
+            CommandOutput::new(
+                ctx,
+                collections,
+                omission_seed(source, true, false),
+                |collections| {
+                    if collections.is_empty() {
+                        println!("No subcollections found.");
+                    } else {
+                        print_collections(collections, 0);
+                    }
+                },
+            )
+        }
+        CollectionCommand::Search(args) => {
+            let collections = reader
+                .collection_search(&args.query, resolved_output_limit(args.limit))
+                .await?;
+            CommandOutput::new(
+                ctx,
+                collections,
+                omission_seed(source, true, false),
+                |collections| print_collections(collections, 0),
+            )
+        }
+        CollectionCommand::Items(args) => {
+            let items = reader.collection_items(&args.key).await?;
+            CommandOutput::new(ctx, items, omission_seed(source, false, true), |items| {
+                print_items(items)
+            })
+        }
+        CollectionCommand::ItemCount(args) => {
+            let count = reader.collection_item_count(&args.key).await?;
+            let payload = serde_json::json!({ "collection_key": args.key, "item_count": count });
+            CommandOutput::new(
+                ctx,
+                payload,
+                omission_seed(source, false, true),
+                move |_| println!("{count}"),
+            )
+        }
+        CollectionCommand::Tags(args) => {
+            let tags = reader.collection_tags(&args.key).await?;
+            CommandOutput::new(ctx, tags, omission_seed(source, false, true), |tags| {
+                if tags.is_empty() {
+                    println!("No tags found.");
+                } else {
+                    for tag in tags {
+                        println!("{} ({})", tag.name, tag.count);
+                    }
+                }
+            })
+        }
+        _ => unreachable!("write commands do not use desktop collection reads"),
+    }
+}
+
+pub(crate) async fn read_library_list(
+    ctx: &AppContext,
+    io: &ReadIo,
+    args: crate::cli::LibraryListArgs,
+) -> Result<CommandOutput> {
+    let include_trashed = args.include_trashed;
+    let limit = resolved_output_limit(args.limit);
+    let offset = args.offset;
+    let collection = args.collection.clone();
+    let (result, source) = match io.route(false).await? {
+        Route::Desktop(choice) => {
+            let source = choice.source;
+            let result = io
+                .reader(&choice)?
+                .library_list(collection.as_deref(), limit, offset, !include_trashed)
+                .await?;
+            (result, source)
+        }
+        Route::Snapshot(library) => {
+            let options = SearchOptions {
+                collection,
+                limit,
+                offset,
+                exclude_trashed: !include_trashed,
+                ..SearchOptions::default()
+            };
+            (library.search(options)?, "snapshot")
+        }
+    };
+    let seed = Some(EnvelopeMetaSeed {
+        count: Some(result.items.len()),
+        total: Some(result.total),
+        trash_policy: Some(trash_policy(include_trashed)),
+        read_source: Some(source.to_string()),
+        ..EnvelopeMetaSeed::default()
+    });
+    CommandOutput::new(ctx, result.items, seed, |items| print_items(items))
+}
+
+pub(crate) async fn read_library_stats(
+    ctx: &AppContext,
+    io: &ReadIo,
+    include_trashed: bool,
+) -> Result<CommandOutput> {
+    let (stats, source) = match io.route(false).await? {
+        Route::Desktop(choice) => {
+            let source = choice.source;
+            let stats = io.reader(&choice)?.library_stats(include_trashed).await?;
+            (stats, source)
+        }
+        Route::Snapshot(library) => (library.get_stats_with_trashed(include_trashed)?, "snapshot"),
+    };
+    let seed = Some(EnvelopeMetaSeed {
+        total: Some(stats.total_items),
+        trash_policy: Some(trash_policy(include_trashed)),
+        read_source: Some(source.to_string()),
+        ..EnvelopeMetaSeed::default()
+    });
+    CommandOutput::new(ctx, stats, seed, print_stats)
+}
+
+pub(crate) async fn read_library_tags(ctx: &AppContext, io: &ReadIo) -> Result<CommandOutput> {
+    let (tags, source) = match io.route(false).await? {
+        Route::Desktop(choice) => {
+            let source = choice.source;
+            let tags = io.reader(&choice)?.library_tags().await?;
+            (tags, source)
+        }
+        Route::Snapshot(library) => (library.get_tags()?, "snapshot"),
+    };
+    CommandOutput::new(ctx, tags, source_seed(source), |tags| {
+        for tag in tags {
+            println!("{} ({})", tag.name, tag.count);
+        }
+    })
+}
+
+fn omission_seed(source: &str, tree: bool, members: bool) -> Option<EnvelopeMetaSeed> {
+    Some(EnvelopeMetaSeed {
+        read_source: Some(source.to_string()),
+        trashed_collections: tree.then(|| "omitted".to_string()),
+        direct_annotations: members.then(|| "omitted".to_string()),
+        ..EnvelopeMetaSeed::default()
     })
 }
 

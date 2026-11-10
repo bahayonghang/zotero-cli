@@ -98,7 +98,7 @@ zot completions powershell
 The Rust runtime is not a flat connector wrapper. Its boundaries are deliberate:
 
 - local reads come from `zotero.sqlite` plus attachment storage
-- Zotero 10+ Local API supports explicit field/creator edits, collection membership, and single-item tag add/remove; merge/dedupe and other existing-item mutations use the Web API; the connector only imports new BibTeX/RIS records
+- Zotero 10+ Local API supports explicit field/creator edits, collection create/membership, single-key collection delete, and single-item tag add/remove; merge/dedupe, collection rename/reparent, and other mutations use the Web API; the connector only imports new BibTeX/RIS records
 - output stays centered on the stable JSON envelope
 - the primary mental model is `library` / `item` / `collection` / `workspace` / `sync`
 

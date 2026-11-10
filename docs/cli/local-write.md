@@ -2,7 +2,7 @@
 
 开发分支验收状态：本地标签、分类创建和 `library organize` 已通过自动化验证，以及 Windows Zotero 10.0.7 独立 profile/data 的授权、核心写入、UI 和正常重启回读验收。组库、其他操作系统和真实提交中断尚未实测；故障注入结果属于自动化证据。
 
-`item update`、分类成员操作、单条 `item tag add/remove` 和 `collection create` 支持官方 Local API。Zotero 必须运行并在高级设置启用本地通信。无需 Web API key 或额外插件；首次确认写入时，Zotero 会请求用户授权。
+`item update`、分类成员操作、单条 `item tag add/remove`、`collection create` 和单 key `collection delete` 支持官方 Local API。Zotero 必须运行并在高级设置启用本地通信。无需 Web API key 或额外插件；首次确认写入时，Zotero 会请求用户授权。
 
 先运行 `zot --json doctor` 查看 `local_api_write`。supported 表示版本/协议支持，credential_present 表示缓存授权；doctor 不弹授权框、不试写，verified 始终为 false。
 
@@ -19,6 +19,7 @@ zot --json collection create "子类" --parent ROOT2345 --write-backend local
 zot --json collection add-item COLLB234 ITEMABCD --write-backend local
 zot --json collection remove-item COLLA234 ITEMABCD --write-backend local
 zot --json collection move-item ITEMABCD --from COLLA234 --to COLLB234 --write-backend local
+zot --json collection delete COLL0001 --write-backend local
 ```
 
 以上默认只返回 preview，或没有变化时返回 unchanged。检查 before/after/skipped_fields 后，保持同一参数再确认。条目和成员操作增加 `--confirm --expected-server-id <server_id> --expected-version <expected_version>`。`collection create` 改用 `--expected-library-version`。值必须取自该次预览，不能使用 Web API/SQLite 的版本号。发生冲突时重新预览。
@@ -38,7 +39,7 @@ zot --json collection move-item ITEMABCD --from COLLA234 --to COLLB234 --write-b
 
 ## 创建分类
 
-`collection create` 不带 `--write-backend local` 时仍走 Web API。重命名、删除和重挂父级没有本地写路径。
+`collection create` 不带 `--write-backend local` 时仍走 Web API。重命名和重挂父级没有本地写路径。单 key `collection delete` 可以显式走本地预览/确认。
 
 ```bash
 zot --json collection create "待读" --write-backend local --confirm --expected-server-id <server_id> --expected-library-version <library_version>
@@ -47,6 +48,20 @@ zot --json collection create "待读" --write-backend local --confirm --expected
 确认使用库版本，不使用条目 version，也不要把不存在对象的 version 填成 0。预览会读取完整分类列表和同一响应的 `Last-Modified-Version`。同一父级精确同名会拒绝并列出候选 key，不复用、不合并、不重命名；不同父级可以同名。只创建根分类，或同库已有父分类下的一层子分类。
 
 POST 是单元素数组，只含 name 和 parentCollection，并带实例 ID 与 `If-Unmodified-Since-Version`。HTTP 200 不等于成功；只有对象级成功且回读 name、parent、server 一致才是 applied。超时、5xx 或不可靠响应是 unknown，不会自动重发，也不会凭事后同名分类认领成功。创建流程不改成员、children 或附件。返回的 key 可作为现有 `collection add-item` 的输入。
+
+## 删除分类
+
+`collection delete KEY` 不带 `--write-backend local` 时仍立即走 Web API。显式 local 时默认只预览，不读取授权，也不发送 DELETE。
+
+```bash
+zot --json collection delete COLL0001 --write-backend local --confirm --expected-server-id <server_id> --expected-version <version> --expected-descendants-sha256 <sha256>
+```
+
+预览列出 Local API 分类列表返回的目标分类和全部子孙分类，并给出按 key 排序后的子孙集合 SHA-256。响应里带 `deleted` 时，这些子孙会计入列表和哈希。Zotero 10.0.8 的 `GET /collections` 不返回已在废纸篓中的分类，也不识别 `includeTrashed`，所以它们不会出现在预览或哈希里；本命令不打开 SQLite 去补齐。确认绑定的是分类对象 version，不是库版本；预览里的 0 可以确认，不要自行填 0。Server ID、对象版本或子孙哈希任一不符就拒绝，不会授权或删除。
+
+删除会永久擦除该分类和每一个子孙分类，包括列表里看不到的废纸篓子分类，不会把子分类提升到父级。文献留在库里，只失去这些分类的成员关系。只发送这一把 key 的 DELETE，不调用批量删除。
+
+只有 DELETE 返回 204 且 Server ID 一致，随后 GET 404，才是 applied 且 verified。HTTP 200、超时、5xx 或 Server ID 不符是 unknown，不能再用后来的 404 改记为成功。204 之后对象仍在是 verification-failed。DELETE 本身 404 是 absent，这次调用没有删除它。这些状态即使 envelope 为 ok 也不是成功，不得盲重试。
 
 ## 字段和作者
 
@@ -72,4 +87,4 @@ POST 是单元素数组，只含 name 和 parentCollection，并带实例 ID 与
 
 Zotero 的一次授权 key 只用于当前进程；选择记住授权时，CLI 按 profile 和 Server ID 保存到平台配置目录的 local-api-credentials.json，不包含在 config show 输出。该目录由 AppConfig::config_dir() 确定，Windows 通常为 `%AppData%\zot`。
 
-既有命令默认仍走 Web；local 专用参数不能用于 Web。任何本地失败都不会自动切换后端。笔记、附件、`item tag batch`、分类重命名/删除/重挂父级和联网自动补全尚未接入本地写路径。SQLite 始终只读。
+既有命令默认仍走 Web；local 专用参数不能用于 Web。任何本地失败都不会自动切换后端。笔记、附件、`item tag batch`、分类重命名/重挂父级和联网自动补全尚未接入本地写路径。SQLite 始终只读。

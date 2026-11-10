@@ -42,6 +42,11 @@ pub trait CollectionNav {
 /// What a collection contains: items, counts, tags.
 pub trait CollectionContent {
     fn get_collection_items(&self, collection_key: &str) -> ZotResult<Vec<Item>>;
+    /// Direct membership for collection inventory. Other callers stay on
+    /// `get_collection_items`, which keeps the bibliographic filter.
+    fn get_collection_direct_items(&self, collection_key: &str) -> ZotResult<Vec<Item>> {
+        self.get_collection_items(collection_key)
+    }
     fn get_collection_item_count(&self, collection_key: &str) -> ZotResult<usize>;
     fn get_collection_tags(&self, collection_key: &str) -> ZotResult<Vec<TagSummary>>;
 }
@@ -102,6 +107,9 @@ impl CollectionNav for LocalLibrary {
 impl CollectionContent for LocalLibrary {
     fn get_collection_items(&self, collection_key: &str) -> ZotResult<Vec<Item>> {
         self.get_collection_items(collection_key)
+    }
+    fn get_collection_direct_items(&self, collection_key: &str) -> ZotResult<Vec<Item>> {
+        self.get_collection_direct_items(collection_key)
     }
     fn get_collection_item_count(&self, collection_key: &str) -> ZotResult<usize> {
         self.get_collection_item_count(collection_key)

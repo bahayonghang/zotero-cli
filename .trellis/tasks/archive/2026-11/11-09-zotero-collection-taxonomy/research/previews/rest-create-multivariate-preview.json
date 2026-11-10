@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "data": {
+    "backend": "local",
+    "state": "preview",
+    "operation": "create-collection",
+    "server_id": "2ZxitCcOtvOu",
+    "library": "User",
+    "collection_key": "",
+    "name": "Multivariate",
+    "parent_key": "Z2YE4E6Y",
+    "parent_name": "01Forecasting",
+    "path": [
+      {
+        "key": "EUKN35DS",
+        "name": "02_Area"
+      },
+      {
+        "key": "2LAXPFZB",
+        "name": "01ScientificResearch"
+      },
+      {
+        "key": "LJFSL4UY",
+        "name": "01TimeSeries"
+      },
+      {
+        "key": "Z2YE4E6Y",
+        "name": "01Forecasting"
+      }
+    ],
+    "expected_library_version": 3683,
+    "before": null,
+    "after": {
+      "name": "Multivariate",
+      "parentCollection": "Z2YE4E6Y"
+    },
+    "write_accepted": false,
+    "verified": false,
+    "observed_expected_state": null,
+    "error": null
+  },
+  "meta": {
+    "api_version": 1
+  }
+}

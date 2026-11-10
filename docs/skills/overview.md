@@ -18,7 +18,7 @@
 
 那就先走 skill，而不是先背命令。
 
-skill 分别路由本地只读查询、Zotero 10+ 授权 Local API 字段/作者、分类创建/成员和单条标签操作、connector 新增导入和 Web API mutation。详见[本地内容操作](../cli/local-write.md)；本机 note/merge 和 `item tag batch` 尚未接入 Local API。
+skill 分别路由本地只读查询、Zotero 10+ 授权 Local API 字段/作者、分类创建/成员、单 key 分类删除和单条标签操作、connector 新增导入和 Web API mutation。详见[本地内容操作](../cli/local-write.md)；本机 note/merge 和 `item tag batch` 尚未接入 Local API。分类重命名和重挂父级仍只走 Web。
 
 如果你的目标是：
 

@@ -41,6 +41,8 @@ async fn build_and_print(
         trash_policy: None,
         fulltext_index: None,
         read_source: None,
+        trashed_collections: None,
+        direct_annotations: None,
     });
     CommandOutput::new(ctx, graph, seed, print_graph_summary)
 }

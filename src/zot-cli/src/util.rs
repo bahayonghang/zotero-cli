@@ -25,7 +25,9 @@ where
     F: FnOnce(LocalLibrary) -> ZotResult<R> + Send + 'static,
     R: Send + 'static,
 {
+    let token = zot_local::snapshot_open_token();
     tokio::task::spawn_blocking(move || {
+        let _token = zot_local::SnapshotOpenTokenGuard::inherit(token);
         let library = LocalLibrary::open(zot_core::get_data_dir(&config), scope)?;
         f(library)
     })
