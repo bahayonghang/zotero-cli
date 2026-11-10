@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/zot-cli/backend/desktop-read.md", "reason": "验收时范围、一个来源、20 页检索和 100 页完整读取不能互相放宽"}
+{"file": ".trellis/spec/zot-cli/backend/local-api.md", "reason": "读取不得授权或携带写密钥；不得把写入预览的冲突码用于读重试"}
+{"file": ".trellis/spec/zot-cli/backend/database-guidelines.md", "reason": "不得写入 sqlite，也不得在探测成功后再开快照"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "不一致和未完成必须失败，不能带着 total 成功"}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "just ci 与 skill 检查仍是合并闸门"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "skill 不得再要求为列分类而关闭 Zotero"}
+{"file": ".trellis/tasks/11-10-zotero-open-inventory/research/open-close-cycle.md", "reason": "实现不得把已否决的活库拷贝或非独占锁当成回退"}

@@ -1,0 +1,11 @@
+{"file": ".trellis/spec/zot-cli/backend/index.md", "reason": "CLI 预检要求先读 desktop-read 和本地库边界"}
+{"file": ".trellis/spec/zot-cli/backend/desktop-read.md", "reason": "现有开库读取契约；本任务要扩展分类和全库清单，同时保留 20 页检索上限"}
+{"file": ".trellis/spec/zot-cli/backend/local-api.md", "reason": "读路径用 read_exchange；collection_snapshot 仍只做要求 Server ID 的写入预览"}
+{"file": ".trellis/spec/zot-cli/backend/database-guidelines.md", "reason": "SQLite 保持只读；一条命令不能在快照和 Local API 之间混接"}
+{"file": ".trellis/spec/zot-cli/backend/error-handling.md", "reason": "busy、不一致和未完成必须使用明确错误码，不能返回假总数"}
+{"file": ".trellis/spec/zot-cli/backend/quality-guidelines.md", "reason": "命令解析测试、JSON 契约和 skill 镜像闸门"}
+{"file": ".trellis/spec/zot-cli/backend/directory-structure.md", "reason": "路由应留在现有 command 模块，不新增第二套 CLI 入口"}
+{"file": ".trellis/spec/zot-cli/backend/logging-guidelines.md", "reason": "人类输出不打印密钥，也不新增 Source 行"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "复用 route、read_exchange 和 collection_snapshot，不重写探针"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "桌面 DTO、命令 JSON、doctor 提示和 skill 必须同一口径"}
+{"file": ".trellis/tasks/11-10-zotero-open-inventory/research/open-close-cycle.md", "reason": "本会话开关证据、独占锁资料，以及被否决的拷贝和加长忙等"}
