@@ -14,6 +14,8 @@ pub struct EnvelopeMetaSeed {
     pub trash_policy: Option<String>,
     pub fulltext_index: Option<String>,
     pub read_source: Option<String>,
+    pub trashed_collections: Option<String>,
+    pub direct_annotations: Option<String>,
 }
 
 pub fn to_pretty_json<T: serde::Serialize>(value: &T) -> anyhow::Result<String> {
@@ -30,6 +32,8 @@ pub fn render_error_json(err: &AppError, profile: Option<&str>) -> anyhow::Resul
             trash_policy: None,
             fulltext_index: None,
             read_source: None,
+            trashed_collections: None,
+            direct_annotations: None,
             api_version: Some(ENVELOPE_API_VERSION),
         },
     ))
@@ -219,6 +223,8 @@ mod tests {
                 trash_policy: Some("excluded".to_string()),
                 fulltext_index: None,
                 read_source: None,
+                trashed_collections: None,
+                direct_annotations: None,
                 api_version: Some(1),
             },
         ))
@@ -247,6 +253,8 @@ mod tests {
                 trash_policy: None,
                 fulltext_index: None,
                 read_source: None,
+                trashed_collections: None,
+                direct_annotations: None,
                 api_version: Some(super::ENVELOPE_API_VERSION),
             },
         ))

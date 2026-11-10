@@ -18,6 +18,12 @@ pub struct EnvelopeMeta {
     /// Omitted for every other command.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub read_source: Option<String>,
+    /// `omitted` when a desktop collection tree does not fill trashed collections.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trashed_collections: Option<String>,
+    /// `omitted` when desktop collection members do not fill direct annotations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub direct_annotations: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<u32>,
 }
@@ -110,6 +116,8 @@ mod tests {
                 trash_policy: Some("excluded".to_string()),
                 fulltext_index: None,
                 read_source: None,
+                trashed_collections: None,
+                direct_annotations: None,
                 api_version: Some(1),
             },
         );
@@ -132,6 +140,8 @@ mod tests {
             trash_policy: None,
             fulltext_index: None,
             read_source: None,
+            trashed_collections: None,
+            direct_annotations: None,
             api_version: Some(1),
         })
         .expect("serialize omitted fulltext_index");
@@ -144,6 +154,8 @@ mod tests {
             trash_policy: None,
             fulltext_index: Some("fts5-sidecar".to_string()),
             read_source: None,
+            trashed_collections: None,
+            direct_annotations: None,
             api_version: Some(1),
         })
         .expect("serialize fulltext_index");

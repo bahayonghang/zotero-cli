@@ -319,6 +319,37 @@ mod tests {
             ["zot", "library", "semantic-status"].as_slice(),
             ["zot", "library", "citekey", "Smith2024"].as_slice(),
             ["zot", "library", "citekey", "Smith2024", "--running-zotero"].as_slice(),
+            ["zot", "library", "list", "--running-zotero"].as_slice(),
+            ["zot", "library", "stats", "--running-zotero"].as_slice(),
+            ["zot", "library", "tags", "--running-zotero"].as_slice(),
+            ["zot", "collection", "list", "--running-zotero"].as_slice(),
+            ["zot", "collection", "get", "COLL0001", "--running-zotero"].as_slice(),
+            [
+                "zot",
+                "collection",
+                "subcollections",
+                "COLL0001",
+                "--running-zotero",
+            ]
+            .as_slice(),
+            ["zot", "collection", "items", "COLL0001", "--running-zotero"].as_slice(),
+            [
+                "zot",
+                "collection",
+                "item-count",
+                "COLL0001",
+                "--running-zotero",
+            ]
+            .as_slice(),
+            ["zot", "collection", "tags", "COLL0001", "--running-zotero"].as_slice(),
+            [
+                "zot",
+                "collection",
+                "search",
+                "Transform",
+                "--running-zotero",
+            ]
+            .as_slice(),
             [
                 "zot",
                 "library",
@@ -505,6 +536,13 @@ mod tests {
                 panic!("cli parse failed for {:?}: {err}", argv);
             }
         }
+    }
+
+    #[test]
+    fn collection_create_rejects_running_zotero() {
+        let result =
+            Cli::try_parse_from(["zot", "collection", "create", "Name", "--running-zotero"]);
+        assert!(result.is_err());
     }
 
     #[test]

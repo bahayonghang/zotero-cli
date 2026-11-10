@@ -22,7 +22,7 @@ pub(crate) enum LibraryCommand {
     Recent(LibraryRecentArgs),
     Stats(LibraryStatsArgs),
     Citekey(LibraryCiteKeyArgs),
-    Tags,
+    Tags(LibraryTagsArgs),
     Libraries,
     Feeds,
     FeedItems(LibraryFeedItemsArgs),
@@ -124,7 +124,7 @@ pub(crate) enum ItemSciteCommand {
 
 #[derive(Subcommand)]
 pub(crate) enum CollectionCommand {
-    List,
+    List(CollectionListArgs),
     Get(CollectionKeyArgs),
     Subcollections(CollectionKeyArgs),
     Items(CollectionItemsArgs),
@@ -272,12 +272,25 @@ pub(crate) struct LibraryListArgs {
     pub(crate) offset: usize,
     #[arg(long)]
     pub(crate) include_trashed: bool,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
 pub(crate) struct LibraryStatsArgs {
     #[arg(long)]
     pub(crate) include_trashed: bool,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
+}
+
+#[derive(Args)]
+pub(crate) struct LibraryTagsArgs {
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
@@ -697,8 +710,18 @@ pub(crate) struct LibraryOrganizeApplyArgs {
 }
 
 #[derive(Args)]
+pub(crate) struct CollectionListArgs {
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
+}
+
+#[derive(Args)]
 pub(crate) struct CollectionItemsArgs {
     pub(crate) key: String,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
@@ -706,6 +729,9 @@ pub(crate) struct CollectionSearchArgs {
     pub(crate) query: String,
     #[arg(long)]
     pub(crate) limit: Option<usize>,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args, Debug, Default)]
@@ -769,6 +795,9 @@ pub(crate) struct CollectionDeleteArgs {
 #[derive(Args)]
 pub(crate) struct CollectionKeyArgs {
     pub(crate) key: String,
+    /// Read the running Zotero when its data directory cannot be proved to match the configured library.
+    #[arg(long)]
+    pub(crate) running_zotero: bool,
 }
 
 #[derive(Args)]
