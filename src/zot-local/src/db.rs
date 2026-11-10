@@ -1757,10 +1757,10 @@ impl LocalLibrary {
         for row in rows {
             let object = row.map_err(sql_err("related-explicit"))?;
             let related_key = object.rsplit('/').next().unwrap_or_default();
-            if !related_key.is_empty() {
-                if let Some(item_id) = self.item_id_by_key(related_key)? {
-                    signals.entry(item_id).or_default().related = true;
-                }
+            if !related_key.is_empty()
+                && let Some(item_id) = self.item_id_by_key(related_key)?
+            {
+                signals.entry(item_id).or_default().related = true;
             }
         }
 
@@ -2302,10 +2302,10 @@ impl LocalLibrary {
         let mut seen = HashSet::new();
         let mut items = Vec::with_capacity(items_by_id.len());
         for item_id in item_ids {
-            if seen.insert(*item_id) {
-                if let Some(item) = items_by_id.remove(item_id) {
-                    items.push(item);
-                }
+            if seen.insert(*item_id)
+                && let Some(item) = items_by_id.remove(item_id)
+            {
+                items.push(item);
             }
         }
         Ok(items)
@@ -3740,10 +3740,10 @@ Original Date: 2017');
         ) {
             panic!("seed rich fixture failed: {err}");
         }
-        if !extra_sql.is_empty() {
-            if let Err(err) = conn.execute_batch(extra_sql) {
-                panic!("seed extra fixture sql failed: {err}");
-            }
+        if !extra_sql.is_empty()
+            && let Err(err) = conn.execute_batch(extra_sql)
+        {
+            panic!("seed extra fixture sql failed: {err}");
         }
         drop(conn);
         setup(dir.path());

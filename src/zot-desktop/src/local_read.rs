@@ -788,10 +788,11 @@ impl DesktopRead {
                 .read_exchange(&path_at(start), self.server())
                 .await?;
             if !exchange.status.is_success() {
-                if rows.is_empty() && exchange.status.as_u16() == 404 {
-                    if let CompleteMiss::Collection(key) = missing {
-                        return Err(collection_missing(&key, true));
-                    }
+                if rows.is_empty()
+                    && exchange.status.as_u16() == 404
+                    && let CompleteMiss::Collection(key) = missing
+                {
+                    return Err(collection_missing(&key, true));
                 }
                 return Err(error(
                     "local-api-http",
@@ -883,25 +884,25 @@ fn finish_search(
 }
 
 fn item_matches_query(item: &Item, query: &DesktopSearchQuery, collection: Option<&str>) -> bool {
-    if let Some(kind) = query.item_type.as_deref() {
-        if item.item_type != kind {
-            return false;
-        }
+    if let Some(kind) = query.item_type.as_deref()
+        && item.item_type != kind
+    {
+        return false;
     }
-    if let Some(tag) = query.tag.as_deref() {
-        if !item_matches_tag_filter(item, tag) {
-            return false;
-        }
+    if let Some(tag) = query.tag.as_deref()
+        && !item_matches_tag_filter(item, tag)
+    {
+        return false;
     }
-    if let Some(creator) = query.creator.as_deref() {
-        if !item_matches_creator_filter(item, creator) {
-            return false;
-        }
+    if let Some(creator) = query.creator.as_deref()
+        && !item_matches_creator_filter(item, creator)
+    {
+        return false;
     }
-    if let Some(year) = query.year.as_deref() {
-        if !item_matches_year_filter(item, year) {
-            return false;
-        }
+    if let Some(year) = query.year.as_deref()
+        && !item_matches_year_filter(item, year)
+    {
+        return false;
     }
     if !item_matches_field_filters(
         item,
@@ -914,10 +915,10 @@ fn item_matches_query(item: &Item, query: &DesktopSearchQuery, collection: Optio
     if !query.query.is_empty() && !item_matches_metadata_query(item, &query.query) {
         return false;
     }
-    if let Some(collection) = collection {
-        if !item.collections.iter().any(|key| key == collection) {
-            return false;
-        }
+    if let Some(collection) = collection
+        && !item.collections.iter().any(|key| key == collection)
+    {
+        return false;
     }
     true
 }

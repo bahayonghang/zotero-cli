@@ -227,14 +227,15 @@ impl LocalApiClient {
             ));
         }
         let status = response.status();
-        if let Some(expected) = server {
-            if status.is_success() && header(&response, SERVER_ID).as_deref() != Some(expected) {
-                return Err(error(
-                    "local-api-conflict",
-                    "Zotero instance changed; preview again",
-                    None,
-                ));
-            }
+        if let Some(expected) = server
+            && status.is_success()
+            && header(&response, SERVER_ID).as_deref() != Some(expected)
+        {
+            return Err(error(
+                "local-api-conflict",
+                "Zotero instance changed; preview again",
+                None,
+            ));
         }
         let allowed = status.is_success() || matches!(status.as_u16(), 404 | 405 | 501);
         if !allowed {
@@ -508,14 +509,14 @@ impl LocalApiClient {
             }
             match next {
                 None => {
-                    if let Some(total) = expected_total {
-                        if collections.len() != usize::try_from(total).unwrap_or(usize::MAX) {
-                            return Err(error(
-                                "local-api-protocol",
-                                "Collection list is incomplete",
-                                None,
-                            ));
-                        }
+                    if let Some(total) = expected_total
+                        && collections.len() != usize::try_from(total).unwrap_or(usize::MAX)
+                    {
+                        return Err(error(
+                            "local-api-protocol",
+                            "Collection list is incomplete",
+                            None,
+                        ));
                     }
                     return Ok(LocalCollectionSnapshot {
                         library_version: library_version.unwrap_or(version),
@@ -924,10 +925,10 @@ fn check_status(response: &Response) -> ZotResult<()> {
         }
     };
     let mut result = error(code, message, Some(response.status().as_u16()));
-    if let ZotError::LocalApi { hint, .. } = &mut result {
-        if let Some(delay) = header(response, "Retry-After") {
-            *hint = Some(format!("Retry-After: {delay}"));
-        }
+    if let ZotError::LocalApi { hint, .. } = &mut result
+        && let Some(delay) = header(response, "Retry-After")
+    {
+        *hint = Some(format!("Retry-After: {delay}"));
     }
     Err(result)
 }
