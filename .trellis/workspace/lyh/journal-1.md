@@ -1190,3 +1190,24 @@ Removed the zot-bridge XPI, bridge CLI/config, desktop merge backend, and legacy
 ### Next Steps
 
 - 真实 agent 是否按新 description 触发仍是 missing evidence
+
+
+## Session 36: 本地删除空分类并归档
+
+**Date**: 2026-11-10
+**Task**: 本地删除空分类并归档
+**Branch**: `dev`
+
+### Summary
+
+安装带本地分类删除的 zot，提交该功能，删掉分类整理里已核为空的 94 把分类，并归档删除、分类整理和 Dependabot #35-#39 三个任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e7b955a` | (see git log) |
+
+### Status
+
+[OK] **Completed**
