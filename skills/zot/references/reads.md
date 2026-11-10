@@ -25,16 +25,24 @@
   - 成功时 `meta.read_source` 为 `desktop`、`desktop-unbound` 或 `snapshot`。回答要说明这次用的来源。
   - 配置了 profile 或明确数据目录、又还没证明和正在运行的 Zotero 是同一个库时，读运行中的实例要加 `--running-zotero`。默认不要换成另一套库。
 - 纯列表 / 翻页：`library list --collection ... --limit ... --offset ...`
+  - Zotero 打开且本机通信可用时走桌面。先取完整过滤结果，在本地按条目 key 降序，再应用 `offset` / `limit`。不要向 Zotero 发送 `sort=key`。
+  - `--collection` 接受 key，或唯一的分类名。重名返回 `collection-ambiguous`，候选 key 按升序给出。名称解析使用同一次分类列表，不另开快照。
+  - 默认排除附件、笔记、注释和回收站。`--include-trashed` 与 `meta.trash_policy` 保持原样。
 - 整库统计：`library stats`
+  - `top_tags`、`total_items`、`by_type`、`collections` 只统计书目条目。`pdf_attachments` 是拥有 `application/pdf` 的不同书目父项数，同一父项两份 PDF 只算 1。`notes` 是书目父项下的笔记行数，没有书目父项的笔记算 0。后两个字段的回收站看父项，不看子项自己。
 - citation key 直达：`library citekey`
   - 精确匹配，区分大小写。前缀相似不是命中。
   - 关闭的库同时查原生 `citationKey` 和 Extra 里的 `Citation Key:` / `CitationKey:`。
   - 打开的库先用 Local API 字段和 Extra。插件候选只有在同一库条目上核对到这个 key 时才接受。插件不可达、而且库里没存过这个 key 时，说明来源限制，不要说成确定没有。
   - 多条条目共用同一个 key 时停下来让用户选，并给出标题、作者、年份和 item key。
 - 最近入库条目：`library recent --count`
-- collection 细粒度读取：`collection get` / `subcollections` / `items` / `item-count` / `tags`
+- collection 细粒度读取：`collection list` / `get` / `subcollections` / `items` / `item-count` / `tags` / `search`
+  - 这七条和 `library list` / `stats` / `tags` 在 Zotero 打开且本机通信可用时走桌面。数据目录还不能证明是同一个库时加 `--running-zotero`。成功的 `meta.read_source` 为 `desktop` 或 `desktop-unbound`。人类输出不另起 `Source:` 行。
+  - `items`、`item-count`、`tags` 使用同一组直接成员：`/collections/{key}/items/top?includeTrashed=1`。子笔记和子附件不算成员。不请求 `/collections/{key}/tags`。
+  - 桌面分类树省略回收站分类，`meta.trashed_collections` 为 `omitted`。桌面成员省略直接注释，`meta.direct_annotations` 为 `omitted`。关闭时的 SQLite 列表仍返回那些分类，不为了补齐而打开另一边。
 - collection 名内检索：`collection search`
 - 库级组织信息：`library tags` / `libraries` / `feeds` / `feed-items`
+  - `library tags` 统计该库全部条目标签，包含笔记、附件、注释和回收站。它和 `library stats` 的 `top_tags` 不是同一口径。顺序是计数降序、名称升序。
 
 ### 2. 取证据
 

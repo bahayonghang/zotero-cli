@@ -12,7 +12,7 @@ description: 当用户要直接查询、提取、整理或安全更新本机已�
 - 目标是已有本地 Zotero 库或 reading workspace 时使用本 skill。文献缺陷、创新点或研究报告交给 `zot-brainstorm`。
 - `zot` 是唯一执行面。`ref/` 和 `zot mcp serve` 都不是当前路径。
 - SQLite 只读。Zotero 10+ Local API 只做已实现的字段、作者、分类创建与成员、单 key 分类删除和单条标签操作。Connector 只新增导入 BibTeX/RIS。其他 mutation 走 Web API。
-- 打开的库中，`item get`、`item children`、`item pdf` / `fulltext`、`library search`、`library citekey` 可以读正在运行的桌面。一次命令只用一个来源，不拼接桌面结果和快照，也不自动改走 Web API。
+- 打开的库中，`item get`、`item children`、`item pdf` / `fulltext`、`library citekey`、`collection list` / `get` / `subcollections` / `search` / `items` / `item-count` / `tags`，以及 `library list` / `stats` / `tags` 可以读正在运行的桌面。非空通用 `library search` 仍先读快照。一次命令只用一个来源，不拼接桌面结果和快照，也不自动改走 Web API。
 - 每条写路径拥有自己的成功和失败。Connector 或 Web API 出错时不能 fallback 到另一条路径。
 - 旧命令名或未实现能力先读 [references/migration.md](references/migration.md)，不要编造命令。
 
@@ -41,7 +41,7 @@ description: 当用户要直接查询、提取、整理或安全更新本机已�
 
 第一次接触环境、任何写入、PDF 或附件排障、semantic index/search、workspace query、citation key、saved search、profile 切换，以及“为什么不工作”，先运行 `zot --json doctor`。
 
-`item get`、`item children`、`item pdf`、`library search`、`library citekey` 不必先跑完整 doctor。SQLite snapshot 被锁时看 `capabilities.sqlite_snapshot` 和 `capabilities.desktop_read` 的 `next`，继续执行读命令。探针可达不等于条目或 PDF 已读。
+`item get`、`item children`、`item pdf`、`library search`、`library citekey`，以及 `collection list` / `get` / `subcollections` / `search` / `items` / `item-count` / `tags` 和 `library list` / `stats` / `tags` 不必先跑完整 doctor。SQLite snapshot 被锁时，这十条分类和库清单命令继续走桌面读，不要先让用户关闭 Zotero。非空通用 `library search` 仍先读快照。看 `capabilities.sqlite_snapshot` 和 `capabilities.desktop_read` 的 `next`。探针可达不等于条目或 PDF 已读。
 
 路由时重点看四项能力：`desktop_read`、`local_api_write`、`connector_write`、`web_write`。`verified: false` 不是写入成功。其余字段、平台路径、硬约束和失败后的停止方式读 [references/doctor.md](references/doctor.md)。
 
