@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "data": {
+    "plan_path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\11-09-zotero-collection-taxonomy\\research\\previews\\rest-batch-006-plan.json",
+    "plan_sha256": "93a2aca56d32bd2f15fa9b78d0fa96ffd5697007513f3f280f8b2a0f5a9010e7",
+    "server_id": "2ZxitCcOtvOu",
+    "library": "user",
+    "max_affected": 50,
+    "item_count": 40,
+    "action_count": 94,
+    "changed_count": 40,
+    "unchanged_count": 0
+  },
+  "meta": {
+    "api_version": 1
+  }
+}

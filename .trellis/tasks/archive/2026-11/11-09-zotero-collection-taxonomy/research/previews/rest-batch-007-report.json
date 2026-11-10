@@ -1,0 +1,1029 @@
+{
+  "schema_version": 1,
+  "plan_sha256": "aa02fd6ac82d46493d85e23e9c3a79d0b672539e134586ee8f03ff870a5ea4b8",
+  "server_id": "2ZxitCcOtvOu",
+  "library": "user",
+  "state": "applied",
+  "started_at": "2026-11-10T05:07:35.658240400+00:00",
+  "updated_at": "2026-11-10T05:07:39.824582500+00:00",
+  "item_count": 40,
+  "applied_count": 40,
+  "unchanged_count": 0,
+  "failed_count": 0,
+  "unknown_count": 0,
+  "not_attempted_count": 0,
+  "items": [
+    {
+      "item_key": "ABC35E7W",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4056,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "ABGR2V69",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4057,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "ABXICLSI",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4058,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AC3KYAM5",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4059,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AEE5DUXG",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "MSKRR445",
+          "3P6VQBP9",
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "3P6VQBP9",
+          "Z2YE4E6Y",
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4060,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AGNJ4ZTR",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "LFYIFTVH"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "AQVFMLX8"
+        ],
+        "tags": [
+          {
+            "tag": "ts/data-cleaning",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4062,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AIJ6F3QJ",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4064,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AJC8X7BG",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4065,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AK72N6XT",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "HDQ2EUZH"
+        ]
+      },
+      "after": {
+        "collections": [
+          "AQVFMLX8"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4066,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AKC5VH7V",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4067,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AM7MV5AL",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "52IMKB43"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "CodeAvailable",
+            "type": 1
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "5FFJS7PN"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "CodeAvailable",
+            "type": 1
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "dl/moe",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4068,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "ANF55ZAR",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4070,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "ANQKYEBC",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4071,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AP2J3RWY",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZUUGNTI8"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable",
+            "type": 1
+          },
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable",
+            "type": 1
+          },
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/spatial-temporal",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4073,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AQWBP38B",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "KAK5GZRM",
+          "MSKRR445"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/probabilistic",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 821,
+      "observed_version": 4074,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AT5ZRXBW",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4076,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "ATRVVX8Z",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "93X55XEE"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "ts/interpretability",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4078,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AULC6DX8",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4079,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "AYIUEUGK",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "Z9BJ9QB5",
+          "STGEGYZS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "STGEGYZS",
+          "ID2KTFJG"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4080,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "B5QIXQEH",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "L83BTEH8"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "2S5SNU3A"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "opt/dynamic",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4081,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "B6B2MEPK",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4083,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "B7DM4DD4",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "MSKRR445"
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4085,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "B7PVHTP4",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4086,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "B83EI7PV",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "WUB6KYIW",
+          "MSKRR445"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "CodeAvailable",
+            "type": 1
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "CodeAvailable",
+            "type": 1
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/irregular",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 3267,
+      "observed_version": 4088,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BAGP3UMG",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4089,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BAQKKDGJ",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4090,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BDZ3E79P",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "BWZM9LW3",
+          "H25B6H67"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "BWZM9LW3",
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "ts/representation",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4092,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BE3XEYA7",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4093,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BFWXM5WE",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "U5JATS34"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "ts/scn",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4096,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BGUVTAWC",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y",
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2",
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4097,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BITTP4Z9",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "MSKRR445",
+          "NYH2W5V4"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "ts/fuzzy",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4100,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BJBSRH75",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "J4PNTSY2"
+        ]
+      },
+      "after": {
+        "collections": [
+          "UMQV286S"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4101,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BKCCZAGK",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "Z9BJ9QB5"
+        ]
+      },
+      "after": {
+        "collections": [
+          "ID2KTFJG"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4103,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BKVH5CZF",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "IT4IVRVT"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "S94BVLDT"
+        ],
+        "tags": [
+          {
+            "tag": "dl/wavelet",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4104,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BLGV6ETR",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "MSKRR445"
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4106,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BLM4VHDK",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "HVRA5J27"
+        ]
+      },
+      "after": {
+        "collections": [
+          "7AI4CBF3"
+        ]
+      },
+      "expected_version": 450,
+      "observed_version": 4107,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BMCQ9EGX",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "MSKRR445"
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ]
+      },
+      "expected_version": 679,
+      "observed_version": 4108,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BPA5496S",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4109,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BPS5478A",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4110,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "BPUTFJ9F",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4111,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    }
+  ],
+  "error": null
+}

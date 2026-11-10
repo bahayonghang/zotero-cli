@@ -1,0 +1,1038 @@
+{
+  "schema_version": 1,
+  "plan_sha256": "7511853844bd341b0180cac30793beeddfe13e333a0911992b74847867106839",
+  "server_id": "2ZxitCcOtvOu",
+  "library": "user",
+  "state": "applied",
+  "started_at": "2026-11-10T05:08:14.659191900+00:00",
+  "updated_at": "2026-11-10T05:08:19.210027900+00:00",
+  "item_count": 40,
+  "applied_count": 40,
+  "unchanged_count": 0,
+  "failed_count": 0,
+  "unknown_count": 0,
+  "not_attempted_count": 0,
+  "items": [
+    {
+      "item_key": "N3G5ZYKA",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "5TM93XGJ"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "HU7D6CU9"
+        ],
+        "tags": [
+          {
+            "tag": "ts/fault",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4552,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N3TYQ4GX",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4553,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N4VKIV3G",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "EPGXDNU2"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "Reference"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "C929JUTG"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "Reference"
+          },
+          {
+            "tag": "opt/algorithms",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4554,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N5YADJYY",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "5PRLUYLC"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "5FFJS7PN"
+        ],
+        "tags": [
+          {
+            "tag": "dl/pinn",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4557,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N6BB9GXY",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "J4PNTSY2"
+        ]
+      },
+      "after": {
+        "collections": [
+          "UMQV286S"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4558,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N6CVJ4SK",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "WUB6KYIW"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/irregular",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4560,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N6SP79F6",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK",
+          "TUYBGNXG",
+          "QIQPCKMJ"
+        ]
+      },
+      "after": {
+        "collections": [
+          "TUYBGNXG",
+          "QIQPCKMJ",
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4561,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N7QGJ7RV",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "H25B6H67"
+        ],
+        "tags": [
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "Chinese_Interpretation",
+            "type": 1
+          },
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/representation",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4562,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N8NLRF36",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "HVRA5J27"
+        ]
+      },
+      "after": {
+        "collections": [
+          "7AI4CBF3"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4564,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N99AKHXA",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4565,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "N9LQ4HM9",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "BWZM9LW3",
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "BWZM9LW3",
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4566,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NA2PHKCM",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "J4PNTSY2"
+        ]
+      },
+      "after": {
+        "collections": [
+          "UMQV286S"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4567,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NAA9BFMP",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 3467,
+      "observed_version": 4568,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NDCB9PSS",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS",
+          "QIQPCKMJ"
+        ]
+      },
+      "after": {
+        "collections": [
+          "QIQPCKMJ",
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4569,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NFGRS6ZY",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "U5JATS34"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "ts/scn",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4571,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NH4KCYZ9",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4573,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NH9B99ZS",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "Z9BJ9QB5"
+        ]
+      },
+      "after": {
+        "collections": [
+          "ID2KTFJG"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4574,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NLNFZJZU",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "HVRA5J27"
+        ]
+      },
+      "after": {
+        "collections": [
+          "7AI4CBF3"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4575,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NM4J4PQ6",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4576,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NMGEYFXY",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4577,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NMRI4MBB",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4578,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NN67SK7P",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4579,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NP934N8V",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "WEUYPTDU",
+          "H25B6H67"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "WEUYPTDU",
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          },
+          {
+            "tag": "ts/representation",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4580,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NPCY9RQK",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "NSPIFD9R"
+        ],
+        "tags": [
+          {
+            "tag": "Reference"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "5FFJS7PN"
+        ],
+        "tags": [
+          {
+            "tag": "Reference"
+          },
+          {
+            "tag": "dl/multi-task",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4584,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NRQZJZGW",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "58QAX269"
+        ],
+        "tags": [
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ],
+        "tags": [
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/semi-supervised",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4585,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NRZADVIT",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4587,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NT5KTQD6",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4589,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NTCZBNVF",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "P5WKAC5Y"
+        ]
+      },
+      "after": {
+        "collections": [
+          "XRF5WWX2"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4590,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NTTFYI5T",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "J4PNTSY2"
+        ]
+      },
+      "after": {
+        "collections": [
+          "UMQV286S"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4591,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NUZGATTC",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "MSKRR445",
+          "3R2KZKPK"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y",
+          "WEUYPTDU"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "ts/wavelet",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4592,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NX8JC8PZ",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "WDQDMY6T"
+        ],
+        "tags": []
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "ts/feature-selection",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4595,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NXHTSWYT",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "MSKRR445"
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4596,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NXND566X",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4597,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NYSDJBQN",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4598,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "NZUI78FV",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "LV94LZEV"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "5FFJS7PN"
+        ],
+        "tags": [
+          {
+            "tag": "CodeAvailable"
+          },
+          {
+            "tag": "dl/rnn",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4600,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "P46RA6G8",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "93X55XEE"
+        ],
+        "tags": [
+          {
+            "tag": "/unread",
+            "type": 1
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "Z2YE4E6Y"
+        ],
+        "tags": [
+          {
+            "tag": "/unread",
+            "type": 1
+          },
+          {
+            "tag": "ts/interpretability",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 20,
+      "observed_version": 4602,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "P6N4JAUP",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZE3Z2YJK"
+        ]
+      },
+      "after": {
+        "collections": [
+          "U4ZWG29U"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4604,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "P6R9SS2F",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "ZME8XQMS"
+        ]
+      },
+      "after": {
+        "collections": [
+          "FQZ9GPPN"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4606,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "P6Z74HTL",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "5WELPTAY"
+        ]
+      },
+      "after": {
+        "collections": [
+          "HU7D6CU9"
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4607,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    },
+    {
+      "item_key": "P7PCNFQG",
+      "status": "applied",
+      "before": {
+        "collections": [
+          "2NXF6MY7"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "🤖️"
+          }
+        ]
+      },
+      "after": {
+        "collections": [
+          "AQVFMLX8"
+        ],
+        "tags": [
+          {
+            "tag": "📒"
+          },
+          {
+            "tag": "🤖️"
+          },
+          {
+            "tag": "ts/missing",
+            "type": 0
+          }
+        ]
+      },
+      "expected_version": 0,
+      "observed_version": 4609,
+      "write_accepted": true,
+      "verified": true,
+      "observed_expected_state": true,
+      "error": null
+    }
+  ],
+  "error": null
+}

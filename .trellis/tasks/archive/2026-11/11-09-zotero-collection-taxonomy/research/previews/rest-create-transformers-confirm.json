@@ -1,0 +1,45 @@
+{
+  "ok": true,
+  "data": {
+    "backend": "local",
+    "state": "applied",
+    "operation": "create-collection",
+    "server_id": "2ZxitCcOtvOu",
+    "library": "User",
+    "collection_key": "U4ZWG29U",
+    "name": "Transformers",
+    "parent_key": "Z2YE4E6Y",
+    "parent_name": "01Forecasting",
+    "path": [
+      {
+        "key": "EUKN35DS",
+        "name": "02_Area"
+      },
+      {
+        "key": "2LAXPFZB",
+        "name": "01ScientificResearch"
+      },
+      {
+        "key": "LJFSL4UY",
+        "name": "01TimeSeries"
+      },
+      {
+        "key": "Z2YE4E6Y",
+        "name": "01Forecasting"
+      }
+    ],
+    "expected_library_version": 3682,
+    "before": null,
+    "after": {
+      "name": "Transformers",
+      "parentCollection": "Z2YE4E6Y"
+    },
+    "write_accepted": true,
+    "verified": true,
+    "observed_expected_state": true,
+    "error": null
+  },
+  "meta": {
+    "api_version": 1
+  }
+}

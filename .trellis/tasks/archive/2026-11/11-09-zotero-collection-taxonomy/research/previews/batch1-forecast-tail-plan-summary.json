@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "data": {
+    "plan_path": "D:\\Documents\\Code\\CLI\\zotero-cli\\.trellis\\tasks\\11-09-zotero-collection-taxonomy\\research\\previews\\batch1-forecast-tail-plan.json",
+    "plan_sha256": "88c7e7054c593c90a75572597b059f94e16d297945444ee8d4937077dd438265",
+    "server_id": "2ZxitCcOtvOu",
+    "library": "user",
+    "max_affected": 50,
+    "item_count": 39,
+    "action_count": 78,
+    "changed_count": 39,
+    "unchanged_count": 0
+  },
+  "meta": {
+    "api_version": 1
+  }
+}

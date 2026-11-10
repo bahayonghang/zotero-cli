@@ -1,0 +1,118 @@
+{
+  "ok": true,
+  "data": {
+    "annotation_support": {
+      "annotation_creation": false,
+      "pdf_outline": true
+    },
+    "better_bibtex": {
+      "available": true
+    },
+    "capabilities": {
+      "connector_write": {
+        "available": true,
+        "configured": true,
+        "scope": "import-only"
+      },
+      "desktop_read": {
+        "api_version": "3",
+        "available": true,
+        "item_read_verified": false,
+        "next": "item get, item children, item pdf, library search, and library citekey can read the running Zotero. A reachable probe is not an item or PDF read. Pass --running-zotero when a profile or explicit data directory is not proved.",
+        "pdf_read_verified": false,
+        "reachable": true,
+        "zotero_version": "10.0.8"
+      },
+      "local_api_write": {
+        "api_version": "3",
+        "credential_error": null,
+        "credential_present": true,
+        "reachable": true,
+        "reason": "read-only probe; authorization and writes not tested",
+        "schema_version": "44",
+        "server_id": "2ZxitCcOtvOu",
+        "supported": true,
+        "verified": false,
+        "zotero_version": "10.0.8"
+      },
+      "local_http_read": {
+        "available": true,
+        "configured": true,
+        "connector_api_version": "3",
+        "zotero_version": "10.0.8"
+      },
+      "local_sqlite_read": {
+        "available": false,
+        "configured": true,
+        "error": {
+          "code": "zotero-db-busy",
+          "hint": "Close Zotero or wait for its database write to finish, then retry",
+          "message": "Timed out while creating a consistent Zotero database snapshot"
+        }
+      },
+      "sqlite_snapshot": {
+        "available": false,
+        "error": {
+          "code": "zotero-db-busy",
+          "hint": "Close Zotero or wait for its database write to finish, then retry",
+          "message": "Timed out while creating a consistent Zotero database snapshot"
+        },
+        "item_read_verified": false,
+        "next": "Close Zotero before a snapshot read.",
+        "pdf_read_verified": false
+      },
+      "web_write": {
+        "checked": "credentials-only",
+        "configured": false,
+        "hint": "Run `zot config init` or set ZOT_LIBRARY_ID and ZOT_API_KEY for Web API writes",
+        "last_error": null,
+        "permissions": null,
+        "verified": false
+      }
+    },
+    "config_file": "C:\\Users\\lyh\\AppData\\Roaming\\zot\\config.toml",
+    "data_dir": "C:\\Users\\lyh\\Zotero",
+    "db_exists": true,
+    "embedding": {
+      "configured": false,
+      "model": "jina-embeddings-v3",
+      "url": "https://api.jina.ai/v1/embeddings"
+    },
+    "libraries": {
+      "count": 0,
+      "feeds_available": false
+    },
+    "migration_hints": [
+      "Zot Bridge has been removed: delete the desktop_bridge and write_backend entries from the config file, then uninstall Zot Bridge from Zotero's plugin manager."
+    ],
+    "pdf_backend": {
+      "auto_download_supported": true,
+      "available": true,
+      "cached": true,
+      "note": "Pdfium is ready for local PDF reads."
+    },
+    "schema_version": null,
+    "semantic_index": {
+      "chunks_with_embeddings": 0,
+      "exists": true,
+      "indexed_chunks": 200,
+      "indexed_items": 200,
+      "last_indexed_at": "2026-04-15T15:58:00.344258300+00:00",
+      "path": "C:\\Users\\lyh\\AppData\\Roaming\\zot\\indexes\\user.idx.sqlite"
+    },
+    "semantic_scholar": {
+      "configured": false
+    },
+    "write_credentials": {
+      "api_key": "(missing)",
+      "configured": false,
+      "library_id": "(missing)",
+      "note": "Optional for local reads; required only for Zotero Web API writes.",
+      "required_for_local_read": false,
+      "required_for_remote_write": true
+    }
+  },
+  "meta": {
+    "api_version": 1
+  }
+}
