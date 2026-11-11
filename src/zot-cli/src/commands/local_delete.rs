@@ -328,12 +328,16 @@ async fn execute(
         Some(key) => key,
         None => authorize(client, &server, credential_path, profile).await?,
     };
+    // A new child does not bump the parent object version, so the descendant
+    // key set is read again immediately before DELETE. The 401 retry authorizes
+    // again and must re-read too.
+    let mut version = confirm_live_descendants(client, &report, args).await?;
     let mut receipt = client
         .delete_collection(
             &server,
             &report.library,
             &report.collection_key,
-            report.version,
+            version,
             &key,
         )
         .await;
@@ -346,12 +350,13 @@ async fn execute(
     ) {
         local_credentials::save(credential_path, profile, &server, None)?;
         key = authorize(client, &server, credential_path, profile).await?;
+        version = confirm_live_descendants(client, &report, args).await?;
         receipt = client
             .delete_collection(
                 &server,
                 &report.library,
                 &report.collection_key,
-                report.version,
+                version,
                 &key,
             )
             .await;
@@ -381,6 +386,24 @@ async fn execute(
         }
     }
     Ok(report)
+}
+
+async fn confirm_live_descendants(
+    client: &LocalApiClient,
+    report: &CollectionDeleteReport,
+    args: &LocalDeleteArgs,
+) -> ZotResult<u64> {
+    let snapshot = client
+        .collection_snapshot(&report.server_id, &report.library)
+        .await?;
+    let (target, descendants) = descendant_tree(&snapshot, &report.collection_key)?;
+    let descendants_sha256 = descendants_sha256(&descendants);
+    require_version(args.expected_version, target.version)?;
+    require_descendant_hash(
+        args.expected_descendants_sha256.as_deref(),
+        &descendants_sha256,
+    )?;
+    Ok(target.version)
 }
 
 async fn verify_absent(client: &LocalApiClient, report: &mut CollectionDeleteReport) {

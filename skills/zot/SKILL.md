@@ -50,7 +50,7 @@ description: 当用户要直接查询、提取、整理或安全更新本机已�
 - 用户只是查看、分析或评估时，不写 Zotero。
 - 预览不是完成。未带确认参数的 merge、dedupe、batch、import 和 status sync 都还没改库。
 - 确认参数必须来自同一次预览，并保持同一输入、过滤器和目标。目标、版本、hash、scope 或 profile 变化时重新预览。
-- 本地 `collection delete` 的确认必须同时带同一次预览的 Server ID、分类对象 version 和子孙 SHA-256。有子分类时先说明它们会被永久删除，文献仍留在库里。Zotero 10.0.8 的分类列表不含废纸篓中的子分类，预览和哈希也看不到它们，但这次删除仍会永久擦除它们。不要替用户点击授权框。
+- 本地 `collection delete` 的确认必须同时带同一次预览的 Server ID、分类对象 version 和子孙 SHA-256。每次 DELETE 前会再读分类列表；父分类 version 未变但子孙 key 变了就拒绝，不发送 DELETE。有子分类时先说明它们会被永久删除，文献仍留在库里。Zotero 10.0.8 的分类列表不含废纸篓中的子分类，预览和哈希也看不到它们，但这次删除仍会永久擦除它们。不要替用户点击授权框。
 - low-confidence 默认跳过。普通 confirm 不是授权，不能自行追加 `--include-low-confidence`。
 - 批量写入先看影响范围，默认不超过 50 条。超过时必须显式提高上限并重新审阅。部分失败不能说成全部成功。
 - 权限缺失、目标只读或路径不支持该 mutation 时停在只读说明。不改走另一条后端，不直接写 `zotero.sqlite`。

@@ -113,7 +113,7 @@
 
 1. 先 doctor。key 必须是八位大写字母或数字。不要猜 key，也不要读 Web 凭据来完成本地路径。
 2. 预览不读取授权、不 DELETE、不打开 `zotero.sqlite`。它列出 Local API 分类列表返回的目标分类和全部子孙分类；响应里带 `deleted` 时，这些子孙进入列表和哈希。Zotero 10.0.8 的 `GET /collections` 不返回已在废纸篓中的分类，也不识别 `includeTrashed`，所以它们不会出现在预览或哈希里。确认后的 DELETE 仍会把这些未列出的子分类和目标一起永久擦除。子分类不会提升到父级。文献留在库里，只失去这些分类的成员关系。
-3. 用户认可后，保持同一 key，并增加 `--confirm --expected-server-id <预览值> --expected-version <预览中的分类对象 version> --expected-descendants-sha256 <预览值>`。版本是分类对象版本，不是库版本。只有预览返回 0 时才能确认 0，不要自行填 0。Server ID、对象版本或子孙哈希任一不符就拒绝，不授权、不删除。不要替用户点击授权框。
+3. 用户认可后，保持同一 key，并增加 `--confirm --expected-server-id <预览值> --expected-version <预览中的分类对象 version> --expected-descendants-sha256 <预览值>`。版本是分类对象版本，不是库版本。只有预览返回 0 时才能确认 0，不要自行填 0。和命令开始时读到的快照不符，就在授权前拒绝，不删除。授权完成后，以及 401 后重新授权再删除之前，再读一次分类列表。新建子分类不会提高父分类 version，所以不能只靠 `If-Unmodified-Since-Version`。这次读到的对象 version 或子孙 key 集合和确认参数不一致就拒绝，不发送 DELETE。不要替用户点击授权框。
 4. 只有 DELETE 返回 204 且 Server ID 一致，随后 GET 404，才是 `applied` 且 `verified=true`。HTTP 200、超时、5xx 或 Server ID 不符是 `unknown`。204 之后对象仍在是 `verification-failed`。DELETE 本身 404 是 `absent`，这次调用没有删除它。`unknown` 之后的 404 不能改记为这次删除成功。这些非成功状态即使 envelope `ok: true` 也不是成功，退出码非 0；只看 `state` 与 `verified`，不得盲重试。
 
 ## 安全门

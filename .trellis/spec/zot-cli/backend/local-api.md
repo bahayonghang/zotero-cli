@@ -96,8 +96,15 @@ uppercase ASCII letters/digits. Group IDs are public IDs from `LibraryScope`.
   byte string. Confirmation requires the preview's Server ID, collection
   object version (zero only when that preview returned zero), and descendant
   hash. A library version is display-only. Server or version mismatch is
-  `local-api-conflict`; hash mismatch is `local-delete-descendants`. Both
-  refuse before auth and before DELETE.
+  `local-api-conflict`; hash mismatch is `local-delete-descendants`. A mismatch
+  against the snapshot read at the start of the command refuses before
+  authorization and before DELETE. Immediately before every DELETE, including
+  the single 401 retry, read the collection list again and recheck the
+  collection object version and descendant key hash. A new child does not
+  change the parent object version, so `If-Unmodified-Since-Version` does not
+  cover it. A mismatch on that later read uses the same codes and does not
+  send DELETE. Authorization may already have completed. That read is not
+  atomic with DELETE.
   One `DELETE .../collections/KEY` sends the API key, Server ID, and
   `If-Unmodified-Since-Version`, with no body, query, or write token.
   Descendant collections are permanently erased with the target, including
@@ -190,7 +197,7 @@ uppercase ASCII letters/digits. Group IDs are public IDs from `LibraryScope`.
 | Report save fails before submission | current and remaining items not-attempted; non-zero exit |
 | Report save fails after submission/finalization | known stdout results retained + report error; disk may remain in-flight; non-zero exit |
 | Collection POST buckets conflict or contain malformed/extra indexes | unknown; never claim success or resend |
-| Local collection delete hash/server/version mismatch | `local-delete-descendants` or `local-api-conflict`, before auth and DELETE |
+| Local collection delete hash/server/version mismatch | `local-delete-descendants` or `local-api-conflict`, before DELETE; the opening snapshot mismatch is also before auth |
 | DELETE 204 with the same Server ID, then GET 404 | `applied`, verified true |
 | DELETE HTTP 200, timeout, 5xx, or mismatched Server ID | `unknown`; do not GET and then claim success |
 | DELETE 404 | `absent`; this call did not delete the object |

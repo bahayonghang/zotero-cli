@@ -481,6 +481,7 @@ async fn confirmed_delete_applies_only_after_matching_204_and_get_404() {
         (200, Value::Null, None),
         (200, list_body(), Some(99)),
         (200, json!({"key": "test-secret", "remember": false}), None),
+        (200, list_body(), Some(99)),
         (204, Value::Null, None),
         (404, Value::Null, None),
     ]);
@@ -549,6 +550,7 @@ async fn confirmed_delete_applies_only_after_matching_204_and_get_404() {
         (200, Value::Null, None),
         (200, list_body(), Some(99)),
         (200, json!({"key": "test-secret", "remember": false}), None),
+        (200, list_body(), Some(99)),
         (204, Value::Null, None),
         (
             200,
@@ -589,6 +591,7 @@ async fn unknown_delete_does_not_become_applied_when_a_later_404_is_available() 
         (200, Value::Null, None),
         (200, list_body(), Some(99)),
         (200, json!({"key": "test-secret", "remember": false}), None),
+        (200, list_body(), Some(99)),
         (500, Value::Null, None),
     ];
     let handle = std::thread::spawn(move || {
@@ -650,6 +653,11 @@ async fn version_zero_can_confirm_and_absent_or_conflict_are_not_unknown() {
             Some(12),
         ),
         (200, json!({"key": "test-secret", "remember": false}), None),
+        (
+            200,
+            json!([object("COLL0001", 0, "Root", Value::Bool(false), false)]),
+            Some(12),
+        ),
         (204, Value::Null, None),
         (404, Value::Null, None),
     ]);
@@ -690,6 +698,11 @@ async fn version_zero_can_confirm_and_absent_or_conflict_are_not_unknown() {
             Some(12),
         ),
         (200, json!({"key": "test-secret", "remember": false}), None),
+        (
+            200,
+            json!([object("COLL0001", 0, "Root", Value::Bool(false), false)]),
+            Some(12),
+        ),
         (404, Value::Null, None),
     ]);
     let report = plan(&client, &LibraryScope::User, &request)
@@ -731,6 +744,11 @@ async fn version_zero_can_confirm_and_absent_or_conflict_are_not_unknown() {
             Some(12),
         ),
         (200, json!({"key": "test-secret", "remember": false}), None),
+        (
+            200,
+            json!([object("COLL0001", 0, "Root", Value::Bool(false), false)]),
+            Some(12),
+        ),
         (412, Value::Null, None),
     ]);
     let report = plan(&client, &LibraryScope::User, &request)
@@ -760,8 +778,18 @@ async fn expired_delete_key_reauthorizes_once() {
             json!([object("COLL0001", 0, "Root", Value::Bool(false), false)]),
             Some(12),
         ),
+        (
+            200,
+            json!([object("COLL0001", 0, "Root", Value::Bool(false), false)]),
+            Some(12),
+        ),
         (401, Value::Null, None),
         (200, json!({"key": "new-secret", "remember": false}), None),
+        (
+            200,
+            json!([object("COLL0001", 0, "Root", Value::Bool(false), false)]),
+            Some(12),
+        ),
         (204, Value::Null, None),
         (404, Value::Null, None),
     ]);
@@ -796,6 +824,77 @@ async fn expired_delete_key_reauthorizes_once() {
             .expect("json")
             .contains("new-secret")
     );
+}
+
+fn list_with_new_child() -> Value {
+    let mut body = list_body();
+    body.as_array_mut().expect("list").push(object(
+        "NEWCHILD",
+        1,
+        "Added later",
+        json!("COLL0001"),
+        false,
+    ));
+    body
+}
+
+#[tokio::test]
+async fn live_descendant_or_version_change_refuses_before_delete() {
+    let hash = sorted_hash();
+    let (client, handle) = server(vec![
+        (200, Value::Null, None),
+        (200, list_body(), Some(99)),
+        (200, json!({"key": "test-secret", "remember": false}), None),
+        (200, list_with_new_child(), Some(100)),
+    ]);
+    let dir = tempfile::tempdir().expect("temp");
+    let request = args(true, 4, &hash);
+    let report = plan(&client, &LibraryScope::User, &request)
+        .await
+        .expect("plan");
+    let error = execute(
+        &client,
+        report,
+        &request.write,
+        &dir.path().join("keys"),
+        None,
+    )
+    .await
+    .expect_err("new child");
+    assert_eq!(error.payload().code, "local-delete-descendants");
+    let requests = handle.join().expect("join");
+    assert_eq!(deletes(&requests), 0);
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|request| request.path.ends_with("authorize"))
+            .count(),
+        1
+    );
+
+    let mut bumped = list_body();
+    bumped.as_array_mut().expect("list")[0]["version"] = json!(5);
+    bumped.as_array_mut().expect("list")[0]["data"]["version"] = json!(5);
+    let (client, handle) = server(vec![
+        (200, Value::Null, None),
+        (200, list_body(), Some(99)),
+        (200, json!({"key": "test-secret", "remember": false}), None),
+        (200, bumped, Some(100)),
+    ]);
+    let report = plan(&client, &LibraryScope::User, &request)
+        .await
+        .expect("plan");
+    let error = execute(
+        &client,
+        report,
+        &request.write,
+        &dir.path().join("version"),
+        None,
+    )
+    .await
+    .expect_err("version");
+    assert_eq!(error.payload().code, "local-api-conflict");
+    assert_eq!(deletes(&handle.join().expect("join")), 0);
 }
 
 #[tokio::test]

@@ -57,7 +57,7 @@ POST 是单元素数组，只含 name 和 parentCollection，并带实例 ID 与
 zot --json collection delete COLL0001 --write-backend local --confirm --expected-server-id <server_id> --expected-version <version> --expected-descendants-sha256 <sha256>
 ```
 
-预览列出 Local API 分类列表返回的目标分类和全部子孙分类，并给出按 key 排序后的子孙集合 SHA-256。响应里带 `deleted` 时，这些子孙会计入列表和哈希。Zotero 10.0.8 的 `GET /collections` 不返回已在废纸篓中的分类，也不识别 `includeTrashed`，所以它们不会出现在预览或哈希里；本命令不打开 SQLite 去补齐。确认绑定的是分类对象 version，不是库版本；预览里的 0 可以确认，不要自行填 0。Server ID、对象版本或子孙哈希任一不符就拒绝，不会授权或删除。
+预览列出 Local API 分类列表返回的目标分类和全部子孙分类，并给出按 key 排序后的子孙集合 SHA-256。响应里带 `deleted` 时，这些子孙会计入列表和哈希。Zotero 10.0.8 的 `GET /collections` 不返回已在废纸篓中的分类，也不识别 `includeTrashed`，所以它们不会出现在预览或哈希里；本命令不打开 SQLite 去补齐。确认绑定的是分类对象 version，不是库版本；预览里的 0 可以确认，不要自行填 0。和命令开始时的快照不符，会在授权前拒绝。每次发送 DELETE 之前，包括授权之后和 401 后重试之前，都会再读一次分类列表。新建子分类不会改变父分类的对象 version，因此不能只靠 `If-Unmodified-Since-Version`。这次读到的对象 version 或子孙 key 集合和确认参数不一致就拒绝，不发送 DELETE。读列表和 DELETE 之间仍有极短间隔。
 
 删除会永久擦除该分类和每一个子孙分类，包括列表里看不到的废纸篓子分类，不会把子分类提升到父级。文献留在库里，只失去这些分类的成员关系。只发送这一把 key 的 DELETE，不调用批量删除。
 

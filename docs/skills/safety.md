@@ -58,7 +58,7 @@
 ## 读写边界
 
 - 本地读：`zotero.sqlite`、Zotero Local HTTP、附件 storage、本地索引 sidecar
-- Local API 写：字段/作者补充、分类创建/添加/移除/移动、单 key `collection delete`、单条 `item tag add/remove`；仅 `--write-backend local --confirm` 会写库。本地删除的确认还必须带同一次预览的 Server ID、分类对象 version 和子孙 SHA-256；子分类会被永久删除，文献仍留在库里，只失去这些成员关系。Zotero 10.0.8 的分类列表不含废纸篓子分类，哈希看不到它们，但删除仍会擦掉。不要替用户点击授权框
+- Local API 写：字段/作者补充、分类创建/添加/移除/移动、单 key `collection delete`、单条 `item tag add/remove`；仅 `--write-backend local --confirm` 会写库。本地删除的确认还必须带同一次预览的 Server ID、分类对象 version 和子孙 SHA-256，并且每次 DELETE 前再核对一次；子分类会被永久删除，文献仍留在库里，只失去这些成员关系。Zotero 10.0.8 的分类列表不含废纸篓子分类，哈希看不到它们，但删除仍会擦掉。不要替用户点击授权框
 - connector 写：只新增导入 BibTeX/RIS，且确认前重新检查 Zotero UI 当前目标可写
 - Web 写：merge/dedupe、note、未指定 local 的 tag add/remove、`item tag batch`、未指定 local 的 collection 变更（含重命名、重挂父级，以及不带 `--write-backend local` 的删除）、Web import、annotation、saved-search、status-sync
 
