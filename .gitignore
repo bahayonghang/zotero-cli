@@ -24,3 +24,6 @@ skills-lock.json
 task_plan.md
 findings.md
 progress.md
+
+# Local Zotero library snapshots. They contain titles, item keys, collection keys, and machine paths.
+.trellis/tasks/**/research/previews/

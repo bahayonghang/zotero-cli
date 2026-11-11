@@ -6,7 +6,7 @@
 
 ## Confirmed facts
 
-证据来自 2026-11-10 的 SQLite 快照，命令是 `zot --json doctor`、`collection list`、`library stats`、`library tags`、`library list --limit 2500`、`library search --title`。`library list` 与标题检索的 `meta.read_source` 为 `snapshot`。当时 Local API 与 connector 都不可达，Web API 凭据未配置。数据目录是 `C:\Users\lyh\Zotero`，配置文件是 `C:\Users\lyh\AppData\Roaming\zot\config.toml`，schema 131。快照源文件修改时间 `2026-11-10T03:12:55Z`。
+证据来自 2026-11-10 的 SQLite 快照，命令是 `zot --json doctor`、`collection list`、`library stats`、`library tags`、`library list --limit 2500`、`library search --title`。`library list` 与标题检索的 `meta.read_source` 为 `snapshot`。当时 Local API 与 connector 都不可达，Web API 凭据未配置。数据目录是本机 Zotero 数据目录，配置文件是本机 `%AppData%\zot\config.toml`，schema 131。快照源文件修改时间 `2026-11-10T03:12:55Z`。
 
 截图里 Forecasting 可见子类的侧边栏数字与快照一致。侧边栏 My Library 显示 1797。快照统计的非附件、非笔记顶层条目是 1793。差 4 条，原因未再拆。
 

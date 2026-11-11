@@ -6,8 +6,8 @@
 
 `zot --json doctor`：
 
-- `data_dir`: `C:\Users\lyh\Zotero`
-- `config_file`: `C:\Users\lyh\AppData\Roaming\zot\config.toml`
+- `data_dir`: 本机 Zotero 数据目录
+- `config_file`: 本机 `%AppData%\zot\config.toml`
 - `schema_version`: 131
 - `local_sqlite_read.snapshot.source_modified_at`: `2026-11-10T03:12:55.219736100Z`
 - `local_sqlite_read.snapshot.snapshot_created_at`: `2026-11-10T03:14:56.690966700Z`
